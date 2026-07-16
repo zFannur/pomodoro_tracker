@@ -136,6 +136,8 @@ abstract final class S {
   static const statTime = 'Время';
   static const statStreak = 'Серия дней';
   static const statBestDay = 'Лучший день';
+  static const statFrog = '🐸 Лягушки';
+  static const statFrogHint = 'дней, где сделал главное';
   static const statByCategory = 'По категориям';
   static const statLast14 = 'Последние 14 дней';
   static const statHeatmap = 'Карта активности';

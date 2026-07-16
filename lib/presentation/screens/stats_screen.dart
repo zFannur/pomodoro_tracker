@@ -113,6 +113,15 @@ class _StatsBody extends StatelessWidget {
                   const SizedBox(width: 8),
                   StatTile(label: S.statFocus, value: '${state.periodFocus}%'),
                   const SizedBox(width: 8),
+                  // Мягкая стата: дней с лягушкой из активных дней. Без стрика —
+                  // «текущей серии» здесь намеренно нет.
+                  StatTile(
+                    label: S.statFrog,
+                    value: state.activeDays == 0
+                        ? '—'
+                        : '${state.frogDays} / ${state.activeDays}',
+                  ),
+                  const SizedBox(width: 8),
                   // ponytail: плитки «Серия дней» нет сознательно — рваный стрик
                   // кормит самокритику (см. систему фокуса пользователя).
                   StatTile(

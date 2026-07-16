@@ -327,6 +327,7 @@ class TasksCubit extends Cubit<TasksState> {
       delayMs: 0,
       interruptions: 0,
       manual: true,
+      frog: task.frog,
     );
   }
 
@@ -459,6 +460,7 @@ class TasksCubit extends Cubit<TasksState> {
       interruptions: result.interruptions,
       manual: false,
       startedAt: result.startedAt,
+      frog: current?.frog ?? false,
     );
     if (state.todo.isEmpty && current != null) {
       await _notify.event(settings, title: S.appTitle, body: S.todoEmptyDone);
@@ -475,6 +477,7 @@ class TasksCubit extends Cubit<TasksState> {
     required int interruptions,
     required bool manual,
     DateTime? startedAt,
+    bool frog = false,
   }) async {
     final settings = _settings();
     final now = DateTime.now();
@@ -518,6 +521,7 @@ class TasksCubit extends Cubit<TasksState> {
       delayMinutes: delayMin,
       interruptions: interruptions,
       manual: manual,
+      frog: frog,
     );
     final writeResult = await _journal.addSession(session, settings.dailyGoal);
     writeResult.match(

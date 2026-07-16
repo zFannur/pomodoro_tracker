@@ -209,7 +209,7 @@ String serializeDayLog(DayLog log) {
     buf.write(
       '| ${two(s.start.hour)}:${two(s.start.minute)} | ${s.minutes} '
       '| ${s.delayMinutes} | ${s.interruptions} '
-      '| ${_cell(s.category)} | ${_cell(s.task)} '
+      '| ${_cell(s.category)} | ${s.frog ? '🐸 ' : ''}${_cell(s.task)} '
       '| ${s.manual ? _manualMark : _timerMark} |\n',
     );
   }
@@ -245,6 +245,10 @@ DayLog parseDayLog(String content, DateTime date, int fallbackGoal) {
     final m = _rowRe.firstMatch(line.trim());
     if (m == null) continue;
     final hour = int.parse(m.group(1)!);
+    // 🐸-префикс в задаче = помидор над лягушкой дня.
+    var task = _uncell(m.group(7)!.trim());
+    final frog = task.startsWith('🐸');
+    if (frog) task = task.replaceFirst('🐸', '').trim();
     // День 05:00–05:00: часы 0–4 принадлежат следующей календарной дате.
     sessions.add(
       PomoSession(
@@ -259,8 +263,9 @@ DayLog parseDayLog(String content, DateTime date, int fallbackGoal) {
         delayMinutes: int.parse(m.group(4)!),
         interruptions: int.parse(m.group(5)!),
         category: _uncell(m.group(6)!.trim()),
-        task: _uncell(m.group(7)!.trim()),
+        task: task,
         manual: m.group(8)!.trim() == _manualMark,
+        frog: frog,
       ),
     );
   }

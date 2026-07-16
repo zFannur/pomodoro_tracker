@@ -26,12 +26,19 @@ void main() {
     });
 
     test('пересчёт минут в помидоры: ceil, минимум 1', () {
-      const task = PomoTask(description: 'X', category: 'y', durationMinutes: 26);
+      const task = PomoTask(
+        description: 'X',
+        category: 'y',
+        durationMinutes: 26,
+      );
       expect(task.pomos(25), 2);
       expect(task.pomos(50), 1);
       expect(
-        const PomoTask(description: 'X', category: 'y', durationMinutes: 12)
-            .pomos(25),
+        const PomoTask(
+          description: 'X',
+          category: 'y',
+          durationMinutes: 12,
+        ).pomos(25),
         1,
       );
     });
@@ -39,11 +46,11 @@ void main() {
     test('вкладка планировщика по сроку', () {
       final now = DateTime(2026, 7, 16); // четверг
       PomoTask withDue(DateTime? due) => PomoTask(
-            description: 'X',
-            category: 'y',
-            durationMinutes: 25,
-            due: due,
-          );
+        description: 'X',
+        category: 'y',
+        durationMinutes: 25,
+        due: due,
+      );
       expect(withDue(null).tab(now), PlannerTab.inbox);
       // Просроченное — во «Входящие».
       expect(withDue(DateTime(2026, 7, 15)).tab(now), PlannerTab.inbox);
@@ -69,8 +76,16 @@ void main() {
     test('round-trip: Сегодня + Планировщик', () {
       final file = TasksFile(
         todo: [
-          const PomoTask(description: 'A', category: 'работа', durationMinutes: 75),
-          const PomoTask(description: 'B', category: 'личное', durationMinutes: 12),
+          const PomoTask(
+            description: 'A',
+            category: 'работа',
+            durationMinutes: 75,
+          ),
+          const PomoTask(
+            description: 'B',
+            category: 'личное',
+            durationMinutes: 12,
+          ),
         ],
         planner: [
           PomoTask(
@@ -79,7 +94,11 @@ void main() {
             durationMinutes: 25,
             due: DateTime(2026, 7, 17),
           ),
-          const PomoTask(description: 'D', category: 'учёба', durationMinutes: 25),
+          const PomoTask(
+            description: 'D',
+            category: 'учёба',
+            durationMinutes: 25,
+          ),
         ],
       );
       final parsed = parseTasksFile(serializeTasksFile(file));
@@ -99,6 +118,7 @@ void main() {
             minutes: 25,
             category: 'работа',
             task: 'Код-ревью',
+            frog: true,
           ),
           PomoSession(
             start: DateTime(2026, 7, 16, 10, 5),
@@ -128,6 +148,11 @@ void main() {
       expect(parsed.sessions[2].start.hour, 0);
       // «|» в тексте задачи не ломает таблицу и восстанавливается обратно.
       expect(parsed.sessions[1].task, 'Английский | Duolingo');
+      // 🐸-флаг лягушки переживает round-trip, а не-лягушки — нет.
+      expect(parsed.sessions[0].frog, isTrue);
+      expect(parsed.sessions[0].task, 'Код-ревью');
+      expect(parsed.sessions[1].frog, isFalse);
+      expect(parsed.hasFrog, isTrue);
     });
 
     test('пустой день — фокус 0 (как в оригинале)', () {
@@ -140,14 +165,24 @@ void main() {
   group('формула фокуса', () {
     test('без простоев и прерываний — 100%', () {
       expect(
-        focusPercent(amount: 4, minutes: 100, delayMinutes: 0, interruptions: 0),
+        focusPercent(
+          amount: 4,
+          minutes: 100,
+          delayMinutes: 0,
+          interruptions: 0,
+        ),
         100,
       );
     });
 
     test('простой = половина работы → 75%', () {
       expect(
-        focusPercent(amount: 4, minutes: 100, delayMinutes: 50, interruptions: 0),
+        focusPercent(
+          amount: 4,
+          minutes: 100,
+          delayMinutes: 50,
+          interruptions: 0,
+        ),
         75,
       );
     });
@@ -215,7 +250,12 @@ void main() {
           ),
         ],
       );
-      final parsed = parseSprint(content, '2026-W29', DateTime(2026, 7, 13), 10);
+      final parsed = parseSprint(
+        content,
+        '2026-W29',
+        DateTime(2026, 7, 13),
+        10,
+      );
       expect(parsed.goal, 40);
       expect(parsed.milestone, sprint.milestone);
       expect(parsed.doneWeek, sprint.doneWeek);

@@ -983,7 +983,7 @@ class _DoneRow extends StatelessWidget {
           ? const SizedBox(width: 8)
           : CategoryChip(entry.category),
       title: Text(
-        entry.task.isEmpty ? '—' : entry.task,
+        '${entry.frog ? '🐸 ' : ''}${entry.task.isEmpty ? '—' : entry.task}',
         style: theme.textTheme.bodyMedium,
       ),
       onTap: () => _edit(context, cubit),

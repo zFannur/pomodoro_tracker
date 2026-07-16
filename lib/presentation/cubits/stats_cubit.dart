@@ -57,6 +57,12 @@ class StatsState extends Equatable {
     return best;
   }
 
+  /// Дней в периоде, где ты работал над лягушкой (сделал главное).
+  int get frogDays => periodDays.where((d) => d.hasFrog).length;
+
+  /// Активных дней в периоде (хотя бы один помидор) — знаменатель для 🐸.
+  int get activeDays => periodDays.where((d) => d.count > 0).length;
+
   Map<String, int> get byCategory {
     final result = <String, int>{};
     for (final day in periodDays) {

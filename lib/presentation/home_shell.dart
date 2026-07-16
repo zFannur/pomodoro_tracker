@@ -116,7 +116,11 @@ class _HomeShellState extends State<HomeShell> {
               onDestinationSelected: (i) => setState(() => _index = i),
               leading: Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 12),
-                child: Image.asset('assets/nav/logo.png', width: 34, height: 34),
+                child: Image.asset(
+                  'assets/nav/logo.png',
+                  width: 34,
+                  height: 34,
+                ),
               ),
               trailing: Expanded(
                 child: Align(
@@ -134,17 +138,26 @@ class _HomeShellState extends State<HomeShell> {
               destinations: [
                 NavigationRailDestination(
                   icon: _navIcon('assets/nav/timer.png', selected: false),
-                  selectedIcon: _navIcon('assets/nav/timer.png', selected: true),
+                  selectedIcon: _navIcon(
+                    'assets/nav/timer.png',
+                    selected: true,
+                  ),
                   label: const Text(S.navTimer),
                 ),
                 NavigationRailDestination(
                   icon: _navIcon('assets/nav/sprint.png', selected: false),
-                  selectedIcon: _navIcon('assets/nav/sprint.png', selected: true),
+                  selectedIcon: _navIcon(
+                    'assets/nav/sprint.png',
+                    selected: true,
+                  ),
                   label: const Text(S.navSprint),
                 ),
                 NavigationRailDestination(
                   icon: _navIcon('assets/nav/stats.png', selected: false),
-                  selectedIcon: _navIcon('assets/nav/stats.png', selected: true),
+                  selectedIcon: _navIcon(
+                    'assets/nav/stats.png',
+                    selected: true,
+                  ),
                   label: const Text(S.navStats),
                 ),
               ],

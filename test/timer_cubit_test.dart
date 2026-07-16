@@ -192,17 +192,20 @@ void main() {
   });
 
   test('умный ввод разбирается на категорию, описание и помидоры', () {
-    expect(
-      parseSmartInput('#работа Код-ревью PR ~4'),
-      (category: 'работа', description: 'Код-ревью PR', pomos: 4),
-    );
-    expect(
-      parseSmartInput('Просто текст ::2'),
-      (category: null, description: 'Просто текст', pomos: 2),
-    );
-    expect(
-      parseSmartInput('Без всего'),
-      (category: null, description: 'Без всего', pomos: null),
-    );
+    expect(parseSmartInput('#работа Код-ревью PR ~4'), (
+      category: 'работа',
+      description: 'Код-ревью PR',
+      pomos: 4,
+    ));
+    expect(parseSmartInput('Просто текст ::2'), (
+      category: null,
+      description: 'Просто текст',
+      pomos: 2,
+    ));
+    expect(parseSmartInput('Без всего'), (
+      category: null,
+      description: 'Без всего',
+      pomos: null,
+    ));
   });
 }

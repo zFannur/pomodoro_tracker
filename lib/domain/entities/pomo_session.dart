@@ -12,6 +12,7 @@ class PomoSession extends Equatable {
     this.delayMinutes = 0,
     this.interruptions = 0,
     this.manual = false,
+    this.frog = false,
   });
 
   final DateTime start;
@@ -29,6 +30,9 @@ class PomoSession extends Equatable {
   /// (аналог флага suspicious в оригинале).
   final bool manual;
 
+  /// Помидор работал над 🐸-задачей дня — для мягкой статы «сделал главное».
+  final bool frog;
+
   PomoSession copyWith({
     DateTime? start,
     int? minutes,
@@ -37,6 +41,7 @@ class PomoSession extends Equatable {
     int? delayMinutes,
     int? interruptions,
     bool? manual,
+    bool? frog,
   }) {
     return PomoSession(
       start: start ?? this.start,
@@ -46,6 +51,7 @@ class PomoSession extends Equatable {
       delayMinutes: delayMinutes ?? this.delayMinutes,
       interruptions: interruptions ?? this.interruptions,
       manual: manual ?? this.manual,
+      frog: frog ?? this.frog,
     );
   }
 
@@ -58,6 +64,7 @@ class PomoSession extends Equatable {
     delayMinutes,
     interruptions,
     manual,
+    frog,
   ];
 }
 
@@ -99,6 +106,9 @@ class DayLog extends Equatable {
   final List<String> notes;
 
   int get count => sessions.length;
+
+  /// В этот день работали над 🐸-задачей (сделал главное).
+  bool get hasFrog => sessions.any((s) => s.frog);
 
   int get minutes => sessions.fold(0, (sum, s) => sum + s.minutes);
 
