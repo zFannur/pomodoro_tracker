@@ -55,6 +55,15 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   fake_async: ^1.3.3
+  flutter_launcher_icons: ^0.14.4
+
+# Иконка приложения (Windows .ico) генерируется из assets/icon/logo.png.
+# Запуск: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  windows:
+    generate: true
+    image_path: "assets/icon/logo.png"
+    icon_size: 256
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
