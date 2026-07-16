@@ -73,6 +73,14 @@ class _HomeShellState extends State<HomeShell> {
     return false;
   }
 
+  /// Иконка раздела: активная — в полную силу, неактивная — приглушена.
+  Widget _navIcon(String asset, {required bool selected}) {
+    return Opacity(
+      opacity: selected ? 1 : 0.45,
+      child: Image.asset(asset, width: 30, height: 30),
+    );
+  }
+
   /// Заголовок окна: при работающем таймере — «MM:SS контекст».
   void _updateTitle(TimerState timer) {
     if (!timer.running) {
@@ -106,9 +114,9 @@ class _HomeShellState extends State<HomeShell> {
               selectedIndex: _index,
               labelType: NavigationRailLabelType.all,
               onDestinationSelected: (i) => setState(() => _index = i),
-              leading: const Padding(
-                padding: EdgeInsets.only(top: 8, bottom: 12),
-                child: Text('🍅', style: TextStyle(fontSize: 26)),
+              leading: Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 12),
+                child: Image.asset('assets/nav/logo.png', width: 34, height: 34),
               ),
               trailing: Expanded(
                 child: Align(
@@ -123,21 +131,21 @@ class _HomeShellState extends State<HomeShell> {
                   ),
                 ),
               ),
-              destinations: const [
+              destinations: [
                 NavigationRailDestination(
-                  icon: Icon(Icons.timer_outlined),
-                  selectedIcon: Icon(Icons.timer),
-                  label: Text(S.navTimer),
+                  icon: _navIcon('assets/nav/timer.png', selected: false),
+                  selectedIcon: _navIcon('assets/nav/timer.png', selected: true),
+                  label: const Text(S.navTimer),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.flag_outlined),
-                  selectedIcon: Icon(Icons.flag),
-                  label: Text(S.navSprint),
+                  icon: _navIcon('assets/nav/sprint.png', selected: false),
+                  selectedIcon: _navIcon('assets/nav/sprint.png', selected: true),
+                  label: const Text(S.navSprint),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.bar_chart_outlined),
-                  selectedIcon: Icon(Icons.bar_chart),
-                  label: Text(S.navStats),
+                  icon: _navIcon('assets/nav/stats.png', selected: false),
+                  selectedIcon: _navIcon('assets/nav/stats.png', selected: true),
+                  label: const Text(S.navStats),
                 ),
               ],
             ),
