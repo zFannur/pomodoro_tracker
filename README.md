@@ -1,12 +1,34 @@
-# 🍅 Помодоро Трекер
+<div align="center">
 
-Десктопное приложение для Windows: локальный клон [pomodoro-tracker.com](https://pomodoro-tracker.com/)
-с точным воспроизведением его поведения — плюс адаптация под личную систему фокуса
-(лягушка дня, задачи спринта, Flowtime) и хранение **всех данных в markdown**
-внутри Obsidian-валта.
+<img src="assets/icon/logo.png" width="120" alt="Помодоро Трекер">
+
+# Помодоро Трекер
+
+**Десктопный Pomodoro-таймер для Windows с хранением данных в markdown.**
+
+Локальный клон [pomodoro-tracker.com](https://pomodoro-tracker.com/) с точным
+воспроизведением его поведения — плюс система фокуса (лягушка дня, задачи спринта,
+Flowtime) и все данные в обычных `.md`-файлах внутри Obsidian-валта.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-E2574C.svg)](LICENSE)
+[![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](#быстрый-старт)
+[![Storage](https://img.shields.io/badge/Storage-Markdown-3FA45B?logo=markdown&logoColor=white)](#хранение-данных)
+[![Tests](https://img.shields.io/badge/tests-25%20passing-3FA45B.svg)](#тесты)
+
+<img src="docs/screenshot-timer.png" width="820" alt="Экран таймера">
+
+</div>
 
 Никакого облака, аккаунтов и телеметрии. Данные — обычные `.md`-файлы, которые
 читаются и правятся руками в Obsidian.
+
+## Почему
+
+Обычные таймеры держат историю в чужой базе. Здесь помидоры, задачи и спринты —
+это markdown в твоём валте: их видно в графе Obsidian, по ним работает поиск,
+их можно править руками и класть в git. Приложение — просто удобный интерфейс
+поверх этих файлов.
 
 ---
 
@@ -24,6 +46,8 @@
 - [Архитектура](#архитектура)
 - [Разработка](#разработка)
 - [Известные ограничения](#известные-ограничения)
+- [Вклад](#вклад)
+- [Лицензия](#лицензия)
 
 ---
 
@@ -337,3 +361,35 @@ flutter build windows --release
   «Сделано за неделю»); произвольные добавленные секции будут стёрты.
 - Серверных фич оригинала нет намеренно: аккаунты, лидерборд, шаринг,
   интеграции (Slack/Trello/Todoist/Google), почтовые отчёты, повторяющиеся задачи.
+
+---
+
+## Вклад
+
+Проект личный, но PR и issue приветствуются.
+
+Перед PR:
+
+```bash
+flutter analyze   # должно быть чисто
+flutter test      # все тесты зелёные
+dart format lib test
+```
+
+Правила кодовой базы:
+
+- **цвета** — только в `lib/app/theme.dart`, **тексты** — только в `lib/app/strings.dart`;
+- репозитории возвращают `Either<Failure, T>`, слои `domain` / `data` / `presentation` не смешиваются;
+- логика парсинга markdown — в `markdown_codec.dart` (чистые функции) и покрывается тестом;
+- любые таймеры отменяются в `close()` / `dispose()`;
+- осознанные упрощения помечаются комментарием `// ponytail:` с указанием потолка решения.
+
+Изменения в поведении, воспроизводящем оригинал (формула фокуса, простои,
+серии, логический день), — только с тестом.
+
+## Лицензия
+
+[MIT](LICENSE) © zFannur
+
+Приложение повторяет поведение [pomodoro-tracker.com](https://pomodoro-tracker.com/)
+и не аффилировано с ним. «Pomodoro Technique» — торговая марка Francesco Cirillo.
