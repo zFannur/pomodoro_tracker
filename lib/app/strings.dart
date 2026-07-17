@@ -1,205 +1,277 @@
-/// Все строки интерфейса. Приложение локальное, язык один — русский.
-/// ponytail: i18n-каркас не нужен, при втором языке — flutter_localizations.
+import '../domain/entities/app_settings.dart';
+
+/// Все строки интерфейса, на двух языках — переключаются в настройках
+/// ([S.lang]) и меняют текст немедленно (виджеты читают геттеры при
+/// каждой перестройке, поэтому строки не помечены `const`).
 abstract final class S {
-  static const appTitle = 'Помодоро Трекер';
+  static AppLanguage lang = AppLanguage.ru;
+
+  static String _t(String ru, String en) => lang == AppLanguage.ru ? ru : en;
+
+  static String get appTitle => _t('Помодоро Трекер', 'Pomodoro Tracker');
 
   // Навигация
-  static const navTimer = 'Таймер';
-  static const navSprint = 'Спринт';
-  static const navStats = 'Статистика';
+  static String get navTimer => _t('Таймер', 'Timer');
+  static String get navSprint => _t('Спринт', 'Sprint');
+  static String get navStats => _t('Статистика', 'Stats');
 
   // Таймер
-  static const pomodoroWord = 'ПОМИДОР';
-  static const takeShortBreak = 'Пора сделать короткий перерыв.';
-  static const takeLongBreak = 'Пора сделать длинный перерыв.';
-  static const shortBreakTitle = 'КОРОТКИЙ ПЕРЕРЫВ';
-  static const longBreakTitle = 'ДЛИННЫЙ ПЕРЕРЫВ';
-  static const breakWord = 'перерыв';
-  static const series = 'серия';
-  static const start = 'Старт';
-  static const stop = 'Стоп';
-  static const pause = 'Пауза';
-  static const resume = 'Продолжить';
-  static const doneEarly = 'Готово';
-  static const skip = 'Пропустить';
-  static const delayLabel = 'ЗАДЕРЖКА';
-  static const prolong = '+1 мин (Shift — +5)';
-  static const forwardHint = 'Прокрутить фазу';
-  static const fullscreen = 'Полный экран';
-  static const hintKeys =
-      'Space — старт/пауза · Esc Esc — стоп/пропуск · +/− — помидоры первой задачи (Shift — ×4)';
+  static String get pomodoroWord => _t('ПОМИДОР', 'POMODORO');
+  static String get takeShortBreak =>
+      _t('Пора сделать короткий перерыв.', 'Time for a short break.');
+  static String get takeLongBreak =>
+      _t('Пора сделать длинный перерыв.', 'Time for a long break.');
+  static String get shortBreakTitle => _t('КОРОТКИЙ ПЕРЕРЫВ', 'SHORT BREAK');
+  static String get longBreakTitle => _t('ДЛИННЫЙ ПЕРЕРЫВ', 'LONG BREAK');
+  static String get breakWord => _t('перерыв', 'break');
+  static String get series => _t('серия', 'series');
+  static String get start => _t('Старт', 'Start');
+  static String get stop => _t('Стоп', 'Stop');
+  static String get pause => _t('Пауза', 'Pause');
+  static String get resume => _t('Продолжить', 'Resume');
+  static String get doneEarly => _t('Готово', 'Done');
+  static String get skip => _t('Пропустить', 'Skip');
+  static String get delayLabel => _t('ЗАДЕРЖКА', 'DELAY');
+  static String get prolong => _t('+1 мин (Shift — +5)', '+1 min (Shift — +5)');
+  static String get forwardHint => _t('Прокрутить фазу', 'Skip forward');
+  static String get fullscreen => _t('Полный экран', 'Fullscreen');
+  static String get hintKeys => _t(
+    'Space — старт/пауза · Esc Esc — стоп/пропуск · +/− — помидоры первой задачи (Shift — ×4)',
+    'Space — start/pause · Esc Esc — stop/skip · +/− — pomodoros of the first task (Shift — ×4)',
+  );
 
   // Задачи
-  static const planned = 'Запланировано';
-  static const categoryHint = 'Категория';
-  static const descriptionHint = '#категория описание ~помидоры';
-  static const add = 'Добавить';
-  static const planner = 'Планировщик';
-  static const emptyPlanned = 'Список планирования пуст.';
-  static const emptyPlannedHint = 'Добавьте задачи через форму выше.';
-  static const finishTime = 'ВРЕМЯ ОКОНЧАНИЯ';
-  static const nextLongBreak = 'Следующий длинный перерыв';
-  static const categories = 'Категории';
-  static const hintTasks =
-      'Клик — редактирование. Клик по числу — +помидор (Alt — минус, Shift — ×4). Перетаскивайте для сортировки.';
-  static const menuAddPomo = 'Добавить помидор';
-  static const menuRemovePomo = 'Убрать один';
-  static const menuMarkDone = 'Отметить как выполненное';
-  static const menuCloseWhole = 'Закрыть задачу целиком';
-  static const menuSplit = 'Разбить';
-  static const menuMerge = 'Объединить';
-  static const menuToInbox = 'Во входящие';
-  static const menuToTomorrow = 'Перенести на завтра';
-  static const menuToLater = 'Перенести на позже';
-  static const delete = 'Удалить';
-  static const close = 'Закрыть';
-  static const cancel = 'Отмена';
-  static const editTask = 'Редактировать задачу';
-  static const confirmClear = 'Точно очистить? Действие необратимо.';
-  static const withoutNote = 'Без заметки';
-  static const emptyBucket = 'Пусто';
-  static const listSettings = 'Настроить';
-  static const tasksTopLabel = 'Новые задачи — наверх';
-  static const completeRemoveLabel = 'Снимать задачу при завершении помидора';
-  static const clearList = 'Очистить список';
-  static const toToday = 'В «Сегодня»';
-  static const save = 'Сохранить';
+  static String get planned => _t('Запланировано', 'Planned');
+  static String get categoryHint => _t('Категория', 'Category');
+  static String get descriptionHint =>
+      _t('#категория описание ~помидоры', '#category description ~pomodoros');
+  static String get add => _t('Добавить', 'Add');
+  static String get planner => _t('Планировщик', 'Planner');
+  static String get emptyPlanned => _t('Список планирования пуст.', 'The plan is empty.');
+  static String get emptyPlannedHint =>
+      _t('Добавьте задачи через форму выше.', 'Add tasks using the form above.');
+  static String get finishTime => _t('ВРЕМЯ ОКОНЧАНИЯ', 'FINISH TIME');
+  static String get nextLongBreak => _t('Следующий длинный перерыв', 'Next long break');
+  static String get categories => _t('Категории', 'Categories');
+  static String get hintTasks => _t(
+    'Клик — редактирование. Клик по числу — +помидор (Alt — минус, Shift — ×4). Перетаскивайте для сортировки.',
+    'Click — edit. Click the number — +pomodoro (Alt — minus, Shift — ×4). Drag to reorder.',
+  );
+  static String get menuAddPomo => _t('Добавить помидор', 'Add a pomodoro');
+  static String get menuRemovePomo => _t('Убрать один', 'Remove one');
+  static String get menuMarkDone => _t('Отметить как выполненное', 'Mark as done');
+  static String get menuCloseWhole => _t('Закрыть задачу целиком', 'Close the whole task');
+  static String get menuSplit => _t('Разбить', 'Split');
+  static String get menuMerge => _t('Объединить', 'Merge');
+  static String get menuToInbox => _t('Во входящие', 'To inbox');
+  static String get menuToTomorrow => _t('Перенести на завтра', 'Move to tomorrow');
+  static String get menuToLater => _t('Перенести на позже', 'Move to later');
+  static String get delete => _t('Удалить', 'Delete');
+  static String get close => _t('Закрыть', 'Close');
+  static String get cancel => _t('Отмена', 'Cancel');
+  static String get editTask => _t('Редактировать задачу', 'Edit task');
+  static String get confirmClear =>
+      _t('Точно очистить? Действие необратимо.', "Clear for good? This can't be undone.");
+  static String get withoutNote => _t('Без заметки', 'No note');
+  static String get emptyBucket => _t('Пусто', 'Empty');
+  static String get listSettings => _t('Настроить', 'Configure');
+  static String get tasksTopLabel => _t('Новые задачи — наверх', 'New tasks go to the top');
+  static String get completeRemoveLabel => _t(
+    'Снимать задачу при завершении помидора',
+    'Remove task when a pomodoro finishes it',
+  );
+  static String get clearList => _t('Очистить список', 'Clear list');
+  static String get toToday => _t('В «Сегодня»', 'To "Today"');
+  static String get save => _t('Сохранить', 'Save');
 
   // Сделано
-  static const doneTitle = 'Сделано';
-  static const focusLabel = 'фокус';
-  static const delaysLabel = 'задержки';
-  static const interruptionsLabel = 'прерывания';
-  static const manualMark = 'вручную';
-  static const goalLine = 'Цель дня';
-  static const goalLeft = 'осталось';
-  static const menuRepeat = 'Повторить';
-  static const menuFillBlanks = 'Заполнить пустые';
-  static const emptyDone = 'Сегодня ещё нет помидоров.';
-  static const todoEmptyDone = 'Отличная работа! Список задач пуст.';
-  static const goalCompleted = 'Поздравляем! Дневная цель выполнена.';
-  static const dayCleared = 'Новый день — список «Сделано» начат заново.';
+  static String get doneTitle => _t('Сделано', 'Done');
+  static String get focusLabel => _t('фокус', 'focus');
+  static String get delaysLabel => _t('задержки', 'delays');
+  static String get interruptionsLabel => _t('прерывания', 'interruptions');
+  static String get manualMark => _t('вручную', 'manual');
+  static String get goalLine => _t('Цель дня', 'Daily goal');
+  static String get goalLeft => _t('осталось', 'left');
+  static String get menuRepeat => _t('Повторить', 'Repeat');
+  static String get menuFillBlanks => _t('Заполнить пустые', 'Fill the gaps');
+  static String get emptyDone => _t('Сегодня ещё нет помидоров.', 'No pomodoros yet today.');
+  static String get todoEmptyDone =>
+      _t('Отличная работа! Список задач пуст.', 'Great work! The task list is empty.');
+  static String get goalCompleted =>
+      _t('Поздравляем! Дневная цель выполнена.', 'Congrats! Daily goal reached.');
+  static String get dayCleared => _t(
+    'Новый день — список «Сделано» начат заново.',
+    'New day — the "Done" list starts over.',
+  );
 
   // Планировщик (корзины — это СРОКИ, не спринт)
-  static const inbox = 'Входящие';
-  static const tomorrow = 'Завтра';
-  static const week = 'Эта неделя';
-  static const later = 'Позже';
+  static String get inbox => _t('Входящие', 'Inbox');
+  static String get tomorrow => _t('Завтра', 'Tomorrow');
+  static String get week => _t('Эта неделя', 'This week');
+  static String get later => _t('Позже', 'Later');
 
   // Неделя (спринт)
-  static const sprintGoal = 'Цель недели (🍅)';
-  static const sprintFact = 'Факт';
-  static const sprintByDay = 'По дням';
-  static const sprintHistory = 'Прошлые недели';
-  static const sprintVelocity = 'Темп';
-  static const perDay = '🍅/день';
-  static const forecast = 'Прогноз';
-  static const milestone = 'Веха недели';
-  static const milestoneHint =
-      'Тонкий срез до реальности, проверяется бинарно: «товар покупается живым юзером»';
-  static const weekTasksTitle = 'Задачи спринта (⭐)';
-  static const weekTasksEmpty =
-      'Отметь 2–3 задачи звездой в Планировщике (кнопка «Выбрать») — они двигают веху. '
-      'В новую неделю звёзды снимаются автоматически.';
-  static const pickWeekTasks = 'Выбрать';
-  static const plannerHint =
-      '🐸 и ⭐ ставятся здесь. Корзины (Завтра/Эта неделя/Позже) — это сроки; '
-      'спринт — только ⭐: 3 задачи из текущей вехи.';
-  static const doneWeekTitle = 'Сделано за неделю';
+  static String get sprintGoal => _t('Цель недели (🍅)', 'Weekly goal (🍅)');
+  static String get sprintFact => _t('Факт', 'Actual');
+  static String get sprintByDay => _t('По дням', 'By day');
+  static String get sprintHistory => _t('Прошлые недели', 'Past weeks');
+  static String get sprintVelocity => _t('Темп', 'Velocity');
+  static String get perDay => _t('🍅/день', '🍅/day');
+  static String get forecast => _t('Прогноз', 'Forecast');
+  static String get milestone => _t('Веха недели', 'Weekly milestone');
+  static String get milestoneHint => _t(
+    'Тонкий срез до реальности, проверяется бинарно: «товар покупается живым юзером»',
+    'A thin slice of reality, checked as pass/fail: "a real user buys the product"',
+  );
+  static String get weekTasksTitle => _t('Задачи спринта (⭐)', 'Sprint tasks (⭐)');
+  static String get weekTasksEmpty => _t(
+    'Отметь 2–3 задачи звездой в Планировщике (кнопка «Выбрать») — они двигают веху. '
+        'В новую неделю звёзды снимаются автоматически.',
+    'Star 2–3 tasks in the Planner (the "Pick" button) — they move the milestone. '
+        'Stars are cleared automatically at the start of a new week.',
+  );
+  static String get pickWeekTasks => _t('Выбрать', 'Pick');
+  static String get plannerHint => _t(
+    '🐸 и ⭐ ставятся здесь. Корзины (Завтра/Эта неделя/Позже) — это сроки; '
+        'спринт — только ⭐: 3 задачи из текущей вехи.',
+    '🐸 and ⭐ are set here. Buckets (Tomorrow/This week/Later) are due dates; '
+        'the sprint is only ⭐: 3 tasks from the current milestone.',
+  );
+  static String get doneWeekTitle => _t('Сделано за неделю', 'Done this week');
 
   // Система фокуса
-  static const nowLabel = 'СЕЙЧАС';
-  static const nowEmpty = 'Возьми одну задачу — верхняя в списке и есть СЕЙЧАС';
-  static const frogLabel = '🐸 Лягушка дня — делается первой';
-  static const frogRemove = 'Убрать лягушку';
-  static const weekMark =
-      '⭐ В спринт — двигает веху недели (снимается в новую неделю)';
-  static const weekUnmark = 'Убрать из спринта';
-  static const toInbox = 'Сразу во «Входящие»';
-  static const dayOverload =
-      'По системе: 🐸 + 2 задачи на день. Лишнее — во «Входящие» (меню ⋮).';
-  static const stuckHint = 'Застрял? Разбей до шага на 5 минут — и стартуй.';
-  static const whereStopped = 'На чём встал?';
-  static const whereStoppedHint =
-      'Одна строка — чтобы завтра не вспоминать (можно пропустить)';
-  static const notesTitle = 'Заметки';
-  static const overtime = 'поток';
+  static String get nowLabel => _t('СЕЙЧАС', 'NOW');
+  static String get nowEmpty =>
+      _t('Возьми одну задачу — верхняя в списке и есть СЕЙЧАС', 'Pick one task — the top of the list is NOW');
+  static String get frogLabel => _t('🐸 Лягушка дня — делается первой', '🐸 Frog of the day — do it first');
+  static String get frogRemove => _t('Убрать лягушку', 'Remove the frog');
+  static String get weekMark => _t(
+    '⭐ В спринт — двигает веху недели (снимается в новую неделю)',
+    '⭐ To the sprint — moves the weekly milestone (cleared next week)',
+  );
+  static String get weekUnmark => _t('Убрать из спринта', 'Remove from sprint');
+  static String get toInbox => _t('Сразу во «Входящие»', 'Straight to "Inbox"');
+  static String get dayOverload => _t(
+    'По системе: 🐸 + 2 задачи на день. Лишнее — во «Входящие» (меню ⋮).',
+    'The system: 🐸 + 2 tasks a day. Extra goes to "Inbox" (⋮ menu).',
+  );
+  static String get stuckHint =>
+      _t('Застрял? Разбей до шага на 5 минут — и стартуй.', "Stuck? Break it down to a 5-minute step — and start.");
+  static String get whereStopped => _t('На чём встал?', 'Where did you leave off?');
+  static String get whereStoppedHint => _t(
+    'Одна строка — чтобы завтра не вспоминать (можно пропустить)',
+    "One line, so you don't have to remember tomorrow (optional)",
+  );
+  static String get notesTitle => _t('Заметки', 'Notes');
+  static String get overtime => _t('поток', 'flow');
 
   // Статистика
-  static const periodToday = 'Сегодня';
-  static const periodWeek = 'Неделя';
-  static const periodMonth = 'Месяц';
-  static const periodYear = '365 дней';
-  static const periodCustom = 'Диапазон';
-  static const statPomodoros = 'Помидоры';
-  static const statFocus = 'Фокус';
-  static const statTime = 'Время';
-  static const statStreak = 'Серия дней';
-  static const statBestDay = 'Лучший день';
-  static const statFrog = '🐸 Лягушки';
-  static const statFrogHint = 'дней, где сделал главное';
-  static const statByCategory = 'По категориям';
-  static const statLast14 = 'Последние 14 дней';
-  static const statHeatmap = 'Карта активности';
-  static const statEmpty = 'Пока нет ни одного помидора за период.';
-  static const daysSuffix = 'дн.';
+  static String get periodToday => _t('Сегодня', 'Today');
+  static String get periodWeek => _t('Неделя', 'Week');
+  static String get periodMonth => _t('Месяц', 'Month');
+  static String get periodYear => _t('365 дней', '365 days');
+  static String get periodCustom => _t('Диапазон', 'Range');
+  static String get statPomodoros => _t('Помидоры', 'Pomodoros');
+  static String get statFocus => _t('Фокус', 'Focus');
+  static String get statTime => _t('Время', 'Time');
+  static String get statStreak => _t('Серия дней', 'Day streak');
+  static String get statBestDay => _t('Лучший день', 'Best day');
+  static String get statFrog => _t('🐸 Лягушки', '🐸 Frogs');
+  static String get statFrogHint => _t('дней, где сделал главное', "days you got the main thing done");
+  static String get statByCategory => _t('По категориям', 'By category');
+  static String get statLast14 => _t('Последние 14 дней', 'Last 14 days');
+  static String get statHeatmap => _t('Карта активности', 'Activity map');
+  static String get statEmpty => _t('Пока нет ни одного помидора за период.', 'No pomodoros in this period yet.');
+  static String get daysSuffix => _t('дн.', 'd.');
 
   // Настройки
-  static const settings = 'Настройки';
-  static const tabTimer = 'Таймер';
-  static const tabNotify = 'Оповещения';
-  static const tabApp = 'Приложение';
-  static const settingsSchemes = 'Схемы';
-  static const schemeName = 'Название схемы';
-  static const pomodoroLen = 'Продолжительность помидора, мин';
-  static const shortLen = 'Короткий перерыв, мин';
-  static const longLen = 'Длинный перерыв, мин';
-  static const longEvery = 'Длинный перерыв через каждые N помидоров';
-  static const autostartPomodoro = 'Автостарт помидора после перерыва';
-  static const autostartBreak = 'Автостарт перерыва после помидора';
-  static const autostartIfTodo = 'Автостарт помидора только при наличии задач';
-  static const flowtimeLabel =
-      'Flowtime: не выбивать из потока (помидор дотикал — таймер тихо считает дальше)';
-  static const dailyGoal = 'Цель на день, 🍅 (0 — без цели)';
-  static const volume = 'Громкость';
-  static const finishSound = 'Финишный звук';
-  static const finishMelody = 'Мелодия финиша';
-  static const tickingSound = 'Тикающий звук во время помидора';
-  static const tickingInBreaks = 'Тикать и в перерывах';
-  static const notifications = 'Системные уведомления';
-  static const notifyMinuteBefore = 'Предупреждать за минуту до конца';
-  static const popupRaiseWindow = 'Поднимать окно, когда фаза окончена';
-  static const messages = 'Сообщения';
-  static const msgPomodoroHint =
-      'Тексты для «Помидор завершён» — по одному на строку, выбирается случайный';
-  static const msgBreakHint = 'Тексты для «Перерыв окончен»';
-  static const telegram = 'Telegram';
-  static const telegramToken = 'Токен бота';
-  static const telegramChatId = 'Chat ID';
-  static const notifyTelegram = 'Дублировать уведомления в Telegram';
-  static const sendTest = 'Отправить тестовое оповещение';
-  static const testNotification = 'Проверка уведомлений';
-  static const themeMode = 'Цветовая схема';
-  static const themeLight = 'Светлая';
-  static const themeDark = 'Тёмная';
-  static const themeSystem = 'Системная';
-  static const themeAuto = 'Авто';
-  static const dateFormat = 'Формат даты';
-  static const timeFormat = 'Формат времени';
-  static const storageFolder = 'Папка хранения (markdown)';
-  static const chooseFolder = 'Выбрать…';
-  static const newCategory = 'Новая категория';
-  static const boundScheme = 'Схема категории';
-  static const defaultScheme = 'по умолчанию';
-  static const sprintGoalDefault = 'Цель спринта по умолчанию, 🍅';
-  static const addScheme = 'Добавить схему';
-  static const notifyMinuteLeft = 'Осталась минута';
-  static const notifyPomodoroDone = 'Помидор завершён!';
-  static const notifyBreakDone = 'Перерыв окончен';
-  static const notifyBreakDoneBody = 'Следующий помидор будет лучше!';
+  static String get settings => _t('Настройки', 'Settings');
+  static String get tabTimer => _t('Таймер', 'Timer');
+  static String get tabNotify => _t('Оповещения', 'Notifications');
+  static String get tabApp => _t('Приложение', 'App');
+  static String get settingsSchemes => _t('Схемы', 'Schemes');
+  static String get schemeName => _t('Название схемы', 'Scheme name');
+  static String get pomodoroLen => _t('Продолжительность помидора, мин', 'Pomodoro length, min');
+  static String get shortLen => _t('Короткий перерыв, мин', 'Short break, min');
+  static String get longLen => _t('Длинный перерыв, мин', 'Long break, min');
+  static String get longEvery => _t('Длинный перерыв через каждые N помидоров', 'Long break every N pomodoros');
+  static String get autostartPomodoro => _t('Автостарт помидора после перерыва', 'Auto-start pomodoro after a break');
+  static String get autostartBreak => _t('Автостарт перерыва после помидора', 'Auto-start break after a pomodoro');
+  static String get autostartIfTodo => _t(
+    'Автостарт помидора только при наличии задач',
+    'Auto-start pomodoro only if tasks are queued',
+  );
+  static String get flowtimeLabel => _t(
+    'Flowtime: не выбивать из потока (помидор дотикал — таймер тихо считает дальше)',
+    "Flowtime: don't break the flow (pomodoro ends — the timer quietly keeps counting)",
+  );
+  static String get dailyGoal => _t('Цель на день, 🍅 (0 — без цели)', 'Daily goal, 🍅 (0 — no goal)');
+  static String get volume => _t('Громкость', 'Volume');
+  static String get finishSound => _t('Финишный звук', 'Finish sound');
+  static String get finishMelody => _t('Мелодия финиша', 'Finish melody');
+  static String get tickingSound => _t('Тикающий звук во время помидора', 'Ticking sound during a pomodoro');
+  static String get tickingInBreaks => _t('Тикать и в перерывах', 'Tick during breaks too');
+  static String get notifications => _t('Системные уведомления', 'System notifications');
+  static String get notifyMinuteBefore => _t('Предупреждать за минуту до конца', 'Warn one minute before the end');
+  static String get popupRaiseWindow => _t('Поднимать окно, когда фаза окончена', 'Raise the window when a phase ends');
+  static String get messages => _t('Сообщения', 'Messages');
+  static String get msgPomodoroHint => _t(
+    'Тексты для «Помидор завершён» — по одному на строку, выбирается случайный',
+    'Texts for "Pomodoro finished" — one per line, a random one is picked',
+  );
+  static String get msgBreakHint => _t('Тексты для «Перерыв окончен»', 'Texts for "Break finished"');
+  static String get telegram => _t('Telegram', 'Telegram');
+  static String get telegramToken => _t('Токен бота', 'Bot token');
+  static String get telegramChatId => _t('Chat ID', 'Chat ID');
+  static String get notifyTelegram => _t('Дублировать уведомления в Telegram', 'Duplicate notifications to Telegram');
+  static String get sendTest => _t('Отправить тестовое оповещение', 'Send a test notification');
+  static String get testNotification => _t('Проверка уведомлений', 'Notification test');
+  static String get themeMode => _t('Цветовая схема', 'Color theme');
+  static String get themeLight => _t('Светлая', 'Light');
+  static String get themeDark => _t('Тёмная', 'Dark');
+  static String get themeSystem => _t('Системная', 'System');
+  static String get themeAuto => _t('Авто', 'Auto');
+  static String get themeMatrix => _t('Матрица', 'Matrix');
+  static String get language => _t('Язык', 'Language');
+  static String get languageRu => 'Русский';
+  static String get languageEn => 'English';
+  static String get dateFormat => _t('Формат даты', 'Date format');
+  static String get timeFormat => _t('Формат времени', 'Time format');
+  static String get storageFolder => _t('Папка хранения (markdown)', 'Storage folder (markdown)');
+  static String get chooseFolder => _t('Выбрать…', 'Choose…');
+  static String get newCategory => _t('Новая категория', 'New category');
+  static String get boundScheme => _t('Схема категории', 'Category scheme');
+  static String get defaultScheme => _t('по умолчанию', 'default');
+  static String get sprintGoalDefault => _t('Цель спринта по умолчанию, 🍅', 'Default sprint goal, 🍅');
+  static String get addScheme => _t('Добавить схему', 'Add scheme');
+  static String get notifyMinuteLeft => _t('Осталась минута', 'One minute left');
+  static String get notifyPomodoroDone => _t('Помидор завершён!', 'Pomodoro finished!');
+  static String get notifyBreakDone => _t('Перерыв окончен', 'Break finished');
+  static String get notifyBreakDoneBody => _t('Следующий помидор будет лучше!', 'The next pomodoro will be better!');
+
+  // Таблица истории спринтов, поле минут в диалоге редактирования записи
+  static String get sprintWord => _t('Спринт', 'Sprint');
+  static String get colWeek => _t('Неделя', 'Week');
+  static String get colGoal => _t('Цель', 'Goal');
+  static String get minutesField => _t('Минуты', 'Minutes');
+  static String pomoClickHint(int minutes) => _t(
+    '$minutesм · клик +1 🍅, Alt-клик −1, Shift ×4',
+    '${minutes}m · click +1 🍅, Alt-click −1, Shift ×4',
+  );
 
   // Общее
-  static const retry = 'Повторить';
-  static const errorPrefix = 'Ошибка: ';
-  static const loading = 'Загрузка…';
+  static String get retry => _t('Повторить', 'Retry');
+  static String get errorPrefix => _t('Ошибка: ', 'Error: ');
+  static String get loading => _t('Загрузка…', 'Loading…');
+}
+
+/// Длительность для UI (в отличие от [formatMinutes] в markdown_codec.dart,
+/// который пишет формат в файлы данных — тот всегда русский, это интерфейс).
+String formatMinutesUi(int minutes) {
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  final hUnit = S.lang == AppLanguage.ru ? 'ч' : 'h';
+  final mUnit = S.lang == AppLanguage.ru ? 'м' : 'm';
+  if (h == 0) return '$m$mUnit';
+  return m == 0 ? '$h$hUnit' : '$h$hUnit $m$mUnit';
 }

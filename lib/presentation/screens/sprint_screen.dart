@@ -68,7 +68,7 @@ class _SprintBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Спринт ${sprint.id} · ${dateHuman(sprint.start)} – ${dateHuman(sprint.end)}',
+                '${S.sprintWord} ${sprint.id} · ${dateHuman(sprint.start)} – ${dateHuman(sprint.end)}',
                 style: theme.textTheme.titleLarge,
               ),
               const SizedBox(height: 12),
@@ -95,7 +95,7 @@ class _SprintBody extends StatelessWidget {
                 title: S.weekTasksTitle,
                 trailing: FilledButton.tonalIcon(
                   icon: const Icon(Icons.star, size: 16),
-                  label: const Text(S.pickWeekTasks),
+                  label: Text(S.pickWeekTasks),
                   onPressed: () => showPlannerDialog(context),
                 ),
                 child: weekTodo.isEmpty
@@ -145,7 +145,7 @@ class _SprintBody extends StatelessWidget {
                   const SizedBox(width: 8),
                   StatTile(
                     label: S.statTime,
-                    value: formatMinutes(state.factMinutes),
+                    value: formatMinutesUi(state.factMinutes),
                   ),
                   const SizedBox(width: 8),
                   StatTile(
@@ -190,10 +190,10 @@ class _SprintBody extends StatelessWidget {
                     children: [
                       TableRow(
                         children: [
-                          Text('Неделя', style: theme.textTheme.labelMedium),
-                          Text('Цель', style: theme.textTheme.labelMedium),
-                          Text('Факт', style: theme.textTheme.labelMedium),
-                          Text('Время', style: theme.textTheme.labelMedium),
+                          Text(S.colWeek, style: theme.textTheme.labelMedium),
+                          Text(S.colGoal, style: theme.textTheme.labelMedium),
+                          Text(S.sprintFact, style: theme.textTheme.labelMedium),
+                          Text(S.statTime, style: theme.textTheme.labelMedium),
                         ],
                       ),
                       for (final s in state.history)
@@ -205,7 +205,7 @@ class _SprintBody extends StatelessWidget {
                             ),
                             Text('${s.goal} 🍅'),
                             Text('${s.fact} 🍅'),
-                            Text(formatMinutes(s.minutes)),
+                            Text(formatMinutesUi(s.minutes)),
                           ],
                         ),
                     ],
@@ -223,27 +223,27 @@ class _SprintBody extends StatelessWidget {
     showDialog<String>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text(S.milestone),
+            title: Text(S.milestone),
             content: TextField(
               controller: controller,
               autofocus: true,
               maxLines: 2,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 helperText: S.milestoneHint,
                 helperMaxLines: 2,
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
               onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text(S.close),
+                child: Text(S.close),
               ),
               FilledButton(
                 onPressed: () =>
                     Navigator.of(dialogContext).pop(controller.text),
-                child: const Text(S.save),
+                child: Text(S.save),
               ),
             ],
           ),
@@ -261,7 +261,7 @@ class _SprintBody extends StatelessWidget {
     showDialog<int>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text(S.sprintGoal),
+            title: Text(S.sprintGoal),
             content: TextField(
               controller: controller,
               autofocus: true,
@@ -273,13 +273,13 @@ class _SprintBody extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text(S.cancel),
+                child: Text(S.cancel),
               ),
               FilledButton(
                 onPressed: () => Navigator.of(
                   dialogContext,
                 ).pop(int.tryParse(controller.text)),
-                child: const Text(S.save),
+                child: Text(S.save),
               ),
             ],
           ),
@@ -334,7 +334,7 @@ class _WeekTaskRow extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '${task.pomos(pomodoro)} 🍅 · ${formatMinutes(task.durationMinutes)}',
+            '${task.pomos(pomodoro)} 🍅 · ${formatMinutesUi(task.durationMinutes)}',
             style: theme.textTheme.labelMedium,
           ),
           if (inPlanner)

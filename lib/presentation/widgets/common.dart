@@ -321,7 +321,7 @@ class ErrorPane extends StatelessWidget {
         children: [
           Text('${S.errorPrefix}$message', textAlign: TextAlign.center),
           const SizedBox(height: 12),
-          FilledButton(onPressed: onRetry, child: const Text(S.retry)),
+          FilledButton(onPressed: onRetry, child: Text(S.retry)),
         ],
       ),
     );

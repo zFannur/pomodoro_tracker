@@ -8,12 +8,16 @@ import '../cubits/tasks_cubit.dart';
 import '../widgets/common.dart';
 
 void showPlannerDialog(BuildContext context) {
+  // Резолвим кубиты сразу — builder вызывается лениво, а к этому моменту
+  // исходный context мог стать невалидным (экран за диалогом перестроился).
+  final tasksCubit = context.read<TasksCubit>();
+  final settingsCubit = context.read<SettingsCubit>();
   showDialog<void>(
     context: context,
     builder: (_) => MultiBlocProvider(
       providers: [
-        BlocProvider.value(value: context.read<TasksCubit>()),
-        BlocProvider.value(value: context.read<SettingsCubit>()),
+        BlocProvider.value(value: tasksCubit),
+        BlocProvider.value(value: settingsCubit),
       ],
       child: const _PlannerDialog(),
     ),
@@ -23,12 +27,12 @@ void showPlannerDialog(BuildContext context) {
 /// Вкладки планировщика: «Сегодня» + четыре корзины по датам.
 enum _Tab { today, inbox, tomorrow, week, later }
 
-const _tabLabels = {
-  _Tab.today: S.periodToday,
-  _Tab.inbox: S.inbox,
-  _Tab.tomorrow: S.tomorrow,
-  _Tab.week: S.week,
-  _Tab.later: S.later,
+String _tabLabel(_Tab tab) => switch (tab) {
+  _Tab.today => S.periodToday,
+  _Tab.inbox => S.inbox,
+  _Tab.tomorrow => S.tomorrow,
+  _Tab.week => S.week,
+  _Tab.later => S.later,
 };
 
 const _tabToPlanner = {
@@ -126,8 +130,8 @@ class _PlannerDialogState extends State<_PlannerDialog> {
                       value: tab,
                       label: Text(
                         (counts[tab] ?? 0) == 0
-                            ? _tabLabels[tab]!
-                            : '${_tabLabels[tab]} · ${counts[tab]}',
+                            ? _tabLabel(tab)
+                            : '${_tabLabel(tab)} · ${counts[tab]}',
                       ),
                     ),
                 ],
@@ -141,7 +145,7 @@ class _PlannerDialogState extends State<_PlannerDialog> {
                     initialSelection: _category,
                     width: 140,
                     requestFocusOnTap: false,
-                    label: const Text(S.categoryHint),
+                    label: Text(S.categoryHint),
                     dropdownMenuEntries: [
                       for (final c in categories)
                         DropdownMenuEntry(value: c, label: c),
@@ -153,16 +157,16 @@ class _PlannerDialogState extends State<_PlannerDialog> {
                   Expanded(
                     child: TextField(
                       controller: _text,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: S.descriptionHint,
                         isDense: true,
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                       onSubmitted: (_) => _add(),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  FilledButton.tonal(onPressed: _add, child: const Text(S.add)),
+                  FilledButton.tonal(onPressed: _add, child: Text(S.add)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -238,17 +242,17 @@ class _PlannerDialogState extends State<_PlannerDialog> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'inbox',
                 child: Text('↩ ${S.menuToInbox}'),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'tomorrow',
                 child: Text(S.menuToTomorrow),
               ),
-              const PopupMenuItem(value: 'later', child: Text(S.menuToLater)),
+              PopupMenuItem(value: 'later', child: Text(S.menuToLater)),
               const PopupMenuDivider(),
-              const PopupMenuItem(value: 'delete', child: Text(S.delete)),
+              PopupMenuItem(value: 'delete', child: Text(S.delete)),
             ],
           ),
         ],
@@ -315,7 +319,7 @@ class _PlannerDialogState extends State<_PlannerDialog> {
                     child: Text('→ ${_plannerTabLabel(tab)}'),
                   ),
               const PopupMenuDivider(),
-              const PopupMenuItem(value: 'delete', child: Text(S.delete)),
+              PopupMenuItem(value: 'delete', child: Text(S.delete)),
             ],
           ),
         ],

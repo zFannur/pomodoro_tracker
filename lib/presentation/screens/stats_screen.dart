@@ -53,7 +53,7 @@ class _StatsBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SegmentedButton<StatsPeriod>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: StatsPeriod.today,
                     label: Text(S.periodToday),
@@ -108,7 +108,7 @@ class _StatsBody extends StatelessWidget {
                   const SizedBox(width: 8),
                   StatTile(
                     label: S.statTime,
-                    value: formatMinutes(state.periodMinutes),
+                    value: formatMinutesUi(state.periodMinutes),
                   ),
                   const SizedBox(width: 8),
                   StatTile(label: S.statFocus, value: '${state.periodFocus}%'),

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../app/strings.dart';
+import 'cubits/settings_cubit.dart';
 import 'cubits/tasks_cubit.dart';
 import 'cubits/timer_cubit.dart';
 import 'screens/settings_dialog.dart';
@@ -105,6 +106,9 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // watch, не read: нав-лейблы (S.navTimer и т.п.) не имеют своего
+    // BlocBuilder, поэтому смена языка должна перестраивать сам HomeShell.
+    final language = context.watch<SettingsCubit>().state.settings.language;
     return BlocListener<TimerCubit, TimerState>(
       listener: (context, timer) => _updateTitle(timer),
       child: Scaffold(
@@ -142,7 +146,7 @@ class _HomeShellState extends State<HomeShell> {
                     'assets/nav/timer.png',
                     selected: true,
                   ),
-                  label: const Text(S.navTimer),
+                  label: Text(S.navTimer),
                 ),
                 NavigationRailDestination(
                   icon: _navIcon('assets/nav/sprint.png', selected: false),
@@ -150,7 +154,7 @@ class _HomeShellState extends State<HomeShell> {
                     'assets/nav/sprint.png',
                     selected: true,
                   ),
-                  label: const Text(S.navSprint),
+                  label: Text(S.navSprint),
                 ),
                 NavigationRailDestination(
                   icon: _navIcon('assets/nav/stats.png', selected: false),
@@ -158,13 +162,16 @@ class _HomeShellState extends State<HomeShell> {
                     'assets/nav/stats.png',
                     selected: true,
                   ),
-                  label: const Text(S.navStats),
+                  label: Text(S.navStats),
                 ),
               ],
             ),
             const VerticalDivider(width: 1),
             Expanded(
+              // Ключ на языке: экраны без своего context.watch(SettingsCubit)
+              // (например StatsScreen) иначе не подхватят смену языка сами.
               child: IndexedStack(
+                key: ValueKey(language),
                 index: _index,
                 sizing: StackFit.expand,
                 children: const [TimerScreen(), SprintScreen(), StatsScreen()],

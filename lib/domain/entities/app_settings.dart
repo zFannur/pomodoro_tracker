@@ -57,7 +57,11 @@ class TimerScheme extends Equatable {
 }
 
 /// Тема приложения. `auto` — светлая днём, тёмная ночью (как в оригинале).
-enum AppThemeMode { light, dark, system, auto }
+/// `matrix` — чёрный фон, неоновый зелёный, моноширинный шрифт.
+enum AppThemeMode { light, dark, system, auto, matrix }
+
+/// Язык интерфейса.
+enum AppLanguage { ru, en }
 
 /// Финишный звук (набор как в оригинале).
 enum FinishSound {
@@ -139,6 +143,7 @@ class AppSettings extends Equatable {
     required this.telegramChatId,
     required this.notifyTelegram,
     required this.themeMode,
+    this.language = AppLanguage.ru,
     required this.dateFmt,
     required this.timeFmt,
     required this.storagePath,
@@ -197,6 +202,8 @@ class AppSettings extends Equatable {
       themeMode:
           AppThemeMode.values.asNameMap()[json['themeMode']] ??
           AppThemeMode.system,
+      language:
+          AppLanguage.values.asNameMap()[json['language']] ?? AppLanguage.ru,
       dateFmt: DateFmt.values.asNameMap()[json['dateFmt']] ?? DateFmt.dmyDot,
       timeFmt: TimeFmt.values.asNameMap()[json['timeFmt']] ?? TimeFmt.h24,
       storagePath: json['storagePath'] as String? ?? fallbackPath,
@@ -286,6 +293,7 @@ class AppSettings extends Equatable {
   final String telegramChatId;
   final bool notifyTelegram;
   final AppThemeMode themeMode;
+  final AppLanguage language;
   final DateFmt dateFmt;
   final TimeFmt timeFmt;
 
@@ -333,6 +341,7 @@ class AppSettings extends Equatable {
     'telegramChatId': telegramChatId,
     'notifyTelegram': notifyTelegram,
     'themeMode': themeMode.name,
+    'language': language.name,
     'dateFmt': dateFmt.name,
     'timeFmt': timeFmt.name,
     'storagePath': storagePath,
@@ -366,6 +375,7 @@ class AppSettings extends Equatable {
     String? telegramChatId,
     bool? notifyTelegram,
     AppThemeMode? themeMode,
+    AppLanguage? language,
     DateFmt? dateFmt,
     TimeFmt? timeFmt,
     String? storagePath,
@@ -398,6 +408,7 @@ class AppSettings extends Equatable {
       telegramChatId: telegramChatId ?? this.telegramChatId,
       notifyTelegram: notifyTelegram ?? this.notifyTelegram,
       themeMode: themeMode ?? this.themeMode,
+      language: language ?? this.language,
       dateFmt: dateFmt ?? this.dateFmt,
       timeFmt: timeFmt ?? this.timeFmt,
       storagePath: storagePath ?? this.storagePath,
@@ -440,6 +451,7 @@ class AppSettings extends Equatable {
     telegramChatId,
     notifyTelegram,
     themeMode,
+    language,
     dateFmt,
     timeFmt,
     storagePath,

@@ -25,7 +25,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await windowManager.ensureInitialized();
-  const windowOptions = WindowOptions(
+  final windowOptions = WindowOptions(
     size: Size(1120, 800),
     minimumSize: Size(880, 620),
     title: S.appTitle,
@@ -181,16 +181,22 @@ class _PomodoroAppState extends State<PomodoroApp> {
     super.dispose();
   }
 
-  ThemeMode _mode(AppThemeMode mode) {
+  /// Разрешаем тему сами (а не через `themeMode`/`darkTheme`), потому что
+  /// matrix — не системная яркость, а отдельная палитра.
+  ThemeData _theme(AppThemeMode mode) {
+    final isSystemDark =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+        Brightness.dark;
     return switch (mode) {
-      AppThemeMode.light => ThemeMode.light,
-      AppThemeMode.dark => ThemeMode.dark,
-      AppThemeMode.system => ThemeMode.system,
+      AppThemeMode.light => AppTheme.light(),
+      AppThemeMode.dark => AppTheme.dark(),
+      AppThemeMode.matrix => AppTheme.matrix(),
+      AppThemeMode.system => isSystemDark ? AppTheme.dark() : AppTheme.light(),
       // Авто: светлая с 07:00 до 18:59, иначе тёмная (как в оригинале).
       AppThemeMode.auto =>
         DateTime.now().hour > 6 && DateTime.now().hour < 19
-            ? ThemeMode.light
-            : ThemeMode.dark,
+            ? AppTheme.light()
+            : AppTheme.dark(),
     };
   }
 
@@ -202,14 +208,14 @@ class _PomodoroAppState extends State<PomodoroApp> {
           context.read<TimerCubit>().applySchemeIfIdle(),
       child: BlocBuilder<SettingsCubit, SettingsState>(
         buildWhen: (prev, next) =>
-            prev.settings.themeMode != next.settings.themeMode,
+            prev.settings.themeMode != next.settings.themeMode ||
+            prev.settings.language != next.settings.language,
         builder: (context, state) {
+          S.lang = state.settings.language;
           return MaterialApp(
             title: S.appTitle,
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            themeMode: _mode(state.settings.themeMode),
+            theme: _theme(state.settings.themeMode),
             home: const HomeShell(),
           );
         },

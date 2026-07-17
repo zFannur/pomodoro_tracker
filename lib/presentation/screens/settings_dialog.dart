@@ -7,12 +7,13 @@ import '../../domain/entities/app_settings.dart';
 import '../cubits/settings_cubit.dart';
 
 void showSettingsDialog(BuildContext context) {
+  // Резолвим кубит сразу, а не внутри builder: тот вызывается лениво, и к
+  // тому моменту исходный context мог стать невалидным (например, если
+  // экран за диалогом успел перестроиться).
+  final cubit = context.read<SettingsCubit>();
   showDialog<void>(
     context: context,
-    builder: (_) => BlocProvider.value(
-      value: context.read<SettingsCubit>(),
-      child: const _SettingsDialog(),
-    ),
+    builder: (_) => BlocProvider.value(value: cubit, child: const _SettingsDialog()),
   );
 }
 
@@ -47,7 +48,7 @@ class _SettingsDialog extends StatelessWidget {
                   ],
                 ),
               ),
-              const TabBar(
+              TabBar(
                 tabs: [
                   Tab(text: S.tabTimer),
                   Tab(text: S.tabNotify),
@@ -134,7 +135,7 @@ class _TimerTab extends StatelessWidget {
             if (settings.schemes.length < 6)
               ActionChip(
                 avatar: const Icon(Icons.add, size: 16),
-                label: const Text(S.addScheme),
+                label: Text(S.addScheme),
                 onPressed: () => _addScheme(context),
               ),
           ],
@@ -175,21 +176,21 @@ class _TimerTab extends StatelessWidget {
         const Divider(height: 24),
         SwitchListTile(
           dense: true,
-          title: const Text(S.autostartBreak),
+          title: Text(S.autostartBreak),
           value: settings.autostartBreak,
           onChanged: (v) =>
               _update(context, settings.copyWith(autostartBreak: v)),
         ),
         SwitchListTile(
           dense: true,
-          title: const Text(S.autostartPomodoro),
+          title: Text(S.autostartPomodoro),
           value: settings.autostartPomodoro,
           onChanged: (v) =>
               _update(context, settings.copyWith(autostartPomodoro: v)),
         ),
         SwitchListTile(
           dense: true,
-          title: const Text(S.autostartIfTodo),
+          title: Text(S.autostartIfTodo),
           value: settings.autostartIfTodo,
           onChanged: settings.autostartPomodoro
               ? (v) => _update(context, settings.copyWith(autostartIfTodo: v))
@@ -197,7 +198,7 @@ class _TimerTab extends StatelessWidget {
         ),
         SwitchListTile(
           dense: true,
-          title: const Text(S.flowtimeLabel),
+          title: Text(S.flowtimeLabel),
           value: settings.flowtime,
           onChanged: (v) => _update(context, settings.copyWith(flowtime: v)),
         ),
@@ -231,19 +232,19 @@ class _TimerTab extends StatelessWidget {
     showDialog<String>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text(S.addScheme),
+            title: Text(S.addScheme),
             content: TextField(
               controller: controller,
               autofocus: true,
               maxLength: 10,
-              decoration: const InputDecoration(labelText: S.schemeName),
+              decoration: InputDecoration(labelText: S.schemeName),
               onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
             ),
             actions: [
               TextButton(
                 onPressed: () =>
                     Navigator.of(dialogContext).pop(controller.text),
-                child: const Text(S.add),
+                child: Text(S.add),
               ),
             ],
           ),
@@ -283,7 +284,7 @@ class _NotifyTab extends StatelessWidget {
       children: [
         ListTile(
           dense: true,
-          title: const Text(S.volume),
+          title: Text(S.volume),
           subtitle: Slider(
             value: settings.volume,
             onChanged: (v) => _update(context, settings.copyWith(volume: v)),
@@ -292,14 +293,14 @@ class _NotifyTab extends StatelessWidget {
         ),
         SwitchListTile(
           dense: true,
-          title: const Text(S.finishSound),
+          title: Text(S.finishSound),
           value: settings.finishSoundEnabled,
           onChanged: (v) =>
               _update(context, settings.copyWith(finishSoundEnabled: v)),
         ),
         ListTile(
           dense: true,
-          title: const Text(S.finishMelody),
+          title: Text(S.finishMelody),
           trailing: DropdownMenu<FinishSound>(
             initialSelection: settings.finishSound,
             requestFocusOnTap: false,
@@ -316,14 +317,14 @@ class _NotifyTab extends StatelessWidget {
         ),
         SwitchListTile(
           dense: true,
-          title: const Text(S.tickingSound),
+          title: Text(S.tickingSound),
           value: settings.tickingSound,
           onChanged: (v) =>
               _update(context, settings.copyWith(tickingSound: v)),
         ),
         SwitchListTile(
           dense: true,
-          title: const Text(S.tickingInBreaks),
+          title: Text(S.tickingInBreaks),
           value: settings.tickingInBreaks,
           onChanged: (v) =>
               _update(context, settings.copyWith(tickingInBreaks: v)),
@@ -331,21 +332,21 @@ class _NotifyTab extends StatelessWidget {
         const Divider(height: 24),
         SwitchListTile(
           dense: true,
-          title: const Text(S.notifications),
+          title: Text(S.notifications),
           value: settings.notifications,
           onChanged: (v) =>
               _update(context, settings.copyWith(notifications: v)),
         ),
         SwitchListTile(
           dense: true,
-          title: const Text(S.notifyMinuteBefore),
+          title: Text(S.notifyMinuteBefore),
           value: settings.notifyMinuteBefore,
           onChanged: (v) =>
               _update(context, settings.copyWith(notifyMinuteBefore: v)),
         ),
         SwitchListTile(
           dense: true,
-          title: const Text(S.popupRaiseWindow),
+          title: Text(S.popupRaiseWindow),
           value: settings.popupRaiseWindow,
           onChanged: (v) =>
               _update(context, settings.copyWith(popupRaiseWindow: v)),
@@ -370,7 +371,7 @@ class _NotifyTab extends StatelessWidget {
         Text(S.telegram, style: Theme.of(context).textTheme.labelLarge),
         SwitchListTile(
           dense: true,
-          title: const Text(S.notifyTelegram),
+          title: Text(S.notifyTelegram),
           value: settings.notifyTelegram,
           onChanged: (v) =>
               _update(context, settings.copyWith(notifyTelegram: v)),
@@ -455,30 +456,59 @@ class _AppTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        ListTile(
-          dense: true,
-          title: const Text(S.themeMode),
-          trailing: SegmentedButton<AppThemeMode>(
-            segments: const [
-              ButtonSegment(
-                value: AppThemeMode.light,
-                label: Text(S.themeLight),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(S.themeMode, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 8),
+              SegmentedButton<AppThemeMode>(
+                segments: [
+                  ButtonSegment(
+                    value: AppThemeMode.light,
+                    label: Text(S.themeLight),
+                  ),
+                  ButtonSegment(
+                    value: AppThemeMode.dark,
+                    label: Text(S.themeDark),
+                  ),
+                  ButtonSegment(
+                    value: AppThemeMode.system,
+                    label: Text(S.themeSystem),
+                  ),
+                  ButtonSegment(
+                    value: AppThemeMode.auto,
+                    label: Text(S.themeAuto),
+                  ),
+                  ButtonSegment(
+                    value: AppThemeMode.matrix,
+                    label: Text(S.themeMatrix),
+                  ),
+                ],
+                selected: {settings.themeMode},
+                onSelectionChanged: (s) =>
+                    _update(context, settings.copyWith(themeMode: s.first)),
               ),
-              ButtonSegment(value: AppThemeMode.dark, label: Text(S.themeDark)),
-              ButtonSegment(
-                value: AppThemeMode.system,
-                label: Text(S.themeSystem),
-              ),
-              ButtonSegment(value: AppThemeMode.auto, label: Text(S.themeAuto)),
             ],
-            selected: {settings.themeMode},
-            onSelectionChanged: (s) =>
-                _update(context, settings.copyWith(themeMode: s.first)),
           ),
         ),
         ListTile(
           dense: true,
-          title: const Text(S.dateFormat),
+          title: Text(S.language),
+          trailing: SegmentedButton<AppLanguage>(
+            segments: [
+              ButtonSegment(value: AppLanguage.ru, label: Text(S.languageRu)),
+              ButtonSegment(value: AppLanguage.en, label: Text(S.languageEn)),
+            ],
+            selected: {settings.language},
+            onSelectionChanged: (s) =>
+                _update(context, settings.copyWith(language: s.first)),
+          ),
+        ),
+        ListTile(
+          dense: true,
+          title: Text(S.dateFormat),
           trailing: DropdownMenu<DateFmt>(
             initialSelection: settings.dateFmt,
             requestFocusOnTap: false,
@@ -493,7 +523,7 @@ class _AppTab extends StatelessWidget {
         ),
         ListTile(
           dense: true,
-          title: const Text(S.timeFormat),
+          title: Text(S.timeFormat),
           trailing: SegmentedButton<TimeFmt>(
             segments: const [
               ButtonSegment(value: TimeFmt.h12, label: Text('2:00PM')),
@@ -506,7 +536,7 @@ class _AppTab extends StatelessWidget {
         ),
         ListTile(
           dense: true,
-          title: const Text(S.storageFolder),
+          title: Text(S.storageFolder),
           subtitle: Text(settings.storagePath),
           trailing: OutlinedButton(
             onPressed: () async {
@@ -517,7 +547,7 @@ class _AppTab extends StatelessWidget {
                 _update(context, settings.copyWith(storagePath: path));
               }
             },
-            child: const Text(S.chooseFolder),
+            child: Text(S.chooseFolder),
           ),
         ),
         const Divider(height: 24),
@@ -545,7 +575,7 @@ class _AppTab extends StatelessWidget {
               ),
             ActionChip(
               avatar: const Icon(Icons.add, size: 16),
-              label: const Text(S.newCategory),
+              label: Text(S.newCategory),
               onPressed: () => _addCategory(context),
             ),
           ],
@@ -564,7 +594,7 @@ class _AppTab extends StatelessWidget {
         children: [
           SimpleDialogOption(
             onPressed: () => Navigator.of(dialogContext).pop(''),
-            child: const Text(S.defaultScheme),
+            child: Text(S.defaultScheme),
           ),
           for (final s in settings.schemes)
             SimpleDialogOption(
@@ -588,7 +618,7 @@ class _AppTab extends StatelessWidget {
     showDialog<String>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text(S.newCategory),
+            title: Text(S.newCategory),
             content: TextField(
               controller: controller,
               autofocus: true,
@@ -598,7 +628,7 @@ class _AppTab extends StatelessWidget {
               TextButton(
                 onPressed: () =>
                     Navigator.of(dialogContext).pop(controller.text),
-                child: const Text(S.add),
+                child: Text(S.add),
               ),
             ],
           ),

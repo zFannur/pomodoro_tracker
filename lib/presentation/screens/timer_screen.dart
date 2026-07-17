@@ -5,7 +5,6 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../app/strings.dart';
 import '../../app/theme.dart';
-import '../../data/markdown_codec.dart' show formatMinutes;
 import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
@@ -70,25 +69,25 @@ class _TimerBlock extends StatelessWidget {
     final note = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text(S.whereStopped),
+        title: Text(S.whereStopped),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             helperText: S.whereStoppedHint,
             isDense: true,
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
           onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text(S.withoutNote),
+            child: Text(S.withoutNote),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-            child: const Text(S.save),
+            child: Text(S.save),
           ),
         ],
       ),
@@ -294,13 +293,13 @@ class _TimerBlock extends StatelessWidget {
         FilledButton.icon(
           onPressed: () => cubit.doneEarly(),
           icon: const Icon(Icons.check),
-          label: const Text(S.doneEarly),
+          label: Text(S.doneEarly),
         ),
         const SizedBox(width: 12),
         OutlinedButton.icon(
           onPressed: () => _stopWithNote(context),
           icon: const Icon(Icons.stop),
-          label: const Text(S.stop),
+          label: Text(S.stop),
         ),
       ];
     }
@@ -309,7 +308,7 @@ class _TimerBlock extends StatelessWidget {
         FilledButton.icon(
           onPressed: cubit.start,
           icon: const Icon(Icons.play_arrow),
-          label: const Text(S.start),
+          label: Text(S.start),
         ),
         const SizedBox(width: 12),
         // Простой — информационный чип, а не «сломанная» серая кнопка.
@@ -321,18 +320,18 @@ class _TimerBlock extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              '${S.delayLabel}: ${formatMinutes(timer.delaysMs ~/ 60000)}',
+              '${S.delayLabel}: ${formatMinutesUi(timer.delaysMs ~/ 60000)}',
               style: TextStyle(color: scheme.tertiary),
             ),
           )
         else
-          const OutlinedButton(onPressed: null, child: Text(S.stop)),
+          OutlinedButton(onPressed: null, child: Text(S.stop)),
       ],
       TimerRun.running => [
         FilledButton.tonalIcon(
           onPressed: cubit.pause,
           icon: const Icon(Icons.pause),
-          label: const Text(S.pause),
+          label: Text(S.pause),
         ),
         const SizedBox(width: 12),
         if (timer.isBreak)
@@ -353,20 +352,20 @@ class _TimerBlock extends StatelessWidget {
         FilledButton.icon(
           onPressed: cubit.resume,
           icon: const Icon(Icons.play_arrow),
-          label: const Text(S.resume),
+          label: Text(S.resume),
         ),
         const SizedBox(width: 12),
         if (!timer.isBreak) ...[
           FilledButton.tonalIcon(
             onPressed: () => cubit.doneEarly(),
             icon: const Icon(Icons.check),
-            label: const Text(S.doneEarly),
+            label: Text(S.doneEarly),
           ),
           const SizedBox(width: 12),
           OutlinedButton.icon(
             onPressed: () => _stopWithNote(context),
             icon: const Icon(Icons.stop),
-            label: const Text(S.stop),
+            label: Text(S.stop),
           ),
         ],
       ],
@@ -487,7 +486,7 @@ class _TodoSection extends StatelessWidget {
 
     return SectionCard(
       title:
-          '${S.planned} · $totalPomos / ${formatMinutes(totalPomos * scheme.pomodoro)}',
+          '${S.planned} · $totalPomos / ${formatMinutesUi(totalPomos * scheme.pomodoro)}',
       trailing: _ListGear(
         items: [
           _GearItem(
@@ -756,8 +755,7 @@ class _TaskRow extends StatelessWidget {
             ),
           const SizedBox(width: 8),
           Tooltip(
-            message:
-                '${task.durationMinutes}м · клик +1 🍅, Alt-клик −1, Shift ×4',
+            message: S.pomoClickHint(task.durationMinutes),
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () {
@@ -854,22 +852,22 @@ class _TaskMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(value: 'plus', child: Text(S.menuAddPomo)),
+        PopupMenuItem(value: 'plus', child: Text(S.menuAddPomo)),
         PopupMenuItem(
           value: 'minus',
           enabled: task.durationMinutes > 1,
-          child: const Text(S.menuRemovePomo),
+          child: Text(S.menuRemovePomo),
         ),
-        const PopupMenuItem(value: 'done', child: Text(S.menuMarkDone)),
-        const PopupMenuItem(value: 'doneAll', child: Text(S.menuCloseWhole)),
-        const PopupMenuItem(value: 'split', child: Text(S.menuSplit)),
-        const PopupMenuItem(value: 'merge', child: Text(S.menuMerge)),
+        PopupMenuItem(value: 'done', child: Text(S.menuMarkDone)),
+        PopupMenuItem(value: 'doneAll', child: Text(S.menuCloseWhole)),
+        PopupMenuItem(value: 'split', child: Text(S.menuSplit)),
+        PopupMenuItem(value: 'merge', child: Text(S.menuMerge)),
         const PopupMenuDivider(),
-        const PopupMenuItem(value: 'inbox', child: Text('↩ ${S.menuToInbox}')),
-        const PopupMenuItem(value: 'tomorrow', child: Text(S.menuToTomorrow)),
-        const PopupMenuItem(value: 'later', child: Text(S.menuToLater)),
+        PopupMenuItem(value: 'inbox', child: Text('↩ ${S.menuToInbox}')),
+        PopupMenuItem(value: 'tomorrow', child: Text(S.menuToTomorrow)),
+        PopupMenuItem(value: 'later', child: Text(S.menuToLater)),
         const PopupMenuDivider(),
-        const PopupMenuItem(value: 'delete', child: Text(S.delete)),
+        PopupMenuItem(value: 'delete', child: Text(S.delete)),
       ],
     );
   }
@@ -917,7 +915,7 @@ class _DoneSection extends StatelessWidget {
     }
 
     return SectionCard(
-      title: '${S.doneTitle} · ${log.count} / ${formatMinutes(log.minutes)}',
+      title: '${S.doneTitle} · ${log.count} / ${formatMinutesUi(log.minutes)}',
       trailing: _ListGear(
         items: [
           _GearItem(
@@ -949,7 +947,7 @@ class _DoneSection extends StatelessWidget {
           const Divider(height: 24),
           Text(
             '${S.focusLabel} · ${log.focus}% · ${S.delaysLabel} · '
-            '${formatMinutes(log.delayMinutes)} · ${S.interruptionsLabel} · ${log.interruptions}',
+            '${formatMinutesUi(log.delayMinutes)} · ${S.interruptionsLabel} · ${log.interruptions}',
             textAlign: TextAlign.center,
             style: theme.textTheme.titleSmall,
           ),
@@ -1001,7 +999,7 @@ class _DoneRow extends StatelessWidget {
             ),
           const SizedBox(width: 6),
           Text(
-            '${formatMinutes(entry.minutes)} · ${formatClock(finish, settings.timeFmt)}',
+            '${formatMinutesUi(entry.minutes)} · ${formatClock(finish, settings.timeFmt)}',
             style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -1022,10 +1020,10 @@ class _DoneRow extends StatelessWidget {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'repeat', child: Text(S.menuRepeat)),
-              const PopupMenuItem(value: 'fill', child: Text(S.menuFillBlanks)),
+              PopupMenuItem(value: 'repeat', child: Text(S.menuRepeat)),
+              PopupMenuItem(value: 'fill', child: Text(S.menuFillBlanks)),
               const PopupMenuDivider(),
-              const PopupMenuItem(value: 'delete', child: Text(S.delete)),
+              PopupMenuItem(value: 'delete', child: Text(S.delete)),
             ],
           ),
         ],
@@ -1040,7 +1038,7 @@ class _DoneRow extends StatelessWidget {
       fields: {
         S.categoryHint: entry.category,
         S.descriptionHint: entry.task,
-        'Минуты': '${entry.minutes}',
+        S.minutesField: '${entry.minutes}',
       },
     ).then((values) {
       if (values == null) return;
@@ -1048,7 +1046,7 @@ class _DoneRow extends StatelessWidget {
         entry,
         category: values[S.categoryHint],
         task: values[S.descriptionHint],
-        minutes: int.tryParse(values['Минуты'] ?? '') ?? entry.minutes,
+        minutes: int.tryParse(values[S.minutesField] ?? '') ?? entry.minutes,
       );
     });
   }
@@ -1240,7 +1238,7 @@ class _AddTaskFormState extends State<_AddTaskForm> {
           initialSelection: _category,
           width: 140,
           requestFocusOnTap: false,
-          label: const Text(S.categoryHint),
+          label: Text(S.categoryHint),
           dropdownMenuEntries: [
             for (final c in categories) DropdownMenuEntry(value: c, label: c),
           ],
@@ -1250,16 +1248,16 @@ class _AddTaskFormState extends State<_AddTaskForm> {
         Expanded(
           child: TextField(
             controller: _text,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: S.descriptionHint,
               isDense: true,
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
             ),
             onSubmitted: (_) => _submit(),
           ),
         ),
         const SizedBox(width: 8),
-        FilledButton.tonal(onPressed: _submit, child: const Text(S.add)),
+        FilledButton.tonal(onPressed: _submit, child: Text(S.add)),
         if (widget.onSubmitInbox != null) ...[
           const SizedBox(width: 4),
           IconButton(
@@ -1272,7 +1270,7 @@ class _AddTaskFormState extends State<_AddTaskForm> {
           const SizedBox(width: 4),
           OutlinedButton.icon(
             icon: const Icon(Icons.inbox_outlined, size: 16),
-            label: const Text(S.planner),
+            label: Text(S.planner),
             onPressed: () => showPlannerDialog(context),
           ),
         ],
@@ -1286,16 +1284,16 @@ Future<bool> _confirmClear(BuildContext context) async {
   final result = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text(S.clearList),
-      content: const Text(S.confirmClear),
+      title: Text(S.clearList),
+      content: Text(S.confirmClear),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text(S.cancel),
+          child: Text(S.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: const Text(S.delete),
+          child: Text(S.delete),
         ),
       ],
     ),
@@ -1336,13 +1334,13 @@ Future<Map<String, String>?> showEditDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text(S.close),
+          child: Text(S.close),
         ),
         FilledButton(
           onPressed: () => Navigator.of(dialogContext).pop({
             for (final e in controllers.entries) e.key: e.value.text.trim(),
           }),
-          child: const Text(S.save),
+          child: Text(S.save),
         ),
       ],
     ),

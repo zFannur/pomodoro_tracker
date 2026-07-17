@@ -27,21 +27,65 @@ abstract final class AppTheme {
   static Color rest(ColorScheme scheme) =>
       scheme.brightness == Brightness.dark ? restGreenDark : restGreen;
 
+  static const _matrixGreen = Color(0xFF00FF66);
+
   static ThemeData light() => _build(Brightness.light);
 
   static ThemeData dark() => _build(Brightness.dark);
 
-  static ThemeData _build(Brightness brightness) {
-    final dark = brightness == Brightness.dark;
+  /// Чёрный терминал, неоновый зелёный, моноширинный шрифт.
+  static ThemeData matrix() {
     final scheme = ColorScheme.fromSeed(
-      seedColor: _seed,
-      brightness: brightness,
+      seedColor: _matrixGreen,
+      brightness: Brightness.dark,
+    ).copyWith(
+      primary: _matrixGreen,
+      onPrimary: Colors.black,
+      secondary: _matrixGreen,
+      tertiary: _matrixGreen,
+      surface: Colors.black,
+      surfaceContainerLowest: const Color(0xFF040A04),
+      onSurface: _matrixGreen,
+      onSurfaceVariant: const Color(0xFF3FA45B),
+      outline: const Color(0xFF1E5C33),
+      outlineVariant: const Color(0xFF123D20),
+      error: const Color(0xFFFF3B30),
     );
+    final base = _build(
+      Brightness.dark,
+      overrideScheme: scheme,
+      background: Colors.black,
+      card: const Color(0xFF040A04),
+      border: const Color(0xFF1E5C33),
+    );
+    final mono = base.textTheme.apply(
+      fontFamily: 'Consolas',
+      fontFamilyFallback: const ['Courier New', 'monospace'],
+    );
+    return base.copyWith(
+      textTheme: mono,
+      primaryTextTheme: mono,
+      scaffoldBackgroundColor: Colors.black,
+    );
+  }
+
+  static ThemeData _build(
+    Brightness brightness, {
+    ColorScheme? overrideScheme,
+    Color? background,
+    Color? card,
+    Color? border,
+  }) {
+    final dark = brightness == Brightness.dark;
+    final scheme =
+        overrideScheme ??
+        ColorScheme.fromSeed(seedColor: _seed, brightness: brightness);
     // Тёплая бумага вместо дефолтного серого: фон чуть тонирован сидом,
-    // карточки — чистые, с тонкой обводкой вместо тени.
-    final background = dark ? const Color(0xFF161416) : const Color(0xFFF8F4F2);
-    final card = dark ? const Color(0xFF201D1F) : Colors.white;
-    final border = dark ? const Color(0xFF383336) : const Color(0xFFEAE1DD);
+    // карточки — чистые, с тонкой обводкой вместо тени. Тема matrix
+    // передаёт свою чёрно-зелёную палитру через параметры выше.
+    background ??= dark ? const Color(0xFF161416) : const Color(0xFFF8F4F2);
+    card ??= dark ? const Color(0xFF201D1F) : Colors.white;
+    border ??= dark ? const Color(0xFF383336) : const Color(0xFFEAE1DD);
 
     final radius12 = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(12),
