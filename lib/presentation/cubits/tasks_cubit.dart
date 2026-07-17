@@ -432,6 +432,49 @@ class TasksCubit extends Cubit<TasksState> {
     await _persist(planner: planner);
   }
 
+  /// Перестановка внутри планировщика (реальные индексы; при drag внутри
+  /// корзины относительный порядок остальных корзин не меняется).
+  Future<void> plannerReorder(int oldIndex, int newIndex) async {
+    final planner = [...state.planner];
+    if (oldIndex < 0 || oldIndex >= planner.length) return;
+    final task = planner.removeAt(oldIndex);
+    planner.insert(math.min(newIndex, planner.length), task);
+    await _persist(planner: planner);
+  }
+
+  Future<void> plannerEdit(
+    int index, {
+    String? description,
+    String? category,
+  }) async {
+    final planner = [...state.planner];
+    if (index < 0 || index >= planner.length) return;
+    planner[index] = planner[index].copyWith(
+      description: description,
+      category: category?.trim().replaceAll(' ', '-'),
+    );
+    await _persist(planner: planner);
+  }
+
+  /// Вернуть задачу на место (undo удаления из «Сегодня»).
+  Future<void> insertTodoAt(int index, PomoTask task) async {
+    final todo = [...state.todo];
+    // Пока висел снекбар, лягушку могли передать другой задаче — инвариант
+    // «одна 🐸» важнее восстановления флага (последний выбор побеждает).
+    final restored = task.frog && todo.any((t) => t.frog)
+        ? task.copyWith(frog: false)
+        : task;
+    todo.insert(index.clamp(0, todo.length), restored);
+    await _persist(todo: todo);
+  }
+
+  /// Вернуть задачу на место (undo удаления из планировщика).
+  Future<void> insertPlannerAt(int index, PomoTask task) async {
+    final planner = [...state.planner];
+    planner.insert(index.clamp(0, planner.length), task);
+    await _persist(planner: planner);
+  }
+
   // -- завершение помидора таймером ---------------------------------------------
 
   /// Верхняя задача получает запись истории; её оценка уменьшается.

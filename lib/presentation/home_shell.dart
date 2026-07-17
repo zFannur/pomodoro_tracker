@@ -10,6 +10,7 @@ import 'cubits/timer_cubit.dart';
 import 'screens/settings_dialog.dart';
 import 'screens/sprint_screen.dart';
 import 'screens/stats_screen.dart';
+import 'screens/tasks_screen.dart';
 import 'screens/timer_screen.dart';
 
 /// Оболочка: NavigationRail + горячие клавиши + заголовок окна с отсчётом.
@@ -40,6 +41,14 @@ class _HomeShellState extends State<HomeShell> {
     // Не перехватываем клавиши, когда открыт диалог/меню: иначе Esc в диалоге
     // одновременно закрывал его и стопал помидор, а Space дёргал таймер.
     if (ModalRoute.of(context)?.isCurrent != true) return false;
+    // Ctrl+N — на экран «Задачи», курсор в поле быстрого добавления.
+    // До проверки текстового поля: работает «из любого места», включая ввод.
+    if (event.logicalKey == LogicalKeyboardKey.keyN &&
+        HardwareKeyboard.instance.isControlPressed) {
+      setState(() => _index = 1);
+      TasksScreen.requestQuickAddFocus();
+      return true;
+    }
     // Не перехватываем клавиши, когда фокус в текстовом поле.
     final focused = FocusManager.instance.primaryFocus?.context?.widget;
     if (focused is EditableText) return false;
@@ -82,6 +91,18 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  /// Иконка «Задачи»: пока без своего 3D-ассета — Material в цвет темы.
+  Widget _tasksIcon({required bool selected}) {
+    return Opacity(
+      opacity: selected ? 1 : 0.45,
+      child: Icon(
+        Icons.checklist_rounded,
+        size: 30,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    );
+  }
+
   /// Заголовок окна: при работающем таймере — «MM:SS контекст».
   void _updateTitle(TimerState timer) {
     if (!timer.running) {
@@ -117,7 +138,12 @@ class _HomeShellState extends State<HomeShell> {
             NavigationRail(
               selectedIndex: _index,
               labelType: NavigationRailLabelType.all,
-              onDestinationSelected: (i) => setState(() => _index = i),
+              onDestinationSelected: (i) {
+                // Снять фокус со скрытого поля ввода (IndexedStack держит
+                // экраны живыми) — иначе оно съедает Space/Esc на другой вкладке.
+                FocusManager.instance.primaryFocus?.unfocus();
+                setState(() => _index = i);
+              },
               leading: Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 12),
                 child: Image.asset(
@@ -149,6 +175,11 @@ class _HomeShellState extends State<HomeShell> {
                   label: Text(S.navTimer),
                 ),
                 NavigationRailDestination(
+                  icon: _tasksIcon(selected: false),
+                  selectedIcon: _tasksIcon(selected: true),
+                  label: Text(S.navTasks),
+                ),
+                NavigationRailDestination(
                   icon: _navIcon('assets/nav/sprint.png', selected: false),
                   selectedIcon: _navIcon(
                     'assets/nav/sprint.png',
@@ -174,7 +205,12 @@ class _HomeShellState extends State<HomeShell> {
                 key: ValueKey(language),
                 index: _index,
                 sizing: StackFit.expand,
-                children: const [TimerScreen(), SprintScreen(), StatsScreen()],
+                children: const [
+                  TimerScreen(),
+                  TasksScreen(),
+                  SprintScreen(),
+                  StatsScreen(),
+                ],
               ),
             ),
           ],

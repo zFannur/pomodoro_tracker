@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
 import '../../app/theme.dart';
 import '../../domain/entities/pomo_session.dart';
+import '../../domain/entities/pomo_task.dart';
+import '../cubits/tasks_cubit.dart';
 
 /// Карточка-секция с заголовком.
 class SectionCard extends StatelessWidget {
@@ -304,6 +307,144 @@ class HeatmapCalendar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Имя корзины планировщика.
+String plannerTabLabel(PlannerTab tab) => switch (tab) {
+  PlannerTab.inbox => S.inbox,
+  PlannerTab.tomorrow => S.tomorrow,
+  PlannerTab.week => S.week,
+  PlannerTab.later => S.later,
+};
+
+/// Снекбар «Задача удалена» с отменой.
+void showUndoSnack(BuildContext context, {required VoidCallback onUndo}) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(S.taskDeleted),
+        duration: const Duration(seconds: 5),
+        behavior: SnackBarBehavior.floating,
+        width: 360,
+        action: SnackBarAction(label: S.undo, onPressed: onUndo),
+      ),
+    );
+}
+
+/// Меню ⋮ задачи из «Сегодня»: помидоры, готово, разбить/слить, корзины.
+class TaskMenu extends StatelessWidget {
+  const TaskMenu({required this.task, super.key});
+
+  final PomoTask task;
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<TasksCubit>();
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert, size: 18),
+      onSelected: (value) {
+        // Индекс в момент выбора: пока меню было открыто, помидор мог
+        // дотикать и сдвинуть список.
+        final index = cubit.todoIndexOf(task);
+        if (index < 0) return;
+        switch (value) {
+          case 'plus':
+            cubit.plus(index);
+          case 'minus':
+            cubit.minus(index);
+          case 'done':
+            cubit.markDone(index);
+          case 'doneAll':
+            cubit.markDone(index, whole: true);
+          case 'split':
+            cubit.split(index);
+          case 'merge':
+            cubit.merge(index);
+          case 'inbox':
+            cubit.postpone(index, PlannerTab.inbox);
+          case 'tomorrow':
+            cubit.postpone(index, PlannerTab.tomorrow);
+          case 'later':
+            cubit.postpone(index, PlannerTab.later);
+          case 'delete':
+            cubit.removeAt(index);
+            showUndoSnack(
+              context,
+              onUndo: () => cubit.insertTodoAt(index, task),
+            );
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(value: 'plus', child: Text(S.menuAddPomo)),
+        PopupMenuItem(
+          value: 'minus',
+          enabled: task.durationMinutes > 1,
+          child: Text(S.menuRemovePomo),
+        ),
+        PopupMenuItem(value: 'done', child: Text(S.menuMarkDone)),
+        PopupMenuItem(value: 'doneAll', child: Text(S.menuCloseWhole)),
+        PopupMenuItem(value: 'split', child: Text(S.menuSplit)),
+        PopupMenuItem(value: 'merge', child: Text(S.menuMerge)),
+        const PopupMenuDivider(),
+        PopupMenuItem(value: 'inbox', child: Text('↩ ${S.menuToInbox}')),
+        PopupMenuItem(value: 'tomorrow', child: Text(S.menuToTomorrow)),
+        PopupMenuItem(value: 'later', child: Text(S.menuToLater)),
+        const PopupMenuDivider(),
+        PopupMenuItem(value: 'delete', child: Text(S.delete)),
+      ],
+    );
+  }
+}
+
+/// Простой диалог редактирования пар «метка → значение».
+Future<Map<String, String>?> showEditDialog(
+  BuildContext context, {
+  required String title,
+  required Map<String, String> fields,
+}) {
+  final controllers = {
+    for (final e in fields.entries) e.key: TextEditingController(text: e.value),
+  };
+  return showDialog<Map<String, String>>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final e in controllers.entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TextField(
+                controller: e.value,
+                decoration: InputDecoration(
+                  labelText: e.key,
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: Text(S.close),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop({
+            for (final e in controllers.entries) e.key: e.value.text.trim(),
+          }),
+          child: Text(S.save),
+        ),
+      ],
+    ),
+  ).whenComplete(() {
+    for (final c in controllers.values) {
+      c.dispose();
+    }
+  });
 }
 
 /// Общий вид ошибки с кнопкой повтора.

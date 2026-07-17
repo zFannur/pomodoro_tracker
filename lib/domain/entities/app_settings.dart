@@ -151,6 +151,7 @@ class AppSettings extends Equatable {
     required this.sprintGoal,
     this.lastDay = '',
     this.lastSprintId = '',
+    this.collapsedGroups = defaultCollapsedGroups,
   });
 
   factory AppSettings.fromJson(
@@ -213,6 +214,9 @@ class AppSettings extends Equatable {
       sprintGoal: json['sprintGoal'] as int? ?? 40,
       lastDay: json['lastDay'] as String? ?? '',
       lastSprintId: json['lastSprintId'] as String? ?? '',
+      collapsedGroups:
+          (json['collapsedGroups'] as List?)?.whereType<String>().toList() ??
+          defaultCollapsedGroups,
     );
   }
 
@@ -241,6 +245,9 @@ class AppSettings extends Equatable {
   ];
 
   static const defaultCategories = ['работа', 'личное'];
+
+  /// Свёрнутые по умолчанию группы экрана «Задачи».
+  static const defaultCollapsedGroups = ['later', 'doneWeek'];
 
   final List<TimerScheme> schemes;
   final String activeScheme;
@@ -312,6 +319,9 @@ class AppSettings extends Equatable {
   /// Служебное: последняя увиденная неделя (сброс ⭐ в новый спринт).
   final String lastSprintId;
 
+  /// Свёрнутые группы экрана «Задачи» (ключи групп).
+  final List<String> collapsedGroups;
+
   TimerScheme get scheme => schemes.firstWhere(
     (s) => s.name == activeScheme,
     orElse: () => schemes.isEmpty ? defaultSchemes.first : schemes.first,
@@ -349,6 +359,7 @@ class AppSettings extends Equatable {
     'sprintGoal': sprintGoal,
     'lastDay': lastDay,
     'lastSprintId': lastSprintId,
+    'collapsedGroups': collapsedGroups,
   };
 
   AppSettings copyWith({
@@ -383,6 +394,7 @@ class AppSettings extends Equatable {
     int? sprintGoal,
     String? lastDay,
     String? lastSprintId,
+    List<String>? collapsedGroups,
   }) {
     return AppSettings(
       schemes: schemes ?? this.schemes,
@@ -416,6 +428,7 @@ class AppSettings extends Equatable {
       sprintGoal: sprintGoal ?? this.sprintGoal,
       lastDay: lastDay ?? this.lastDay,
       lastSprintId: lastSprintId ?? this.lastSprintId,
+      collapsedGroups: collapsedGroups ?? this.collapsedGroups,
     );
   }
 
@@ -459,5 +472,6 @@ class AppSettings extends Equatable {
     sprintGoal,
     lastDay,
     lastSprintId,
+    collapsedGroups,
   ];
 }

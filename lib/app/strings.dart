@@ -12,6 +12,7 @@ abstract final class S {
 
   // Навигация
   static String get navTimer => _t('Таймер', 'Timer');
+  static String get navTasks => _t('Задачи', 'Tasks');
   static String get navSprint => _t('Спринт', 'Sprint');
   static String get navStats => _t('Статистика', 'Stats');
 
@@ -258,6 +259,14 @@ abstract final class S {
     '$minutesм · клик +1 🍅, Alt-клик −1, Shift ×4',
     '${minutes}m · click +1 🍅, Alt-click −1, Shift ×4',
   );
+
+  // Экран задач
+  static String get quickAddHint => _t(
+    'Enter — во «Входящие» · Ctrl+Enter — в «Сегодня» · Ctrl+N — сюда из любого места',
+    'Enter — to "Inbox" · Ctrl+Enter — to "Today" · Ctrl+N — jump here from anywhere',
+  );
+  static String get undo => _t('Отменить', 'Undo');
+  static String get taskDeleted => _t('Задача удалена', 'Task deleted');
 
   // Общее
   static String get retry => _t('Повторить', 'Retry');

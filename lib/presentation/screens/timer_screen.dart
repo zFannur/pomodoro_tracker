@@ -786,7 +786,7 @@ class _TaskRow extends StatelessWidget {
               ),
             ),
           ),
-          _TaskMenu(task: task),
+          TaskMenu(task: task),
         ],
       ),
     );
@@ -810,66 +810,6 @@ class _TaskRow extends StatelessWidget {
         description: values[S.descriptionHint],
       );
     });
-  }
-}
-
-class _TaskMenu extends StatelessWidget {
-  const _TaskMenu({required this.task});
-
-  final PomoTask task;
-
-  @override
-  Widget build(BuildContext context) {
-    final cubit = context.read<TasksCubit>();
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert, size: 18),
-      onSelected: (value) {
-        // Индекс в момент выбора: пока меню было открыто, помидор мог
-        // дотикать и сдвинуть список.
-        final index = cubit.todoIndexOf(task);
-        if (index < 0) return;
-        switch (value) {
-          case 'plus':
-            cubit.plus(index);
-          case 'minus':
-            cubit.minus(index);
-          case 'done':
-            cubit.markDone(index);
-          case 'doneAll':
-            cubit.markDone(index, whole: true);
-          case 'split':
-            cubit.split(index);
-          case 'merge':
-            cubit.merge(index);
-          case 'inbox':
-            cubit.postpone(index, PlannerTab.inbox);
-          case 'tomorrow':
-            cubit.postpone(index, PlannerTab.tomorrow);
-          case 'later':
-            cubit.postpone(index, PlannerTab.later);
-          case 'delete':
-            cubit.removeAt(index);
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem(value: 'plus', child: Text(S.menuAddPomo)),
-        PopupMenuItem(
-          value: 'minus',
-          enabled: task.durationMinutes > 1,
-          child: Text(S.menuRemovePomo),
-        ),
-        PopupMenuItem(value: 'done', child: Text(S.menuMarkDone)),
-        PopupMenuItem(value: 'doneAll', child: Text(S.menuCloseWhole)),
-        PopupMenuItem(value: 'split', child: Text(S.menuSplit)),
-        PopupMenuItem(value: 'merge', child: Text(S.menuMerge)),
-        const PopupMenuDivider(),
-        PopupMenuItem(value: 'inbox', child: Text('↩ ${S.menuToInbox}')),
-        PopupMenuItem(value: 'tomorrow', child: Text(S.menuToTomorrow)),
-        PopupMenuItem(value: 'later', child: Text(S.menuToLater)),
-        const PopupMenuDivider(),
-        PopupMenuItem(value: 'delete', child: Text(S.delete)),
-      ],
-    );
   }
 }
 
@@ -1301,52 +1241,3 @@ Future<bool> _confirmClear(BuildContext context) async {
   return result ?? false;
 }
 
-/// Простой диалог редактирования пар «метка → значение».
-Future<Map<String, String>?> showEditDialog(
-  BuildContext context, {
-  required String title,
-  required Map<String, String> fields,
-}) {
-  final controllers = {
-    for (final e in fields.entries) e.key: TextEditingController(text: e.value),
-  };
-  return showDialog<Map<String, String>>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text(title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final e in controllers.entries)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: TextField(
-                controller: e.value,
-                decoration: InputDecoration(
-                  labelText: e.key,
-                  isDense: true,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-            ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: Text(S.close),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(dialogContext).pop({
-            for (final e in controllers.entries) e.key: e.value.text.trim(),
-          }),
-          child: Text(S.save),
-        ),
-      ],
-    ),
-  ).whenComplete(() {
-    for (final c in controllers.values) {
-      c.dispose();
-    }
-  });
-}
