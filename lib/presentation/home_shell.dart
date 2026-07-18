@@ -50,8 +50,16 @@ class _HomeShellState extends State<HomeShell> {
       return true;
     }
     // Не перехватываем клавиши, когда фокус в текстовом поле.
-    final focused = FocusManager.instance.primaryFocus?.context?.widget;
-    if (focused is EditableText) return false;
+    // Узел фокуса привязан к внутреннему Focus-виджету EditableText,
+    // поэтому прямой проверки `widget is EditableText` недостаточно —
+    // ищем EditableText вверх по дереву от точки фокуса.
+    final focusContext = FocusManager.instance.primaryFocus?.context;
+    if (focusContext != null &&
+        (focusContext.widget is EditableText ||
+            focusContext.findAncestorWidgetOfExactType<EditableText>() !=
+                null)) {
+      return false;
+    }
     final timer = context.read<TimerCubit>();
     final tasks = context.read<TasksCubit>();
     final shift = HardwareKeyboard.instance.isShiftPressed;
