@@ -5,6 +5,7 @@ import '../../app/strings.dart';
 import '../../app/theme.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
+import '../cubits/settings_cubit.dart';
 import '../cubits/tasks_cubit.dart';
 
 /// Карточка-секция с заголовком.
@@ -397,35 +398,83 @@ class TaskMenu extends StatelessWidget {
   }
 }
 
-/// Простой диалог редактирования пар «метка → значение».
-Future<Map<String, String>?> showEditDialog(
+/// Новая категория из диалога сразу попадает в настройки —
+/// появляется во всех дропдаунах, схема таймера — по умолчанию.
+void registerCategory(SettingsCubit settings, String category) {
+  final name = category.trim().replaceAll(' ', '-');
+  final current = settings.state.settings;
+  if (name.isEmpty || current.categories.containsKey(name)) return;
+  settings.update(
+    current.copyWith(categories: {...current.categories, name: null}),
+  );
+}
+
+/// Диалог редактирования задачи/записи: категория — выбор из списка ИЛИ
+/// свободный ввод новой (она сразу регистрируется в настройках).
+/// [minutes] != null — добавляется поле минут (записи «Сделано»).
+Future<({String category, String description, int? minutes})?>
+showTaskEditDialog(
   BuildContext context, {
   required String title,
-  required Map<String, String> fields,
+  required String category,
+  required String description,
+  int? minutes,
 }) {
-  final controllers = {
-    for (final e in fields.entries) e.key: TextEditingController(text: e.value),
-  };
-  return showDialog<Map<String, String>>(
+  // Кубит — до showDialog: builder ленив, исходный context может умереть.
+  final settingsCubit = context.read<SettingsCubit>();
+  final categories = settingsCubit.state.settings.categories.keys.toList();
+  final catController = TextEditingController(text: category);
+  final descController = TextEditingController(text: description);
+  final minController = minutes == null
+      ? null
+      : TextEditingController(text: '$minutes');
+  return showDialog<({String category, String description, int? minutes})>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: Text(title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final e in controllers.entries)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: TextField(
-                controller: e.value,
+      content: SizedBox(
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DropdownMenu<String>(
+              controller: catController,
+              initialSelection: categories.contains(category)
+                  ? category
+                  : null,
+              // Клик в поле — курсор: можно вписать новую категорию.
+              requestFocusOnTap: true,
+              expandedInsets: EdgeInsets.zero,
+              label: Text(S.categoryHint),
+              dropdownMenuEntries: [
+                for (final c in categories)
+                  DropdownMenuEntry(value: c, label: c),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descController,
+              decoration: InputDecoration(
+                labelText: S.descriptionHint,
+                isDense: true,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            if (minController != null) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: minController,
+                keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: e.key,
+                  labelText: S.minutesField,
                   isDense: true,
                   border: const OutlineInputBorder(),
                 ),
               ),
-            ),
-        ],
+            ],
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -433,17 +482,25 @@ Future<Map<String, String>?> showEditDialog(
           child: Text(S.close),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(dialogContext).pop({
-            for (final e in controllers.entries) e.key: e.value.text.trim(),
-          }),
+          onPressed: () {
+            final cat = catController.text.trim();
+            registerCategory(settingsCubit, cat);
+            Navigator.of(dialogContext).pop((
+              category: cat,
+              description: descController.text.trim(),
+              minutes: minController == null
+                  ? null
+                  : int.tryParse(minController.text.trim()),
+            ));
+          },
           child: Text(S.save),
         ),
       ],
     ),
   ).whenComplete(() {
-    for (final c in controllers.values) {
-      c.dispose();
-    }
+    catController.dispose();
+    descController.dispose();
+    minController?.dispose();
   });
 }
 

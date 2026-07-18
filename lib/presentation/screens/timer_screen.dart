@@ -793,21 +793,19 @@ class _TaskRow extends StatelessWidget {
   }
 
   void _editTask(BuildContext context, TasksCubit cubit) {
-    showEditDialog(
+    showTaskEditDialog(
       context,
       title: S.editTask,
-      fields: {
-        S.categoryHint: task.category,
-        S.descriptionHint: task.description,
-      },
-    ).then((values) {
-      if (values == null) return;
+      category: task.category,
+      description: task.description,
+    ).then((r) {
+      if (r == null) return;
       final index = cubit.todoIndexOf(task);
       if (index < 0) return;
       cubit.edit(
         index,
-        category: values[S.categoryHint],
-        description: values[S.descriptionHint],
+        category: r.category.isEmpty ? null : r.category,
+        description: r.description.isEmpty ? null : r.description,
       );
     });
   }
@@ -972,21 +970,19 @@ class _DoneRow extends StatelessWidget {
   }
 
   void _edit(BuildContext context, JournalCubit cubit) {
-    showEditDialog(
+    showTaskEditDialog(
       context,
       title: S.doneTitle,
-      fields: {
-        S.categoryHint: entry.category,
-        S.descriptionHint: entry.task,
-        S.minutesField: '${entry.minutes}',
-      },
-    ).then((values) {
-      if (values == null) return;
+      category: entry.category,
+      description: entry.task,
+      minutes: entry.minutes,
+    ).then((r) {
+      if (r == null) return;
       cubit.editEntry(
         entry,
-        category: values[S.categoryHint],
-        task: values[S.descriptionHint],
-        minutes: int.tryParse(values[S.minutesField] ?? '') ?? entry.minutes,
+        category: r.category,
+        task: r.description,
+        minutes: r.minutes ?? entry.minutes,
       );
     });
   }

@@ -550,6 +550,13 @@ class _AppTab extends StatelessWidget {
             child: Text(S.chooseFolder),
           ),
         ),
+        SwitchListTile(
+          dense: true,
+          title: Text(S.mirrorToVaultLabel),
+          value: settings.mirrorToVault,
+          onChanged: (v) =>
+              _update(context, settings.copyWith(mirrorToVault: v)),
+        ),
         const Divider(height: 24),
         Text('${S.categories}:', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 8),

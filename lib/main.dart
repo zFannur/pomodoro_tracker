@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:ffi' show nullptr;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:win32/win32.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app/strings.dart';
 import 'app/theme.dart';
+import 'data/json_task_repository.dart';
 import 'data/markdown_codec.dart' show dateKey, sprintId;
 import 'data/timer_state_store.dart';
 import 'data/vault_repositories.dart';
@@ -21,8 +25,34 @@ import 'presentation/home_shell.dart';
 import 'services/notify_service.dart';
 import 'services/sound_service.dart';
 
+/// Один экземпляр на систему: два процесса держат список задач в памяти
+/// и пишут tasks.json целиком — последний молча воскрешает удалённое.
+/// Второй запуск поднимает окно первого и выходит.
+void _ensureSingleInstance() {
+  // OpenEvent, а не GetLastError после CreateEvent: Dart-рантайм делает
+  // свои Win32-вызовы между FFI-вызовами и затирает код последней ошибки.
+  final name = TEXT('pomodoro_tracker_single_instance');
+  final existing = OpenEvent(EVENT_ALL_ACCESS, FALSE, name);
+  if (existing == 0) {
+    // Мы первые: создаём именованный event, живёт до конца процесса.
+    CreateEvent(nullptr, TRUE, FALSE, name);
+    return;
+  }
+  // ponytail: ищем по классу окна Flutter — заголовок меняется таймером;
+  // если у пользователя окажется другое Flutter-окно, поднимем не то,
+  // но данные в любом случае целы (процесс ниже выходит всегда).
+  final hwnd = FindWindow(TEXT('FLUTTER_RUNNER_WIN32_WINDOW'), nullptr);
+  if (hwnd != 0) {
+    ShowWindow(hwnd, SW_RESTORE);
+    SetForegroundWindow(hwnd);
+  }
+  exit(0);
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // На этапе Android-сборки обернуть в Platform.isWindows.
+  _ensureSingleInstance();
 
   await windowManager.ensureInitialized();
   final windowOptions = WindowOptions(
@@ -58,9 +88,14 @@ Future<void> main() async {
   await settingsCubit.load();
   AppSettings settings() => settingsCubit.state.settings;
 
-  final taskRepository = TaskRepositoryImpl(store);
+  // Задачи живут в tasks.json (AppData); валт — зеркало + инбокс-захват.
+  final taskRepository = JsonTaskRepository(
+    store,
+    mirrorEnabled: () => settings().mirrorToVault,
+  );
   final journalRepository = JournalRepositoryImpl(store);
   final sprintRepository = SprintRepositoryImpl(store);
+  final inbox = InboxImporter(store);
 
   final tasksCubit = TasksCubit(
     taskRepository,
@@ -126,9 +161,17 @@ Future<void> main() async {
     await sprintCubit.refresh();
   };
 
+  // Захват из «Входящие.md» (валт): при старте и при каждом фокусе окна.
+  Future<void> drainInbox() async {
+    for (final line in await inbox.drain()) {
+      await tasksCubit.add(line, fallbackCategory: 'прочее', toPlanner: true);
+    }
+  }
+
   // Rollover — до refresh спринта, чтобы файл новой недели не создался
   // со звёздами прошлой.
   await tasksCubit.load();
+  await drainInbox();
   await rolloverCheck();
   await Future.wait([
     journalCubit.refresh(),
@@ -147,24 +190,28 @@ Future<void> main() async {
         BlocProvider.value(value: sprintCubit),
         BlocProvider.value(value: timerCubit),
       ],
-      child: const PomodoroApp(),
+      child: PomodoroApp(onWindowFocus: drainInbox),
     ),
   );
 }
 
 class PomodoroApp extends StatefulWidget {
-  const PomodoroApp({super.key});
+  const PomodoroApp({this.onWindowFocus, super.key});
+
+  /// Вернулись в окно — забрать захваченное из «Входящие.md».
+  final Future<void> Function()? onWindowFocus;
 
   @override
   State<PomodoroApp> createState() => _PomodoroAppState();
 }
 
-class _PomodoroAppState extends State<PomodoroApp> {
+class _PomodoroAppState extends State<PomodoroApp> with WindowListener {
   Timer? _autoTheme;
 
   @override
   void initState() {
     super.initState();
+    windowManager.addListener(this);
     // Тема «авто» зависит от времени суток — пересматриваем раз в минуту.
     _autoTheme = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted &&
@@ -177,8 +224,14 @@ class _PomodoroAppState extends State<PomodoroApp> {
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
     _autoTheme?.cancel();
     super.dispose();
+  }
+
+  @override
+  void onWindowFocus() {
+    widget.onWindowFocus?.call();
   }
 
   /// Разрешаем тему сами (а не через `themeMode`/`darkTheme`), потому что

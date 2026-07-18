@@ -50,6 +50,57 @@ class VaultStore {
   }
 }
 
+/// Файл-инбокс «Входящие.md» в валте: ручной захват задач из Obsidian
+/// (или с телефона через Drive). Направление строго одно — файл → приложение:
+/// приложение забирает строки и возвращает файл к шаблону, мерджить нечего.
+class InboxImporter {
+  InboxImporter(this._store);
+
+  final VaultStore _store;
+
+  static const fileName = 'Входящие.md';
+  static const template =
+      '# Входящие\n\n'
+      '<!-- Строки отсюда Помодоро Трекер забирает во «Входящие» '
+      'при запуске и фокусе окна. Формат: #категория описание ~помидоры -->\n\n'
+      '- \n';
+
+  File _file() => File('${_store.root}${Platform.pathSeparator}$fileName');
+
+  /// Забрать строки-задачи и вернуть файл к шаблону.
+  /// Ошибки ФС (валт недоступен) — пустой список, приложение живёт дальше.
+  Future<List<String>> drain() async {
+    try {
+      final file = _file();
+      final content = await _store.read(file);
+      if (content == null) {
+        // Создаём точку входа, чтобы файл был заметен в валте.
+        await _store.write(file, template);
+        return const [];
+      }
+      final lines = <String>[];
+      for (final raw in content.split('\n')) {
+        var line = raw.trim();
+        // Заголовок — только «# » с пробелом: строка «#категория описание»
+        // (smart-ввод) заголовком не является и должна попасть в задачи.
+        if (line.isEmpty ||
+            RegExp(r'^#{1,6}\s').hasMatch(line) ||
+            line.startsWith('<!--')) {
+          continue;
+        }
+        // Срезаем маркеры списка и чекбоксы: «- », «- [ ] », «* ».
+        line = line.replaceFirst(RegExp(r'^[-*]\s*(\[.\]\s*)?'), '').trim();
+        if (line.isEmpty) continue;
+        lines.add(line);
+      }
+      if (lines.isNotEmpty) await _store.write(file, template);
+      return lines;
+    } on FileSystemException {
+      return const [];
+    }
+  }
+}
+
 Future<Either<Failure, T>> _guard<T>(Future<T> Function() body) async {
   try {
     return Either.right(await body());

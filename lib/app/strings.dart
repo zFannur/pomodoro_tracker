@@ -239,6 +239,10 @@ abstract final class S {
   static String get dateFormat => _t('Формат даты', 'Date format');
   static String get timeFormat => _t('Формат времени', 'Time format');
   static String get storageFolder => _t('Папка хранения (markdown)', 'Storage folder (markdown)');
+  static String get mirrorToVaultLabel => _t(
+    'Зеркалить задачи в валт («Задачи.md», только просмотр)',
+    'Mirror tasks to the vault ("Задачи.md", view-only)',
+  );
   static String get chooseFolder => _t('Выбрать…', 'Choose…');
   static String get newCategory => _t('Новая категория', 'New category');
   static String get boundScheme => _t('Схема категории', 'Category scheme');

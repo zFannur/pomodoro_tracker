@@ -438,21 +438,19 @@ class _TodayRow extends StatelessWidget {
   final bool isNow;
 
   void _edit(BuildContext context, TasksCubit cubit) {
-    showEditDialog(
+    showTaskEditDialog(
       context,
       title: S.editTask,
-      fields: {
-        S.categoryHint: task.category,
-        S.descriptionHint: task.description,
-      },
-    ).then((values) {
-      if (values == null) return;
+      category: task.category,
+      description: task.description,
+    ).then((r) {
+      if (r == null) return;
       final index = cubit.todoIndexOf(task);
       if (index < 0) return;
       cubit.edit(
         index,
-        category: values[S.categoryHint],
-        description: values[S.descriptionHint],
+        category: r.category.isEmpty ? null : r.category,
+        description: r.description.isEmpty ? null : r.description,
       );
     });
   }
@@ -628,21 +626,19 @@ class _BucketRow extends StatelessWidget {
   final int pomodoro;
 
   void _edit(BuildContext context, TasksCubit cubit) {
-    showEditDialog(
+    showTaskEditDialog(
       context,
       title: S.editTask,
-      fields: {
-        S.categoryHint: task.category,
-        S.descriptionHint: task.description,
-      },
-    ).then((values) {
-      if (values == null) return;
+      category: task.category,
+      description: task.description,
+    ).then((r) {
+      if (r == null) return;
       final index = cubit.plannerIndexOf(task);
       if (index < 0) return;
       cubit.plannerEdit(
         index,
-        category: values[S.categoryHint],
-        description: values[S.descriptionHint],
+        category: r.category.isEmpty ? null : r.category,
+        description: r.description.isEmpty ? null : r.description,
       );
     });
   }

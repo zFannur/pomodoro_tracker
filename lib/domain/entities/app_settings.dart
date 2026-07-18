@@ -152,6 +152,7 @@ class AppSettings extends Equatable {
     this.lastDay = '',
     this.lastSprintId = '',
     this.collapsedGroups = defaultCollapsedGroups,
+    this.mirrorToVault = true,
   });
 
   factory AppSettings.fromJson(
@@ -217,6 +218,7 @@ class AppSettings extends Equatable {
       collapsedGroups:
           (json['collapsedGroups'] as List?)?.whereType<String>().toList() ??
           defaultCollapsedGroups,
+      mirrorToVault: json['mirrorToVault'] as bool? ?? true,
     );
   }
 
@@ -322,6 +324,9 @@ class AppSettings extends Equatable {
   /// Свёрнутые группы экрана «Задачи» (ключи групп).
   final List<String> collapsedGroups;
 
+  /// Зеркалить задачи в валт («Задачи.md», только для просмотра).
+  final bool mirrorToVault;
+
   TimerScheme get scheme => schemes.firstWhere(
     (s) => s.name == activeScheme,
     orElse: () => schemes.isEmpty ? defaultSchemes.first : schemes.first,
@@ -360,6 +365,7 @@ class AppSettings extends Equatable {
     'lastDay': lastDay,
     'lastSprintId': lastSprintId,
     'collapsedGroups': collapsedGroups,
+    'mirrorToVault': mirrorToVault,
   };
 
   AppSettings copyWith({
@@ -395,6 +401,7 @@ class AppSettings extends Equatable {
     String? lastDay,
     String? lastSprintId,
     List<String>? collapsedGroups,
+    bool? mirrorToVault,
   }) {
     return AppSettings(
       schemes: schemes ?? this.schemes,
@@ -429,6 +436,7 @@ class AppSettings extends Equatable {
       lastDay: lastDay ?? this.lastDay,
       lastSprintId: lastSprintId ?? this.lastSprintId,
       collapsedGroups: collapsedGroups ?? this.collapsedGroups,
+      mirrorToVault: mirrorToVault ?? this.mirrorToVault,
     );
   }
 
@@ -473,5 +481,6 @@ class AppSettings extends Equatable {
     lastDay,
     lastSprintId,
     collapsedGroups,
+    mirrorToVault,
   ];
 }

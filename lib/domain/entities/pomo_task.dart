@@ -14,7 +14,12 @@ class PomoTask extends Equatable {
     this.due,
     this.frog = false,
     this.week = false,
+    this.id,
   });
+
+  /// Стабильный id для JSON-хранилища и будущего синка. null — задача из
+  /// markdown или свежесозданная; id выдаёт репозиторий при сохранении.
+  final String? id;
 
   final String description;
   final String category;
@@ -61,6 +66,7 @@ class PomoTask extends Equatable {
     bool clearDue = false,
     bool? frog,
     bool? week,
+    String? id,
   }) {
     return PomoTask(
       description: description ?? this.description,
@@ -69,11 +75,13 @@ class PomoTask extends Equatable {
       due: clearDue ? null : (due ?? this.due),
       frog: frog ?? this.frog,
       week: week ?? this.week,
+      id: id ?? this.id,
     );
   }
 
   @override
   List<Object?> get props => [
+    id,
     description,
     category,
     durationMinutes,

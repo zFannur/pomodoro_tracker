@@ -43,6 +43,9 @@ dependencies:
   file_picker: ^11.0.2
   path_provider: ^2.1.6
   intl: ^0.20.3
+  # Защита от второго экземпляра (named mutex): два процесса пишут
+  # tasks.json целиком и молча воскрешают удалённые задачи.
+  win32: ^5.15.0
 
 dev_dependencies:
   flutter_test:
