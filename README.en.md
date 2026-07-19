@@ -4,11 +4,13 @@
 
 # Pomodoro Tracker
 
-**A desktop Pomodoro timer for Windows that stores everything as markdown.**
+**A desktop Pomodoro timer and task manager for Windows that plays well with Obsidian.**
 
 A Pomodoro-technique timer with a precise model of series, idle time and
-focus — plus a personal focus system (frog of the day, sprint tasks,
-Flowtime) and all data as plain `.md` files inside an Obsidian vault.
+focus, a task screen with collapsible groups — plus a personal focus system
+(frog of the day, sprint tasks, Flowtime). Pomodoro history and sprints are
+plain `.md` files in an Obsidian vault; tasks live in `tasks.json` and are
+mirrored into the vault for viewing.
 
 [Русский README](README.md)
 
@@ -16,7 +18,7 @@ Flowtime) and all data as plain `.md` files inside an Obsidian vault.
 [![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](#quick-start)
 [![Storage](https://img.shields.io/badge/Storage-Markdown-3FA45B?logo=markdown&logoColor=white)](#data-storage)
-[![Tests](https://img.shields.io/badge/tests-27%20passing-3FA45B.svg)](#tests)
+[![Tests](https://img.shields.io/badge/tests-38%20passing-3FA45B.svg)](#tests)
 
 <img src="docs/screenshot-timer.png" width="820" alt="Timer screen">
 
@@ -99,6 +101,22 @@ A single-page flow:
 The window title shows `MM:SS category` while running — visible from the
 taskbar.
 
+### Tasks
+
+A full-screen task manager over the same list the timer uses:
+
+- **Quick-add on top**: smart input, `Enter` — straight to Inbox (capture
+  without deciding), `Ctrl+Enter` — to Today, `Ctrl+N` — jump here from
+  anywhere in the app;
+- **Collapsible groups** with counters and 🍅 totals: Today / Inbox /
+  Tomorrow / This week / Later / Done this week (collapse state is
+  remembered);
+- the first Today task is highlighted as **NOW** (WIP = 1);
+- priority = tap 🐸 / tap ⭐ / drag (reordering works inside Planner buckets
+  too);
+- deleting shows an Undo snackbar;
+- wide window (≥1000px) — two columns, narrow — one.
+
 ### Sprint
 
 The weekly milestone, ⭐ sprint tasks, "Done this week", fact tiles (Actual /
@@ -148,9 +166,12 @@ execution. Group a project's tasks under one category and watch its counter.
 | `Space` | Start / Pause |
 | `Esc` `Esc` | Stop (or Skip break) — **double press**, second one within 1.5s. The button turns red while armed. |
 | `+` / `−` | Pomodoros of the first task (`Shift` — by 4) |
+| `Ctrl+N` | Tasks screen with the cursor in the quick-add field — from anywhere |
 
+On the Tasks screen: `Enter` — to Inbox, `Ctrl+Enter` — to Today.
 Click the pomodoro count: `+1`, `Alt`-click `−1`, `Shift` — ×4.
-Shortcuts are disabled while a dialog is open or a text field is focused.
+Shortcuts are disabled while a dialog is open or a text field is focused
+(except `Ctrl+N`).
 
 ---
 
@@ -173,11 +194,17 @@ The **📥** button captures straight to "Inbox" — bypassing today's list.
 
 ## Data storage
 
-Everything lives in the storage folder (`…\Obsidian\Помодоро` by default):
+**Tasks** live in `tasks.json` (`%APPDATA%\com.local\pomodoro_tracker\`,
+atomic writes, stable ids): the task manager doesn't depend on the vault and
+keeps working even when the vault is unavailable. On first launch, tasks are
+migrated automatically from the legacy `Задачи.md`.
+
+The storage folder (`…\Obsidian\Помодоро` by default) keeps:
 
 ```
 Помодоро/
-├── Задачи.md                    # Today + Planner
+├── Задачи.md                    # MIRROR of the task list (view-only)
+├── Входящие.md                  # inbox: capture tasks from Obsidian
 ├── Журнал/
 │   └── 2026-07/
 │       └── 2026-07-16.md        # day's pomodoros + notes
@@ -192,9 +219,14 @@ switch only translates the app's own text**; the markdown format itself
 (section headers, table columns) is fixed, and task/category names stay
 exactly as you typed them.
 
-### Задачи.md ("Tasks.md")
+### Задачи.md ("Tasks.md") — a one-way mirror
+
+Regenerated on every task change: visible in Obsidian, searchable, versioned
+by git, and doubles as an emergency backup. **Edits to it are not read back**
+(a note at the top says so). The mirror can be turned off in Settings.
 
 ```markdown
+<!-- Зеркало Помодоро Трекера: правки здесь не читаются. -->
 # Задачи
 
 ## Сегодня
@@ -209,6 +241,15 @@ exactly as you typed them.
 - `⏱ 50м` — estimate in minutes; `📅 2026-07-18` — due date (the Planner tab
   is computed from the date, and **overdue items automatically show up in
   "Inbox"**).
+
+### Входящие.md ("Inbox.md") — capture from Obsidian
+
+Write lines in any shape (`- buy a domain ~1 #misc`, checkboxes and list
+markers welcome) — on startup and on window focus the app pulls them into
+Inbox through the smart-input parser and resets the file to its template.
+Strictly one direction (file → app), so there's nothing to merge. This is
+how you add tasks from Obsidian or from your phone (the file syncs via
+Google Drive).
 
 ### Журнал/YYYY-MM/YYYY-MM-DD.md ("Journal")
 
@@ -250,7 +291,8 @@ and **"Done this week"**.
 ### App settings
 
 JSON, **not** in the vault: `%APPDATA%\com.local\pomodoro_tracker\settings.json`.
-`timer_state.json` lives next to it — the timer state used for restore.
+`tasks.json` (the task list) and `timer_state.json` (timer state used for
+restore) live next to it.
 
 ---
 
@@ -281,9 +323,11 @@ JSON, **not** in the vault: `%APPDATA%\com.local\pomodoro_tracker\settings.json`
 - **interface language** — Russian / English, switches instantly, no restart
   needed;
 - date format (6 options) and time format (24h / 12h);
-- storage folder;
+- storage folder and **mirroring tasks into the vault** (`Задачи.md`);
 - categories and **scheme-per-category binding** (a task in that category
-  gets that scheme's pomodoro length when estimated).
+  gets that scheme's pomodoro length when estimated). A new category can be
+  typed right in the task edit dialog — it registers instantly and shows up
+  in every dropdown.
 
 Category names and the markdown files themselves always stay in whatever
 language you typed them in — the interface language only affects the app's
@@ -312,6 +356,8 @@ The key rules that define timer and journal behavior:
   passed.
 - **Day rollover** is caught live (checked once a minute): the "Done" list
   starts over, 🐸 resets, and ⭐ clears on a week change.
+- **Single instance per system**: a second launch raises the existing window
+  and exits (two processes would silently overwrite each other's data).
 
 ---
 
@@ -328,11 +374,12 @@ lib/
 │   └── repositories.dart
 ├── data/
 │   ├── markdown_codec.dart      # pure serialize/parse (test-covered)
-│   ├── vault_repositories.dart  # file access, atomic writes
+│   ├── json_task_repository.dart# tasks.json + migration + vault mirror
+│   ├── vault_repositories.dart  # file access, inbox, atomic writes
 │   └── timer_state_store.dart
 ├── presentation/
 │   ├── cubits/     # timer, tasks, journal, sprint, stats, settings
-│   ├── screens/    # timer, sprint, stats, planner_dialog, settings_dialog
+│   ├── screens/    # timer, tasks, sprint, stats, planner_dialog, settings_dialog
 │   ├── widgets/    # common.dart
 │   └── home_shell.dart
 ├── services/       # sound_service (WAV-synthesized sounds), notify_service
@@ -352,7 +399,7 @@ lib/
 ```bash
 flutter pub get
 flutter analyze          # should be clean
-flutter test             # 27 tests
+flutter test             # 38 tests
 flutter run -d windows   # debug
 flutter build windows --release
 ```
@@ -378,14 +425,18 @@ may need to clear the Windows icon cache (`IconCache.db` + restart Explorer).
 - `test/stats_frog_test.dart` — counting days with a frog.
 - `test/strings_test.dart` — interface language switching, localized time
   units.
+- `test/json_task_repository_test.dart` — migration from `Задачи.md`,
+  `tasks.json` round-trip, duplicate-id resolution, the mirror, the inbox
+  file.
+- `test/tasks_cubit_planner_test.dart` — bucket reordering, editing,
+  undo restore.
 
 ---
 
 ## Known limitations
 
-- **External edits to `Задачи.md` while the app is open get overwritten** —
-  the file is only read at startup, there's no file watcher. Edit it while
-  the app is closed.
+- **`Задачи.md` is a mirror only**: edits to it are never read back. Add
+  tasks from Obsidian via `Входящие.md`; move and edit them in the app.
 - **Flowtime overtime doesn't survive a restart** — closing the app during
   overtime loses that pomodoro.
 - In the sprint file, only "its own" sections survive an overwrite (goal,
