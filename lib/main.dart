@@ -4,12 +4,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:win32/win32.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app/strings.dart';
 import 'app/theme.dart';
-import 'data/json_task_repository.dart';
+import 'data/json_data_repository.dart';
 import 'data/markdown_codec.dart' show dateKey, sprintId;
 import 'data/timer_state_store.dart';
 import 'data/vault_repositories.dart';
@@ -19,11 +20,14 @@ import 'presentation/cubits/journal_cubit.dart';
 import 'presentation/cubits/settings_cubit.dart';
 import 'presentation/cubits/sprint_cubit.dart';
 import 'presentation/cubits/stats_cubit.dart';
+import 'presentation/cubits/sync_cubit.dart';
 import 'presentation/cubits/tasks_cubit.dart';
 import 'presentation/cubits/timer_cubit.dart';
 import 'presentation/home_shell.dart';
+import 'services/drive_sync_service.dart';
 import 'services/notify_service.dart';
 import 'services/sound_service.dart';
+import 'services/sync_auth.dart';
 
 /// Один экземпляр на систему: два процесса держат список задач в памяти
 /// и пишут tasks.json целиком — последний молча воскрешает удалённое.
@@ -51,20 +55,25 @@ void _ensureSingleInstance() {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // На этапе Android-сборки обернуть в Platform.isWindows.
-  _ensureSingleInstance();
+  if (Platform.isWindows) {
+    _ensureSingleInstance();
 
-  await windowManager.ensureInitialized();
-  final windowOptions = WindowOptions(
-    size: Size(1120, 800),
-    minimumSize: Size(880, 620),
-    title: S.appTitle,
-    center: true,
-  );
-  await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.show();
-    await windowManager.focus();
-  });
+    await windowManager.ensureInitialized();
+    final windowOptions = WindowOptions(
+      size: Size(1120, 800),
+      minimumSize: Size(880, 620),
+      title: S.appTitle,
+      center: true,
+    );
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  } else {
+    // На мобильных нет USERPROFILE — корень хранилища в документах приложения.
+    SettingsRepositoryImpl.mobileRoot =
+        (await getApplicationDocumentsDirectory()).path;
+  }
 
   final sound = SoundService();
   await sound.init();
@@ -88,25 +97,24 @@ Future<void> main() async {
   await settingsCubit.load();
   AppSettings settings() => settingsCubit.state.settings;
 
-  // Задачи живут в tasks.json (AppData); валт — зеркало + инбокс-захват.
-  final taskRepository = JsonTaskRepository(
+  // Всё состояние живёт в data.json (AppData) и синхронизируется целиком;
+  // валт получает markdown-зеркало и отдаёт захват через «Входящие.md».
+  final dataRepository = JsonDataRepository(
     store,
     mirrorEnabled: () => settings().mirrorToVault,
   );
-  final journalRepository = JournalRepositoryImpl(store);
-  final sprintRepository = SprintRepositoryImpl(store);
   final inbox = InboxImporter(store);
 
   final tasksCubit = TasksCubit(
-    taskRepository,
-    journalRepository,
+    dataRepository,
+    dataRepository,
     settings,
     notify,
   );
-  final statsCubit = StatsCubit(journalRepository, () => settings().dailyGoal);
+  final statsCubit = StatsCubit(dataRepository, () => settings().dailyGoal);
   final sprintCubit = SprintCubit(
-    sprintRepository,
-    journalRepository,
+    dataRepository,
+    dataRepository,
     () => settings().sprintGoal,
     () => settings().dailyGoal,
     tasksCubit.weekTasks,
@@ -131,7 +139,7 @@ Future<void> main() async {
   }
 
   final journalCubit = JournalCubit(
-    journalRepository,
+    dataRepository,
     settings,
     notify,
     onDayChanged: () async {
@@ -160,12 +168,44 @@ Future<void> main() async {
     await statsCubit.refresh();
     await sprintCubit.refresh();
   };
+  // Ручное «сделано» дописало запись в журнал — показать её сразу, иначе
+  // задача уходит из «Сегодня», а в «Сделано» появляется только после
+  // перезапуска.
+  tasksCubit.onHistoryWritten = () async {
+    await journalCubit.refresh();
+    await statsCubit.refresh();
+    await sprintCubit.refresh();
+  };
+
+  // Google Drive синк: data.json целиком — задачи, журнал, спринты.
+  // Слияние по id с надгробиями, конфликт не теряет ни одной записи.
+  final syncService = DriveSyncService(
+    auth: SyncAuth(
+      clientId: () => settings().syncClientId,
+      clientSecret: () => settings().syncClientSecret,
+      serverClientId: () => settings().syncServerClientId,
+    ),
+    localFile: dataRepository.jsonFile,
+    // Записывает сам репозиторий: иначе документ в памяти разойдётся с
+    // диском, и следующая правка похоронила бы всё, что только что приехало.
+    applyRemote: dataRepository.applyRemote,
+    onRemoteApplied: reloadVault,
+  );
+  final syncCubit = SyncCubit(syncService, settings);
+  dataRepository.onSaved = syncCubit.scheduleSync;
 
   // Захват из «Входящие.md» (валт): при старте и при каждом фокусе окна.
   Future<void> drainInbox() async {
     for (final line in await inbox.drain()) {
       await tasksCubit.add(line, fallbackCategory: 'прочее', toPlanner: true);
     }
+  }
+
+  // Вернулись в приложение (фокус на Windows / resume на Android):
+  // забрать инбокс и подтянуть удалённые правки.
+  Future<void> onForeground() async {
+    await drainInbox();
+    await syncCubit.syncIfStale();
   }
 
   // Rollover — до refresh спринта, чтобы файл новой недели не создался
@@ -179,6 +219,8 @@ Future<void> main() async {
     sprintCubit.refresh(),
   ]);
   await timerCubit.restore();
+  // Синк не блокирует запуск: сеть может думать сколько хочет.
+  unawaited(syncCubit.init());
 
   runApp(
     MultiBlocProvider(
@@ -189,8 +231,9 @@ Future<void> main() async {
         BlocProvider.value(value: statsCubit),
         BlocProvider.value(value: sprintCubit),
         BlocProvider.value(value: timerCubit),
+        BlocProvider.value(value: syncCubit),
       ],
-      child: PomodoroApp(onWindowFocus: drainInbox),
+      child: PomodoroApp(onWindowFocus: onForeground),
     ),
   );
 }
@@ -205,13 +248,15 @@ class PomodoroApp extends StatefulWidget {
   State<PomodoroApp> createState() => _PomodoroAppState();
 }
 
-class _PomodoroAppState extends State<PomodoroApp> with WindowListener {
+class _PomodoroAppState extends State<PomodoroApp>
+    with WindowListener, WidgetsBindingObserver {
   Timer? _autoTheme;
 
   @override
   void initState() {
     super.initState();
     windowManager.addListener(this);
+    WidgetsBinding.instance.addObserver(this);
     // Тема «авто» зависит от времени суток — пересматриваем раз в минуту.
     _autoTheme = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted &&
@@ -225,6 +270,7 @@ class _PomodoroAppState extends State<PomodoroApp> with WindowListener {
   @override
   void dispose() {
     windowManager.removeListener(this);
+    WidgetsBinding.instance.removeObserver(this);
     _autoTheme?.cancel();
     super.dispose();
   }
@@ -232,6 +278,15 @@ class _PomodoroAppState extends State<PomodoroApp> with WindowListener {
   @override
   void onWindowFocus() {
     widget.onWindowFocus?.call();
+  }
+
+  /// Android: вернулись в приложение. На Windows тем же занимается
+  /// onWindowFocus — не дублируем.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !Platform.isWindows) {
+      widget.onWindowFocus?.call();
+    }
   }
 
   /// Разрешаем тему сами (а не через `themeMode`/`darkTheme`), потому что

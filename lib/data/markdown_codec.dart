@@ -231,6 +231,8 @@ DayLog parseDayLog(String content, DateTime date, int fallbackGoal) {
   final goal = int.tryParse(fm['цель'] ?? '') ?? fallbackGoal;
   final sessions = <PomoSession>[];
   final notes = <String>[];
+  // Счётчик записей на одну и ту же минуту — разводит их id.
+  final sameMinute = <String, int>{};
   var inNotes = false;
   for (final line in content.split('\n')) {
     if (line.startsWith('## ')) {
@@ -249,9 +251,15 @@ DayLog parseDayLog(String content, DateTime date, int fallbackGoal) {
     var task = _uncell(m.group(7)!.trim());
     final frog = task.startsWith('🐸');
     if (frog) task = task.replaceFirst('🐸', '').trim();
+    // id детерминированный, а не случайный: markdown его не хранит, а два
+    // устройства мигрируют одну и ту же историю независимо друг от друга —
+    // при случайных id первое же слияние удвоило бы весь журнал.
+    final slot = '${two(hour)}${m.group(2)!}';
+    final n = sameMinute[slot] = (sameMinute[slot] ?? -1) + 1;
     // День 05:00–05:00: часы 0–4 принадлежат следующей календарной дате.
     sessions.add(
       PomoSession(
+        id: 'm${dateKey(date)}-$slot-$n',
         start: DateTime(
           date.year,
           date.month,

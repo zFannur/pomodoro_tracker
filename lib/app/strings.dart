@@ -71,8 +71,10 @@ abstract final class S {
   static String get close => _t('Закрыть', 'Close');
   static String get cancel => _t('Отмена', 'Cancel');
   static String get editTask => _t('Редактировать задачу', 'Edit task');
-  static String get confirmClear =>
-      _t('Точно очистить? Действие необратимо.', "Clear for good? This can't be undone.");
+  static String get confirmClear => _t(
+    'Очистить «Сегодня»? Задачи уедут в корзину — их можно будет вернуть.',
+    'Clear "Today"? Tasks go to Trash — you can bring them back.',
+  );
   static String get withoutNote => _t('Без заметки', 'No note');
   static String get emptyBucket => _t('Пусто', 'Empty');
   static String get listSettings => _t('Настроить', 'Configure');
@@ -139,6 +141,11 @@ abstract final class S {
         'the sprint is only ⭐: 3 tasks from the current milestone.',
   );
   static String get doneWeekTitle => _t('Сделано за неделю', 'Done this week');
+  static String get doneTodayTitle => _t('Сделано сегодня', 'Done today');
+  static String get doneTodayEmpty =>
+      _t('Сегодня пока ничего не закрыто', 'Nothing closed today yet');
+  static String get noDescription => _t('без описания', 'no description');
+  static String get minShort => _t('мин', 'min');
 
   // Система фокуса
   static String get nowLabel => _t('СЕЙЧАС', 'NOW');
@@ -271,6 +278,67 @@ abstract final class S {
   );
   static String get undo => _t('Отменить', 'Undo');
   static String get taskDeleted => _t('Задача удалена', 'Task deleted');
+  static String get trashTitle => _t('Корзина', 'Trash');
+  static String get trashEmpty => _t('Корзина пуста', 'Trash is empty');
+
+  // Google Drive синк
+  static String get syncSection => _t(
+    'Google Drive — синхронизация задач',
+    'Google Drive — task sync',
+  );
+  static String get syncConnect => _t('Подключить', 'Connect');
+  static String get syncDisconnect => _t('Отключить', 'Disconnect');
+  static String get syncNowBtn => _t('Синхронизировать', 'Sync now');
+  static String get syncConnected => _t('Подключено', 'Connected');
+  static String get syncDisconnected => _t('Не подключено', 'Not connected');
+  static String get syncSyncing => _t('Синхронизация…', 'Syncing…');
+  static String get syncLast => _t('Последний синк', 'Last sync');
+  static String get syncClientIdLabel => _t(
+    'Client ID (Desktop app)',
+    'Client ID (Desktop app)',
+  );
+  static String get syncClientSecretLabel => _t(
+    'Client Secret (Desktop app)',
+    'Client Secret (Desktop app)',
+  );
+  static String get syncServerClientIdLabel => _t(
+    'Server Client ID (Web)',
+    'Server Client ID (Web)',
+  );
+  static String get syncFillCredentials => _t(
+    'Заполни Client ID и Client Secret: Google Cloud Console → '
+        'Credentials → OAuth client «Desktop app». Инструкция — в README.',
+    'Fill in Client ID and Client Secret: Google Cloud Console → '
+        'Credentials → OAuth client "Desktop app". See README for steps.',
+  );
+  static String get syncFillServerClientId => _t(
+    'Заполни Server Client ID: Google Cloud Console → Credentials → '
+        'OAuth client «Web application». Инструкция — в README.',
+    'Fill in Server Client ID: Google Cloud Console → Credentials → '
+        'OAuth client "Web application". See README for steps.',
+  );
+  static String get syncRestartNeeded => _t(
+    'Server Client ID изменён. Перезапусти приложение, чтобы он вступил '
+        'в силу — вход Google настраивается один раз за запуск.',
+    'Server Client ID changed. Restart the app for it to take effect — '
+        'Google sign-in is configured once per launch.',
+  );
+  static String get syncDeveloperErrorHint => _t(
+    'Google не нашёл OAuth-клиента под это приложение. Проверь в Cloud '
+        'Console клиент типа Android: имя пакета com.zfannur.pomodoro_tracker '
+        'и SHA-1 ключа, которым подписан APK (gradlew signingReport). '
+        'Все клиенты — в одном проекте с включённым Drive API.',
+    'Google found no OAuth client for this app. Check the Android client in '
+        'Cloud Console: package com.zfannur.pomodoro_tracker and the SHA-1 of '
+        'the key the APK is signed with (gradlew signingReport). All clients '
+        'must be in one project with the Drive API enabled.',
+  );
+  static String get syncHint => _t(
+    'Задачи хранятся в скрытой папке приложения на твоём Google Drive '
+        'и синхронизируются между устройствами.',
+    'Tasks are stored in a hidden app folder on your Google Drive '
+        'and synced across devices.',
+  );
 
   // Общее
   static String get retry => _t('Повторить', 'Retry');

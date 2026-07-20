@@ -114,6 +114,7 @@ void main() {
         goal: 8,
         sessions: [
           PomoSession(
+            id: 's1',
             start: DateTime(2026, 7, 16, 9, 12),
             minutes: 25,
             category: 'работа',
@@ -121,6 +122,7 @@ void main() {
             frog: true,
           ),
           PomoSession(
+            id: 's2',
             start: DateTime(2026, 7, 16, 10, 5),
             minutes: 25,
             delayMinutes: 7,
@@ -131,6 +133,7 @@ void main() {
           ),
           // Помидор после полуночи — логический день тот же.
           PomoSession(
+            id: 's3',
             start: DateTime(2026, 7, 17, 0, 30),
             minutes: 25,
             category: 'работа',
@@ -230,6 +233,7 @@ void main() {
             sessions: [
               if (i < 3)
                 PomoSession(
+                  id: 'f$i',
                   start: DateTime(2026, 7, 13 + i, 9),
                   minutes: 25,
                   category: 'работа',

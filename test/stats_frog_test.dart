@@ -11,6 +11,7 @@ void main() {
     sessions: [
       for (var i = 0; i < pomos; i++)
         PomoSession(
+          id: 'd$d-$i',
           start: DateTime(2026, 7, d, 9 + i),
           minutes: 25,
           category: 'работа',

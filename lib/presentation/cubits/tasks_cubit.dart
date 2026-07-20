@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
+import '../../data/json_data_repository.dart' show newId;
 import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
@@ -13,11 +14,24 @@ import 'timer_cubit.dart' show PomodoroResult;
 
 enum TasksStatus { loading, ready, failure }
 
+/// Удалённая задача в корзине: помнит, куда восстанавливать — в «Сегодня»
+/// или в планировщик (сохраняет исходный бакет через due).
+class TrashedTask extends Equatable {
+  const TrashedTask({required this.task, required this.fromPlanner});
+
+  final PomoTask task;
+  final bool fromPlanner;
+
+  @override
+  List<Object?> get props => [task, fromPlanner];
+}
+
 class TasksState extends Equatable {
   const TasksState({
     required this.status,
     this.todo = const [],
     this.planner = const [],
+    this.trash = const [],
     this.categoryFilter,
     this.error = '',
   });
@@ -29,6 +43,11 @@ class TasksState extends Equatable {
 
   /// Планировщик: задачи с датами (вкладки вычисляются из due).
   final List<PomoTask> planner;
+
+  /// Корзина: последние удалённые задачи (новые — в начале). Живёт только
+  /// в памяти сессии — ponytail: не переживает перезапуск, апгрейд на
+  /// персистентную корзину — если это когда-нибудь станет реальной болью.
+  final List<TrashedTask> trash;
 
   /// Активный фильтр по категории (null — все).
   final String? categoryFilter;
@@ -55,6 +74,7 @@ class TasksState extends Equatable {
     TasksStatus? status,
     List<PomoTask>? todo,
     List<PomoTask>? planner,
+    List<TrashedTask>? trash,
     String? categoryFilter,
     bool clearFilter = false,
     String? error,
@@ -63,6 +83,7 @@ class TasksState extends Equatable {
       status: status ?? this.status,
       todo: todo ?? this.todo,
       planner: planner ?? this.planner,
+      trash: trash ?? this.trash,
       categoryFilter: clearFilter
           ? null
           : (categoryFilter ?? this.categoryFilter),
@@ -71,7 +92,14 @@ class TasksState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [status, todo, planner, categoryFilter, error];
+  List<Object?> get props => [
+    status,
+    todo,
+    planner,
+    trash,
+    categoryFilter,
+    error,
+  ];
 }
 
 /// Разбор умного ввода «#категория описание ~N» (также ::N).
@@ -105,6 +133,11 @@ class TasksCubit extends Cubit<TasksState> {
 
   /// Вызывается, когда ⭐-задача недели полностью закрыта (для спринта).
   Future<void> Function(String line)? onWeeklyClosed;
+
+  /// Ручная отметка «сделано» дописала запись в журнал. Таймер идёт своим
+  /// путём (onPomodoroComplete), а здесь без этого журнал и статистика
+  /// не перечитывались — задача исчезала из «Сегодня» будто в никуда.
+  Future<void> Function()? onHistoryWritten;
 
   int get _pomodoroMinutes => _settings().scheme.pomodoro;
 
@@ -212,13 +245,17 @@ class TasksCubit extends Cubit<TasksState> {
     if (index < 0 || index >= todo.length) return;
     final task = todo[index];
     final rest = task.durationMinutes - count * _pomodoroMinutes;
+    var trash = state.trash;
     if (rest <= 0) {
       todo.removeAt(index);
+      // Минус не пишет в журнал (в отличие от markDone/таймера) — без
+      // корзины удаление здесь было бы никак не отслеживаемым.
+      trash = _trashed(task, fromPlanner: false);
       if (task.week) await _notifyWeeklyClosed(task);
     } else {
       todo[index] = task.copyWith(durationMinutes: rest);
     }
-    await _persist(todo: todo);
+    await _persist(todo: todo, trash: trash);
   }
 
   /// 🐸 Лягушка дня: одна на список, всегда наверху.
@@ -329,6 +366,7 @@ class TasksCubit extends Cubit<TasksState> {
       manual: true,
       frog: task.frog,
     );
+    await onHistoryWritten?.call();
   }
 
   Future<void> edit(int index, {String? description, String? category}) async {
@@ -344,8 +382,11 @@ class TasksCubit extends Cubit<TasksState> {
   Future<void> removeAt(int index) async {
     final todo = [...state.todo];
     if (index < 0 || index >= todo.length) return;
-    todo.removeAt(index);
-    await _persist(todo: todo);
+    final removed = todo.removeAt(index);
+    await _persist(
+      todo: todo,
+      trash: _trashed(removed, fromPlanner: false),
+    );
   }
 
   Future<void> reorder(int oldIndex, int newIndex) async {
@@ -356,8 +397,14 @@ class TasksCubit extends Cubit<TasksState> {
     await _persist(todo: todo);
   }
 
+  /// Очистить «Сегодня» целиком — все задачи уходят в корзину одним разом.
   Future<void> clearTodo() async {
-    await _persist(todo: []);
+    if (state.todo.isEmpty) return;
+    var trash = state.trash;
+    for (final t in state.todo) {
+      trash = _trashed(t, fromPlanner: false, into: trash);
+    }
+    await _persist(todo: [], trash: trash);
   }
 
   void setCategoryFilter(String? category) {
@@ -428,8 +475,11 @@ class TasksCubit extends Cubit<TasksState> {
   Future<void> plannerRemove(int index) async {
     final planner = [...state.planner];
     if (index < 0 || index >= planner.length) return;
-    planner.removeAt(index);
-    await _persist(planner: planner);
+    final removed = planner.removeAt(index);
+    await _persist(
+      planner: planner,
+      trash: _trashed(removed, fromPlanner: true),
+    );
   }
 
   /// Перестановка внутри планировщика (реальные индексы; при drag внутри
@@ -456,23 +506,26 @@ class TasksCubit extends Cubit<TasksState> {
     await _persist(planner: planner);
   }
 
-  /// Вернуть задачу на место (undo удаления из «Сегодня»).
-  Future<void> insertTodoAt(int index, PomoTask task) async {
+  /// Восстановить задачу из корзины — наверх «Сегодня» или в планировщик,
+  /// откуда она была удалена (используется и снекбаром «Отменить», и
+  /// экраном «Корзина» — единая точка восстановления).
+  Future<void> restoreFromTrash(TrashedTask entry) async {
+    // Без этой проверки повторный клик (снекбар + позже корзина на ту же
+    // запись) вставил бы задачу дважды — filter ниже сам по себе не спасает.
+    if (!state.trash.any((t) => identical(t, entry))) return;
+    final trash = state.trash.where((t) => !identical(t, entry)).toList();
+    if (entry.fromPlanner) {
+      await _persist(planner: [entry.task, ...state.planner], trash: trash);
+      return;
+    }
     final todo = [...state.todo];
-    // Пока висел снекбар, лягушку могли передать другой задаче — инвариант
+    // Пока задача лежала в корзине, лягушку могли передать другой — инвариант
     // «одна 🐸» важнее восстановления флага (последний выбор побеждает).
-    final restored = task.frog && todo.any((t) => t.frog)
-        ? task.copyWith(frog: false)
-        : task;
-    todo.insert(index.clamp(0, todo.length), restored);
-    await _persist(todo: todo);
-  }
-
-  /// Вернуть задачу на место (undo удаления из планировщика).
-  Future<void> insertPlannerAt(int index, PomoTask task) async {
-    final planner = [...state.planner];
-    planner.insert(index.clamp(0, planner.length), task);
-    await _persist(planner: planner);
+    final restored = entry.task.frog && todo.any((t) => t.frog)
+        ? entry.task.copyWith(frog: false)
+        : entry.task;
+    todo.insert(0, restored);
+    await _persist(todo: todo, trash: trash);
   }
 
   // -- завершение помидора таймером ---------------------------------------------
@@ -557,6 +610,7 @@ class TasksCubit extends Cubit<TasksState> {
         ? 0
         : math.min(duration, delayMs ~/ 60000);
     final session = PomoSession(
+      id: newId(),
       start: startFor(duration),
       minutes: duration,
       category: category,
@@ -589,17 +643,48 @@ class TasksCubit extends Cubit<TasksState> {
   int plannerIndexOf(PomoTask task) =>
       state.planner.indexWhere((t) => identical(t, task));
 
-  Future<void> _persist({List<PomoTask>? todo, List<PomoTask>? planner}) async {
+  /// Сколько последних удалённых задач помнит корзина.
+  static const _trashCap = 30;
+
+  /// Положить задачу в корзину (новые — в начале, старше [_trashCap] —
+  /// забываются). [into] — явный аккумулятор для пакетного удаления
+  /// (несколько задач одной операцией, см. [clearTodo]).
+  List<TrashedTask> _trashed(
+    PomoTask task, {
+    required bool fromPlanner,
+    List<TrashedTask>? into,
+  }) {
+    final updated = [
+      TrashedTask(task: task, fromPlanner: fromPlanner),
+      ...(into ?? state.trash),
+    ];
+    return updated.length > _trashCap
+        ? updated.sublist(0, _trashCap)
+        : updated;
+  }
+
+  // Очередь записи на диск: без неё параллельные _persist (например, быстрые
+  // подряд клики) могут завершиться в обратном порядке и более старый снимок
+  // молча перезапишет новый — самый опасный класс бага для этих данных.
+  Future<void> _writeQueue = Future.value();
+
+  Future<void> _persist({
+    List<PomoTask>? todo,
+    List<PomoTask>? planner,
+    List<TrashedTask>? trash,
+  }) async {
     emit(
       state.copyWith(
         status: TasksStatus.ready,
         todo: todo ?? state.todo,
         planner: planner ?? state.planner,
+        trash: trash ?? state.trash,
       ),
     );
-    final result = await _tasks.save(
-      TasksFile(todo: state.todo, planner: state.planner),
-    );
+    final snapshot = TasksFile(todo: state.todo, planner: state.planner);
+    final completion = _writeQueue.then((_) => _tasks.saveTasks(snapshot));
+    _writeQueue = completion.then((_) {}, onError: (_) {});
+    final result = await completion;
     result.match(
       (failure) => emit(
         state.copyWith(status: TasksStatus.failure, error: failure.message),

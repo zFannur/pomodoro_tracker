@@ -6,11 +6,14 @@ import 'entities/pomo_session.dart';
 import 'entities/pomo_task.dart';
 import 'entities/sprint.dart';
 
-/// Задачи: TODO + планировщик (файл Задачи.md).
+/// Задачи: TODO + планировщик.
+/// Метод назван saveTasks, а не save: одна реализация закрывает и этот
+/// интерфейс, и SprintRepository — одноимённые методы с разными сигнатурами
+/// в одном классе не уживаются.
 abstract interface class TaskRepository {
   Future<Either<Failure, TasksFile>> load();
 
-  Future<Either<Failure, Unit>> save(TasksFile file);
+  Future<Either<Failure, Unit>> saveTasks(TasksFile file);
 }
 
 /// Журнал помидоров по дням (Журнал/YYYY-MM/YYYY-MM-DD.md).
@@ -30,11 +33,11 @@ abstract interface class JournalRepository {
   );
 }
 
-/// Спринты (Спринты/YYYY-Wnn.md).
+/// Спринты (неделя пн–вс).
 abstract interface class SprintRepository {
   Future<Either<Failure, Sprint>> current(DateTime now, int defaultGoal);
 
-  Future<Either<Failure, Unit>> save(
+  Future<Either<Failure, Unit>> saveSprint(
     Sprint sprint,
     List<DayLog> fact, {
     List<PomoTask> weekTasks,

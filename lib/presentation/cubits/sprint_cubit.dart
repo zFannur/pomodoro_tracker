@@ -113,7 +113,7 @@ class SprintCubit extends Cubit<SprintState> {
                 history: history,
               ),
             );
-            await _sprints.save(sprint, fact, weekTasks: _weekTasks());
+            await _sprints.saveSprint(sprint, fact, weekTasks: _weekTasks());
           },
         );
       },
@@ -144,7 +144,7 @@ class SprintCubit extends Cubit<SprintState> {
 
   Future<void> _save(Sprint sprint) async {
     emit(state.copyWith(status: SprintStatus.ready, sprint: sprint));
-    final result = await _sprints.save(
+    final result = await _sprints.saveSprint(
       sprint,
       state.fact,
       weekTasks: _weekTasks(),

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/strings.dart';
 import '../../domain/entities/app_settings.dart';
 import '../cubits/settings_cubit.dart';
+import '../cubits/sync_cubit.dart';
 
 void showSettingsDialog(BuildContext context) {
   // Резолвим кубит сразу, а не внутри builder: тот вызывается лениво, и к
@@ -79,6 +82,33 @@ class _SettingsDialog extends StatelessWidget {
 
 void _update(BuildContext context, AppSettings next) {
   context.read<SettingsCubit>().update(next);
+}
+
+/// Телефон/узкое окно. Порог тот же, что у навигации в HomeShell.
+bool _isNarrow(BuildContext context) => MediaQuery.sizeOf(context).width < 600;
+
+/// Строка настройки. На широком — подпись слева, контрол справа. На телефоне
+/// контрол в `trailing` зажимался до нечитаемого (текст сыпался по буквам),
+/// поэтому там подпись уходит наверх, а контролу достаётся вся ширина.
+Widget _settingRow(BuildContext context, String label, Widget control) {
+  if (!_isNarrow(context)) {
+    return ListTile(dense: true, title: Text(label), trailing: control);
+  }
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 8),
+        // Скролл: набор сегментов может быть шире экрана телефона.
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: control,
+        ),
+      ],
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -298,10 +328,10 @@ class _NotifyTab extends StatelessWidget {
           onChanged: (v) =>
               _update(context, settings.copyWith(finishSoundEnabled: v)),
         ),
-        ListTile(
-          dense: true,
-          title: Text(S.finishMelody),
-          trailing: DropdownMenu<FinishSound>(
+        _settingRow(
+          context,
+          S.finishMelody,
+          DropdownMenu<FinishSound>(
             initialSelection: settings.finishSound,
             requestFocusOnTap: false,
             dropdownMenuEntries: [
@@ -456,47 +486,41 @@ class _AppTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(S.themeMode, style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 8),
-              SegmentedButton<AppThemeMode>(
-                segments: [
-                  ButtonSegment(
-                    value: AppThemeMode.light,
-                    label: Text(S.themeLight),
-                  ),
-                  ButtonSegment(
-                    value: AppThemeMode.dark,
-                    label: Text(S.themeDark),
-                  ),
-                  ButtonSegment(
-                    value: AppThemeMode.system,
-                    label: Text(S.themeSystem),
-                  ),
-                  ButtonSegment(
-                    value: AppThemeMode.auto,
-                    label: Text(S.themeAuto),
-                  ),
-                  ButtonSegment(
-                    value: AppThemeMode.matrix,
-                    label: Text(S.themeMatrix),
-                  ),
-                ],
-                selected: {settings.themeMode},
-                onSelectionChanged: (s) =>
-                    _update(context, settings.copyWith(themeMode: s.first)),
+        _settingRow(
+          context,
+          S.themeMode,
+          SegmentedButton<AppThemeMode>(
+            segments: [
+              ButtonSegment(
+                value: AppThemeMode.light,
+                label: Text(S.themeLight),
+              ),
+              ButtonSegment(
+                value: AppThemeMode.dark,
+                label: Text(S.themeDark),
+              ),
+              ButtonSegment(
+                value: AppThemeMode.system,
+                label: Text(S.themeSystem),
+              ),
+              ButtonSegment(
+                value: AppThemeMode.auto,
+                label: Text(S.themeAuto),
+              ),
+              ButtonSegment(
+                value: AppThemeMode.matrix,
+                label: Text(S.themeMatrix),
               ),
             ],
+            selected: {settings.themeMode},
+            onSelectionChanged: (s) =>
+                _update(context, settings.copyWith(themeMode: s.first)),
           ),
         ),
-        ListTile(
-          dense: true,
-          title: Text(S.language),
-          trailing: SegmentedButton<AppLanguage>(
+        _settingRow(
+          context,
+          S.language,
+          SegmentedButton<AppLanguage>(
             segments: [
               ButtonSegment(value: AppLanguage.ru, label: Text(S.languageRu)),
               ButtonSegment(value: AppLanguage.en, label: Text(S.languageEn)),
@@ -506,10 +530,10 @@ class _AppTab extends StatelessWidget {
                 _update(context, settings.copyWith(language: s.first)),
           ),
         ),
-        ListTile(
-          dense: true,
-          title: Text(S.dateFormat),
-          trailing: DropdownMenu<DateFmt>(
+        _settingRow(
+          context,
+          S.dateFormat,
+          DropdownMenu<DateFmt>(
             initialSelection: settings.dateFmt,
             requestFocusOnTap: false,
             dropdownMenuEntries: [
@@ -521,10 +545,10 @@ class _AppTab extends StatelessWidget {
             },
           ),
         ),
-        ListTile(
-          dense: true,
-          title: Text(S.timeFormat),
-          trailing: SegmentedButton<TimeFmt>(
+        _settingRow(
+          context,
+          S.timeFormat,
+          SegmentedButton<TimeFmt>(
             segments: const [
               ButtonSegment(value: TimeFmt.h12, label: Text('2:00PM')),
               ButtonSegment(value: TimeFmt.h24, label: Text('14:00')),
@@ -538,17 +562,21 @@ class _AppTab extends StatelessWidget {
           dense: true,
           title: Text(S.storageFolder),
           subtitle: Text(settings.storagePath),
-          trailing: OutlinedButton(
-            onPressed: () async {
-              final path = await FilePicker.getDirectoryPath(
-                initialDirectory: settings.storagePath,
-              );
-              if (path != null && context.mounted) {
-                _update(context, settings.copyWith(storagePath: path));
-              }
-            },
-            child: Text(S.chooseFolder),
-          ),
+          // На Android выбор папки даёт content:// URI, а не путь — писать
+          // File'ом туда нельзя. Папка там фиксирована (документы приложения).
+          trailing: Platform.isWindows
+              ? OutlinedButton(
+                  onPressed: () async {
+                    final path = await FilePicker.getDirectoryPath(
+                      initialDirectory: settings.storagePath,
+                    );
+                    if (path != null && context.mounted) {
+                      _update(context, settings.copyWith(storagePath: path));
+                    }
+                  },
+                  child: Text(S.chooseFolder),
+                )
+              : null,
         ),
         SwitchListTile(
           dense: true,
@@ -557,6 +585,8 @@ class _AppTab extends StatelessWidget {
           onChanged: (v) =>
               _update(context, settings.copyWith(mirrorToVault: v)),
         ),
+        const Divider(height: 24),
+        _SyncSection(settings: settings),
         const Divider(height: 24),
         Text('${S.categories}:', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 8),
@@ -656,6 +686,103 @@ class _AppTab extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Google Drive синк
+// ---------------------------------------------------------------------------
+
+class _SyncSection extends StatelessWidget {
+  const _SyncSection({required this.settings});
+
+  final AppSettings settings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final sync = context.watch<SyncCubit>().state;
+    final statusText = switch (sync.status) {
+      SyncStatus.syncing => S.syncSyncing,
+      SyncStatus.idle => S.syncConnected,
+      SyncStatus.error => sync.message,
+      SyncStatus.disconnected => S.syncDisconnected,
+    };
+    final lastSync = sync.lastSync;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(S.syncSection, style: theme.textTheme.labelLarge),
+        const SizedBox(height: 4),
+        Text(S.syncHint, style: theme.textTheme.bodySmall),
+        const SizedBox(height: 8),
+        // Windows входит через Desktop-клиент, Android — через serverClientId
+        // (Web) + Android-клиент по SHA-1; показываем только нужные поля.
+        if (Platform.isWindows) ...[
+          _TextRow(
+            label: S.syncClientIdLabel,
+            value: settings.syncClientId,
+            onChanged: (v) =>
+                _update(context, settings.copyWith(syncClientId: v)),
+          ),
+          _TextRow(
+            label: S.syncClientSecretLabel,
+            value: settings.syncClientSecret,
+            obscure: true,
+            onChanged: (v) =>
+                _update(context, settings.copyWith(syncClientSecret: v)),
+          ),
+        ] else
+          _TextRow(
+            label: S.syncServerClientIdLabel,
+            value: settings.syncServerClientId,
+            onChanged: (v) =>
+                _update(context, settings.copyWith(syncServerClientId: v)),
+          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                lastSync == null
+                    ? statusText
+                    : '$statusText · ${S.syncLast}: '
+                          '${formatClock(lastSync, settings.timeFmt)}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: sync.status == SyncStatus.error
+                      ? theme.colorScheme.error
+                      : null,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (sync.status == SyncStatus.syncing)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else if (sync.connected) ...[
+              IconButton(
+                tooltip: S.syncNowBtn,
+                icon: const Icon(Icons.sync, size: 20),
+                onPressed: () => context.read<SyncCubit>().syncNow(),
+              ),
+              TextButton(
+                onPressed: () => context.read<SyncCubit>().disconnect(),
+                child: Text(S.syncDisconnect),
+              ),
+            ] else
+              FilledButton(
+                onPressed: () => context.read<SyncCubit>().connect(),
+                child: Text(S.syncConnect),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Мелкие поля
 // ---------------------------------------------------------------------------
 
@@ -741,6 +868,10 @@ class _TextRowState extends State<_TextRow> {
         child: TextField(
           controller: _controller,
           obscureText: widget.obscure,
+          // Отдаём значение сразу, а не только при потере фокуса: на телефоне
+          // нажатие «Подключить» фокус с поля не снимает, и введённый ID
+          // не успевал попасть в настройки — вход падал как «поле пустое».
+          onChanged: (v) => widget.onChanged(v.trim()),
           decoration: InputDecoration(
             labelText: widget.label,
             isDense: true,

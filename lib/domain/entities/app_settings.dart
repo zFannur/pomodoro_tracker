@@ -153,6 +153,9 @@ class AppSettings extends Equatable {
     this.lastSprintId = '',
     this.collapsedGroups = defaultCollapsedGroups,
     this.mirrorToVault = true,
+    this.syncClientId = '',
+    this.syncClientSecret = '',
+    this.syncServerClientId = '',
   });
 
   factory AppSettings.fromJson(
@@ -219,6 +222,9 @@ class AppSettings extends Equatable {
           (json['collapsedGroups'] as List?)?.whereType<String>().toList() ??
           defaultCollapsedGroups,
       mirrorToVault: json['mirrorToVault'] as bool? ?? true,
+      syncClientId: json['syncClientId'] as String? ?? '',
+      syncClientSecret: json['syncClientSecret'] as String? ?? '',
+      syncServerClientId: json['syncServerClientId'] as String? ?? '',
     );
   }
 
@@ -249,7 +255,12 @@ class AppSettings extends Equatable {
   static const defaultCategories = ['работа', 'личное'];
 
   /// Свёрнутые по умолчанию группы экрана «Задачи».
-  static const defaultCollapsedGroups = ['later', 'doneWeek'];
+  static const defaultCollapsedGroups = [
+    'later',
+    'doneToday',
+    'doneWeek',
+    'trash',
+  ];
 
   final List<TimerScheme> schemes;
   final String activeScheme;
@@ -327,6 +338,13 @@ class AppSettings extends Equatable {
   /// Зеркалить задачи в валт («Задачи.md», только для просмотра).
   final bool mirrorToVault;
 
+  /// Google Drive синк: OAuth-клиент «Desktop app» (Windows).
+  final String syncClientId;
+  final String syncClientSecret;
+
+  /// Google Drive синк: OAuth-клиент типа Web — serverClientId для Android.
+  final String syncServerClientId;
+
   TimerScheme get scheme => schemes.firstWhere(
     (s) => s.name == activeScheme,
     orElse: () => schemes.isEmpty ? defaultSchemes.first : schemes.first,
@@ -366,6 +384,9 @@ class AppSettings extends Equatable {
     'lastSprintId': lastSprintId,
     'collapsedGroups': collapsedGroups,
     'mirrorToVault': mirrorToVault,
+    'syncClientId': syncClientId,
+    'syncClientSecret': syncClientSecret,
+    'syncServerClientId': syncServerClientId,
   };
 
   AppSettings copyWith({
@@ -402,6 +423,9 @@ class AppSettings extends Equatable {
     String? lastSprintId,
     List<String>? collapsedGroups,
     bool? mirrorToVault,
+    String? syncClientId,
+    String? syncClientSecret,
+    String? syncServerClientId,
   }) {
     return AppSettings(
       schemes: schemes ?? this.schemes,
@@ -437,6 +461,9 @@ class AppSettings extends Equatable {
       lastSprintId: lastSprintId ?? this.lastSprintId,
       collapsedGroups: collapsedGroups ?? this.collapsedGroups,
       mirrorToVault: mirrorToVault ?? this.mirrorToVault,
+      syncClientId: syncClientId ?? this.syncClientId,
+      syncClientSecret: syncClientSecret ?? this.syncClientSecret,
+      syncServerClientId: syncServerClientId ?? this.syncServerClientId,
     );
   }
 
@@ -482,5 +509,8 @@ class AppSettings extends Equatable {
     lastSprintId,
     collapsedGroups,
     mirrorToVault,
+    syncClientId,
+    syncClientSecret,
+    syncServerClientId,
   ];
 }

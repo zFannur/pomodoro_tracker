@@ -133,7 +133,9 @@ class JournalCubit extends Cubit<JournalState> {
     final log = state.log;
     if (log == null) return;
     final sessions = [...log.sessions];
-    final index = sessions.indexOf(entry);
+    // Поиск по id, а не по значению: две одинаковые записи одной минуты
+    // раньше приводили к правке первой совпавшей, а не выбранной.
+    final index = sessions.indexWhere((s) => s.id == entry.id);
     if (index < 0) return;
     sessions[index] = entry.copyWith(
       category: category,
@@ -146,7 +148,8 @@ class JournalCubit extends Cubit<JournalState> {
   Future<void> deleteEntry(PomoSession entry) async {
     final log = state.log;
     if (log == null) return;
-    final sessions = [...log.sessions]..remove(entry);
+    final sessions = [...log.sessions]
+      ..removeWhere((s) => s.id == entry.id);
     await _saveDay(sessions);
   }
 

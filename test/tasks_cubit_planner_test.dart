@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:pomodoro_tracker/core/failure.dart';
@@ -16,18 +18,38 @@ class _MemTasks implements TaskRepository {
   Future<Either<Failure, TasksFile>> load() async => Either.right(file);
 
   @override
-  Future<Either<Failure, Unit>> save(TasksFile f) async {
+  Future<Either<Failure, Unit>> saveTasks(TasksFile f) async {
     file = f;
     return Either.right(unit);
   }
 }
 
+/// Первая запись искусственно медленная — воспроизводит гонку, при которой
+/// более старый снимок мог бы завершиться позже и молча затереть новый.
+class _RacyTasks extends _MemTasks {
+  var _first = true;
+
+  @override
+  Future<Either<Failure, Unit>> saveTasks(TasksFile f) async {
+    if (_first) {
+      _first = false;
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+    }
+    return super.saveTasks(f);
+  }
+}
+
 class _MemJournal implements JournalRepository {
+  final List<PomoSession> written = [];
+
   @override
   Future<Either<Failure, Unit>> addSession(
     PomoSession session,
     int dailyGoal,
-  ) async => Either.right(unit);
+  ) async {
+    written.add(session);
+    return Either.right(unit);
+  }
 
   @override
   Future<Either<Failure, Unit>> saveDay(DayLog log) async =>
@@ -50,6 +72,7 @@ PomoTask t(String d, {DateTime? due}) =>
 
 void main() {
   late _MemTasks repo;
+  late _MemJournal journal;
   late TasksCubit cubit;
 
   Future<void> seed({
@@ -57,9 +80,10 @@ void main() {
     List<PomoTask> planner = const [],
   }) async {
     repo = _MemTasks()..file = TasksFile(todo: todo, planner: planner);
+    journal = _MemJournal();
     cubit = TasksCubit(
       repo,
-      _MemJournal(),
+      journal,
       () => AppSettings.fromJson(const {}, fallbackPath: '.'),
       NotifyService(),
     );
@@ -92,19 +116,92 @@ void main() {
     expect(cubit.state.planner.first.category, 'моя-кат');
   });
 
-  test('insertTodoAt/insertPlannerAt возвращают удалённое (undo)', () async {
+  test('removeAt/plannerRemove кладут в корзину, restoreFromTrash возвращает',
+      () async {
     await seed(todo: [t('x'), t('y')], planner: [t('p')]);
-    final removedTodo = cubit.state.todo[1];
     await cubit.removeAt(1);
-    await cubit.insertTodoAt(1, removedTodo);
-    expect(cubit.state.todo.map((t) => t.description), ['x', 'y']);
+    expect(cubit.state.todo.map((t) => t.description), ['x']);
+    expect(cubit.state.trash, hasLength(1));
+    expect(cubit.state.trash.first.task.description, 'y');
+    expect(cubit.state.trash.first.fromPlanner, isFalse);
 
-    final removedPlanner = cubit.state.planner[0];
+    await cubit.restoreFromTrash(cubit.state.trash.first);
+    expect(cubit.state.todo.map((t) => t.description), ['y', 'x']);
+    expect(cubit.state.trash, isEmpty);
+
     await cubit.plannerRemove(0);
-    await cubit.insertPlannerAt(0, removedPlanner);
+    expect(plannerNames(), isEmpty);
+    expect(cubit.state.trash.single.fromPlanner, isTrue);
+
+    await cubit.restoreFromTrash(cubit.state.trash.single);
     expect(plannerNames(), ['p']);
-    // Индекс за пределами — вставка в конец, не падение.
-    await cubit.insertPlannerAt(99, t('q'));
-    expect(plannerNames(), ['p', 'q']);
+    expect(cubit.state.trash, isEmpty);
+  });
+
+  test('minus, обнуляющий задачу, кладёт её в корзину', () async {
+    await seed(todo: [t('только один помидор')]);
+    // pomodoroMinutes по умолчанию 25, у задачи ровно 25 — один minus её съест.
+    await cubit.minus(0);
+    expect(cubit.state.todo, isEmpty);
+    expect(cubit.state.trash.single.task.description, 'только один помидор');
+  });
+
+  test('clearTodo переносит все задачи «Сегодня» в корзину разом', () async {
+    await seed(todo: [t('a'), t('b'), t('c')]);
+    await cubit.clearTodo();
+    expect(cubit.state.todo, isEmpty);
+    expect(cubit.state.trash.map((e) => e.task.description).toSet(), {
+      'a',
+      'b',
+      'c',
+    });
+    expect(cubit.state.trash.every((e) => !e.fromPlanner), isTrue);
+  });
+
+  test('restoreFromTrash игнорирует индекс — вставка всегда в конец/начало,'
+      ' не падает на несуществующей записи', () async {
+    await seed(todo: [t('x')]);
+    await cubit.removeAt(0);
+    final entry = cubit.state.trash.single;
+    await cubit.restoreFromTrash(entry);
+    expect(cubit.state.todo.single.description, 'x');
+    // Повторный вызов той же (уже отсутствующей) записи — no-op, не падает.
+    await cubit.restoreFromTrash(entry);
+    expect(cubit.state.todo.single.description, 'x');
+  });
+
+  test('markDone пишет в журнал и дёргает onHistoryWritten', () async {
+    await seed(todo: [t('закрыть руками')]);
+    var refreshed = 0;
+    cubit.onHistoryWritten = () async => refreshed++;
+    await cubit.markDone(0, whole: true);
+    // Задача ушла из «Сегодня»…
+    expect(cubit.state.todo, isEmpty);
+    // …но не в никуда: запись в журнале есть.
+    expect(journal.written.single.task, 'закрыть руками');
+    expect(journal.written.single.manual, isTrue);
+    // Без этого журнал и статистика показали бы её только после перезапуска.
+    expect(refreshed, 1);
+  });
+
+  test('запись на диск сериализована: медленная первая не затирает вторую',
+      () async {
+    final racy = _RacyTasks()..file = const TasksFile(todo: [], planner: []);
+    final racyCubit = TasksCubit(
+      racy,
+      _MemJournal(),
+      () => AppSettings.fromJson(const {}, fallbackPath: '.'),
+      NotifyService(),
+    );
+    await racyCubit.load();
+    // Первый add() запускает медленную запись и НЕ дожидается её (fire-and-
+    // forget, как реально делает UI); второй стартует почти сразу следом.
+    unawaited(racyCubit.add('a', fallbackCategory: 'x'));
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    await racyCubit.add('b', fallbackCategory: 'x');
+    // Без сериализации файл содержал бы только 'a' (медленная запись
+    // финишировала бы последней и перезаписала бы более полный снимок).
+    // Порядок не важен (tasksTop) — важно, что обе задачи выжили.
+    expect(racy.file.todo.map((t) => t.description).toSet(), {'a', 'b'});
   });
 }

@@ -5,6 +5,7 @@ import 'package:equatable/equatable.dart';
 /// Один засчитанный помидор (запись истории «Сделано»).
 class PomoSession extends Equatable {
   const PomoSession({
+    required this.id,
     required this.start,
     required this.minutes,
     required this.category,
@@ -14,6 +15,12 @@ class PomoSession extends Equatable {
     this.manual = false,
     this.frog = false,
   });
+
+  /// Стабильный идентификатор записи. Нужен синку (union по id при слиянии
+  /// двух устройств), но чинит и живой баг: без него два помидора одной
+  /// минуты по одной задаче неразличимы, и правка/удаление в журнале
+  /// попадали в первую совпадающую строку, а не в выбранную.
+  final String id;
 
   final DateTime start;
   final int minutes;
@@ -34,6 +41,7 @@ class PomoSession extends Equatable {
   final bool frog;
 
   PomoSession copyWith({
+    String? id,
     DateTime? start,
     int? minutes,
     String? category,
@@ -44,6 +52,7 @@ class PomoSession extends Equatable {
     bool? frog,
   }) {
     return PomoSession(
+      id: id ?? this.id,
       start: start ?? this.start,
       minutes: minutes ?? this.minutes,
       category: category ?? this.category,
@@ -57,6 +66,9 @@ class PomoSession extends Equatable {
 
   @override
   List<Object?> get props => [
+    // id первым: иначе Equatable по-прежнему считает два одинаковых
+    // помидора равными и баг с правкой не той строки остаётся.
+    id,
     start,
     minutes,
     category,
