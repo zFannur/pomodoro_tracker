@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -113,6 +115,7 @@ class _HomeShellState extends State<HomeShell> {
 
   /// Заголовок окна: при работающем таймере — «MM:SS контекст».
   void _updateTitle(TimerState timer) {
+    if (!Platform.isWindows) return;
     if (!timer.running) {
       windowManager.setTitle(S.appTitle);
       return;
@@ -133,96 +136,132 @@ class _HomeShellState extends State<HomeShell> {
     windowManager.setTitle('$m:$s $context_');
   }
 
+  void _select(int i) {
+    // Снять фокус со скрытого поля ввода (IndexedStack держит
+    // экраны живыми) — иначе оно съедает Space/Esc на другой вкладке.
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _index = i);
+  }
+
   @override
   Widget build(BuildContext context) {
     // watch, не read: нав-лейблы (S.navTimer и т.п.) не имеют своего
     // BlocBuilder, поэтому смена языка должна перестраивать сам HomeShell.
     final language = context.watch<SettingsCubit>().state.settings.language;
+    // Ключ на языке: экраны без своего context.watch(SettingsCubit)
+    // (например StatsScreen) иначе не подхватят смену языка сами.
+    final screens = IndexedStack(
+      key: ValueKey(language),
+      index: _index,
+      sizing: StackFit.expand,
+      children: const [
+        TimerScreen(),
+        TasksScreen(),
+        SprintScreen(),
+        StatsScreen(),
+      ],
+    );
+    // Телефон/узкое окно — навигация снизу, шестерёнка в баре сверху.
+    final narrow = MediaQuery.sizeOf(context).width < 600;
     return BlocListener<TimerCubit, TimerState>(
       listener: (context, timer) => _updateTitle(timer),
-      child: Scaffold(
-        body: Row(
-          children: [
-            NavigationRail(
-              selectedIndex: _index,
-              labelType: NavigationRailLabelType.all,
-              onDestinationSelected: (i) {
-                // Снять фокус со скрытого поля ввода (IndexedStack держит
-                // экраны живыми) — иначе оно съедает Space/Esc на другой вкладке.
-                FocusManager.instance.primaryFocus?.unfocus();
-                setState(() => _index = i);
-              },
-              leading: Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 12),
-                child: Image.asset(
-                  'assets/nav/logo.png',
-                  width: 34,
-                  height: 34,
-                ),
-              ),
-              trailing: Expanded(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: IconButton(
-                      tooltip: S.settings,
-                      icon: const Icon(Icons.settings_outlined),
-                      onPressed: () => showSettingsDialog(context),
-                    ),
-                  ),
-                ),
-              ),
-              destinations: [
-                NavigationRailDestination(
-                  icon: _navIcon('assets/nav/timer.png', selected: false),
-                  selectedIcon: _navIcon(
-                    'assets/nav/timer.png',
-                    selected: true,
-                  ),
-                  label: Text(S.navTimer),
-                ),
-                NavigationRailDestination(
-                  icon: _tasksIcon(selected: false),
-                  selectedIcon: _tasksIcon(selected: true),
-                  label: Text(S.navTasks),
-                ),
-                NavigationRailDestination(
-                  icon: _navIcon('assets/nav/sprint.png', selected: false),
-                  selectedIcon: _navIcon(
-                    'assets/nav/sprint.png',
-                    selected: true,
-                  ),
-                  label: Text(S.navSprint),
-                ),
-                NavigationRailDestination(
-                  icon: _navIcon('assets/nav/stats.png', selected: false),
-                  selectedIcon: _navIcon(
-                    'assets/nav/stats.png',
-                    selected: true,
-                  ),
-                  label: Text(S.navStats),
-                ),
-              ],
+      child: narrow ? _narrowShell(screens) : _wideShell(screens),
+    );
+  }
+
+  Widget _narrowShell(Widget screens) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(S.appTitle),
+        actions: [
+          IconButton(
+            tooltip: S.settings,
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => showSettingsDialog(context),
+          ),
+        ],
+      ),
+      body: screens,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: _select,
+        destinations: [
+          NavigationDestination(
+            icon: _navIcon('assets/nav/timer.png', selected: false),
+            selectedIcon: _navIcon('assets/nav/timer.png', selected: true),
+            label: S.navTimer,
+          ),
+          NavigationDestination(
+            icon: _tasksIcon(selected: false),
+            selectedIcon: _tasksIcon(selected: true),
+            label: S.navTasks,
+          ),
+          NavigationDestination(
+            icon: _navIcon('assets/nav/sprint.png', selected: false),
+            selectedIcon: _navIcon('assets/nav/sprint.png', selected: true),
+            label: S.navSprint,
+          ),
+          NavigationDestination(
+            icon: _navIcon('assets/nav/stats.png', selected: false),
+            selectedIcon: _navIcon('assets/nav/stats.png', selected: true),
+            label: S.navStats,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _wideShell(Widget screens) {
+    return Scaffold(
+      body: Row(
+        children: [
+          NavigationRail(
+            selectedIndex: _index,
+            labelType: NavigationRailLabelType.all,
+            onDestinationSelected: _select,
+            leading: Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 12),
+              child: Image.asset('assets/nav/logo.png', width: 34, height: 34),
             ),
-            const VerticalDivider(width: 1),
-            Expanded(
-              // Ключ на языке: экраны без своего context.watch(SettingsCubit)
-              // (например StatsScreen) иначе не подхватят смену языка сами.
-              child: IndexedStack(
-                key: ValueKey(language),
-                index: _index,
-                sizing: StackFit.expand,
-                children: const [
-                  TimerScreen(),
-                  TasksScreen(),
-                  SprintScreen(),
-                  StatsScreen(),
-                ],
+            trailing: Expanded(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: IconButton(
+                    tooltip: S.settings,
+                    icon: const Icon(Icons.settings_outlined),
+                    onPressed: () => showSettingsDialog(context),
+                  ),
+                ),
               ),
             ),
-          ],
-        ),
+            destinations: [
+              NavigationRailDestination(
+                icon: _navIcon('assets/nav/timer.png', selected: false),
+                selectedIcon: _navIcon('assets/nav/timer.png', selected: true),
+                label: Text(S.navTimer),
+              ),
+              NavigationRailDestination(
+                icon: _tasksIcon(selected: false),
+                selectedIcon: _tasksIcon(selected: true),
+                label: Text(S.navTasks),
+              ),
+              NavigationRailDestination(
+                icon: _navIcon('assets/nav/sprint.png', selected: false),
+                selectedIcon: _navIcon('assets/nav/sprint.png', selected: true),
+                label: Text(S.navSprint),
+              ),
+              NavigationRailDestination(
+                icon: _navIcon('assets/nav/stats.png', selected: false),
+                selectedIcon: _navIcon('assets/nav/stats.png', selected: true),
+                label: Text(S.navStats),
+              ),
+            ],
+          ),
+          const VerticalDivider(width: 1),
+          Expanded(child: screens),
+        ],
       ),
     );
   }

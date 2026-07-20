@@ -16,6 +16,9 @@ class NotifyService {
     ..connectionTimeout = const Duration(seconds: 5);
 
   Future<void> init(String appName) async {
+    // ponytail: на Android локальных уведомлений нет (таймер живёт в
+    // открытом приложении); появится нужда — flutter_local_notifications.
+    if (!Platform.isWindows) return;
     await localNotifier.setup(appName: appName);
     _ready = true;
   }
@@ -43,7 +46,7 @@ class NotifyService {
     if (settings.notifications) {
       await show(title, body);
     }
-    if (raise && settings.popupRaiseWindow) {
+    if (raise && settings.popupRaiseWindow && Platform.isWindows) {
       await windowManager.show();
       await windowManager.focus();
     }
