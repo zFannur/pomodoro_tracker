@@ -4,35 +4,37 @@
 
 # Pomodoro Tracker
 
-**A desktop Pomodoro timer and task manager for Windows that plays well with Obsidian.**
+**A Pomodoro timer and task manager for Windows and Android that plays well with Obsidian.**
 
 A Pomodoro-technique timer with a precise model of series, idle time and
 focus, a task screen with collapsible groups — plus a personal focus system
-(frog of the day, sprint tasks, Flowtime). Pomodoro history and sprints are
-plain `.md` files in an Obsidian vault; tasks live in `tasks.json` and are
-mirrored into the vault for viewing.
+(frog of the day, sprint tasks, Flowtime). Tasks, pomodoro history and sprints
+sync across devices through your own Google Drive and are mirrored into an
+Obsidian vault as plain `.md` files for reading, search and git.
 
 [Русский README](README.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-E2574C.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
-[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](#quick-start)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Android-0078D6?logo=windows&logoColor=white)](#quick-start)
 [![Storage](https://img.shields.io/badge/Storage-Markdown-3FA45B?logo=markdown&logoColor=white)](#data-storage)
-[![Tests](https://img.shields.io/badge/tests-38%20passing-3FA45B.svg)](#tests)
+[![Tests](https://img.shields.io/badge/tests-82%20passing-3FA45B.svg)](#tests)
 
 <img src="docs/screenshot-timer.png" width="820" alt="Timer screen">
 
 </div>
 
-No cloud, no accounts, no telemetry. Data is plain `.md` files you can read
-and edit by hand in Obsidian.
+No service accounts, no telemetry, no third-party servers: the only cloud is
+your own Google Drive, and only if you connect it yourself. Without sync the
+app is fully local.
 
 ## Why
 
-Ordinary timers keep their history in someone else's database. Here,
-pomodoros, tasks and sprints are markdown files in your own vault: they show
-up in Obsidian's graph, they're searchable, editable by hand, and you can put
-them in git. The app is just a convenient interface on top of those files.
+Ordinary timers keep their history in someone else's database. Here it stays
+with you: the working file lives in the app folder, and its readable mirror is
+markdown in your own vault — visible in Obsidian's graph, searchable, and easy
+to keep in git. Sync goes through your personal Drive, not through a
+middleman service.
 
 ---
 
@@ -45,6 +47,7 @@ them in git. The app is just a convenient interface on top of those files.
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Smart task input](#smart-task-input)
 - [Data storage](#data-storage)
+- [Google Drive sync](#google-drive-sync)
 - [Settings](#settings)
 - [Exact behavior rules](#exact-behavior-rules)
 - [Architecture](#architecture)
@@ -61,10 +64,16 @@ them in git. The app is just a convenient interface on top of those files.
 flutter pub get
 flutter build windows --release
 # → build\windows\x64\runner\Release\pomodoro_tracker.exe
+
+flutter build apk --release
+# → build\app\outputs\flutter-apk\app-release.apk
 ```
 
 On first launch the app creates a storage folder (`…\Obsidian\Помодоро` by
 default) — the path can be changed in Settings.
+
+Cross-device sync is optional: without it the app runs fully offline. See
+[below](#google-drive-sync) for how to turn it on.
 
 ---
 
@@ -194,22 +203,29 @@ The **📥** button captures straight to "Inbox" — bypassing today's list.
 
 ## Data storage
 
-**Tasks** live in `tasks.json` (`%APPDATA%\com.local\pomodoro_tracker\`,
-atomic writes, stable ids): the task manager doesn't depend on the vault and
-keeps working even when the vault is unavailable. On first launch, tasks are
-migrated automatically from the legacy `Задачи.md`.
+**The source of truth is `data.json`** (on Windows
+`%APPDATA%\com.local\pomodoro_tracker\`, on Android the app-private directory;
+atomic writes, stable ids on every task and every pomodoro). One document for
+everything: tasks, journal, sprints and tombstones of deleted records. That
+same document is what syncs — so a closed task and the pomodoro it produced
+always reach the other device together.
 
-The storage folder (`…\Obsidian\Помодоро` by default) keeps:
+On first launch data is migrated automatically from whatever was there before:
+tasks from `tasks.json`, journal and sprints from the vault's markdown. The
+source files are not deleted — deleting `data.json` rolls everything back.
+
+Markdown in the storage folder (`…\Obsidian\Помодоро` by default) is a set of
+**read-only mirrors**:
 
 ```
 Помодоро/
-├── Задачи.md                    # MIRROR of the task list (view-only)
+├── Задачи.md                    # MIRROR of the task list
 ├── Входящие.md                  # inbox: capture tasks from Obsidian
 ├── Журнал/
 │   └── 2026-07/
-│       └── 2026-07-16.md        # day's pomodoros + notes
+│       └── 2026-07-16.md        # MIRROR: day's pomodoros + notes
 └── Спринты/
-    └── 2026-W29.md              # milestone, goal, daily facts
+    └── 2026-W29.md              # MIRROR: milestone, goal, daily facts
 ```
 
 The folder and file names are fixed (`Задачи.md`, `Журнал/`, `Спринты/`) —
@@ -219,11 +235,15 @@ switch only translates the app's own text**; the markdown format itself
 (section headers, table columns) is fixed, and task/category names stay
 exactly as you typed them.
 
-### Задачи.md ("Tasks.md") — a one-way mirror
+### Mirrors are read-only
 
-Regenerated on every task change: visible in Obsidian, searchable, versioned
-by git, and doubles as an emergency backup. **Edits to it are not read back**
-(a note at the top says so). The mirror can be turned off in Settings.
+`Задачи.md`, `Журнал/*.md` and `Спринты/*.md` are regenerated on every change:
+visible in Obsidian, searchable, versioned by git, and they double as a
+human-readable emergency backup. **Edits to them are not read back and get
+overwritten** (a note at the top says so). Edit the weekly milestone in the
+app. Mirrors can be turned off in Settings.
+
+`Входящие.md` is the only file read back.
 
 ```markdown
 <!-- Зеркало Помодоро Трекера: правки здесь не читаются. -->
@@ -285,14 +305,88 @@ Google Drive).
 Frontmatter (goal, milestone, week bounds, weekly facts), a `## Задачи
 недели` snapshot, `## Сделано за неделю`, and a `## По дням` table.
 
-Hand-edited and survive being overwritten: the **goal**, the **milestone**,
-and **"Done this week"**.
+Daily facts are not stored in `data.json` — they're derived from the journal.
+That's why pomodoros don't push the sprint to Drive: the file only travels
+when the goal, the milestone or the "done" list actually changes.
 
 ### App settings
 
-JSON, **not** in the vault: `%APPDATA%\com.local\pomodoro_tracker\settings.json`.
-`tasks.json` (the task list) and `timer_state.json` (timer state used for
-restore) live next to it.
+JSON, **not** in the vault: `%APPDATA%\com.local\pomodoro_tracker\settings.json`
+(the folder name comes from `CompanyName` in `windows/runner/Runner.rc` — don't
+change it, or the data ends up in a different directory).
+Settings are local to the device and never synced — the OAuth keys live there.
+`data.json` (all data) and `timer_state.json` (timer state used for restore)
+sit next to it.
+
+---
+
+## Google Drive sync
+
+All of `data.json` — tasks, journal and sprints — syncs across devices through
+the **hidden app folder** (appDataFolder) on your Google Drive: the file is
+invisible both in the Drive UI and to other apps. Settings stay local to each
+device.
+
+**How it works:**
+
+- auto-sync on startup, on returning to the window/app (at most once a
+  minute) and 5 seconds after any edit;
+- the file is compared by its Drive revision: only the remote changed —
+  pull; only we changed — push;
+- a **conflict** (both devices changed) is resolved by **merging, not by
+  picking a winner**: lists are unioned by id, so no task and no pomodoro is
+  lost. The newer side only decides contested scalars — the daily goal and the
+  weekly milestone. The losing version is additionally saved next door as
+  `data_conflict.json`;
+- **first connection** of a device to a non-empty Drive uses the same merge:
+  nothing gets overwritten on either side.
+
+### Deletions and tombstones
+
+A "shorter file" is indistinguishable from "data hasn't arrived yet", so
+deletions are recorded explicitly. On every write the repository diffs the set
+of ids before and after: whatever disappeared becomes a tombstone with a
+timestamp and travels with the data. Merging subtracts buried ids from every
+list.
+
+- deletion wins **unconditionally**: if a record was deleted on one device and
+  edited on another, it stays deleted. Device clocks never decide a record's
+  fate — clock drift between Android and Windows would bring back
+  non-determinism;
+- tombstones are produced by diffing at write time rather than at each deletion
+  site, which covers every path at once — "minus" to zero, "Clear list",
+  deleting a journal entry, merging tasks;
+- restoring a record (from the trash) removes its tombstone;
+- tombstones older than 90 days are pruned: by then the deletion has reached
+  every device.
+
+### Google Cloud setup (one-time)
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → create a
+   project (any name).
+2. **APIs & Services → Library** → enable the **Google Drive API**.
+3. **APIs & Services → OAuth consent screen** → External → fill in the name
+   and email → add yourself under **Test users** (no need to publish).
+4. **Credentials → Create credentials → OAuth client ID:**
+   - **Desktop app** — for Windows. Paste the Client ID + Client Secret into
+     Settings → App → Google Drive → "Connect";
+   - additionally for Android:
+     - **Android** — package `com.zfannur.pomodoro_tracker` + the SHA-1 of the
+       key the APK is actually signed with (`cd android && ./gradlew
+       signingReport`, the `Variant: release` line). This client's values are
+       never entered into the app — it exists so Google can recognise it;
+     - **Web application** — paste its Client ID into the
+       "Server Client ID (Web)" field in the app settings on the phone.
+
+All three clients must live **in one project** with the Drive API enabled.
+
+The only scope is `drive.appdata` — the app cannot see the rest of your
+Drive. Per Google's policy the Desktop client secret is not treated as a
+secret for installed apps; it is stored in your local `settings.json`.
+
+**If sign-in fails with `DEVELOPER_ERROR`**, Google found no client matching
+the app: usually the Android client holds the SHA-1 of a different key (debug
+instead of release), or the clients are spread across separate projects.
 
 ---
 
@@ -327,7 +421,9 @@ restore) live next to it.
 - categories and **scheme-per-category binding** (a task in that category
   gets that scheme's pomodoro length when estimated). A new category can be
   typed right in the task edit dialog — it registers instantly and shows up
-  in every dropdown.
+  in every dropdown;
+- **Google Drive** — task sync connection
+  (see [the section above](#google-drive-sync)).
 
 Category names and the markdown files themselves always stay in whatever
 language you typed them in — the interface language only affects the app's
@@ -363,7 +459,7 @@ The key rules that define timer and journal behavior:
 
 ## Architecture
 
-Flutter 3.44 / Dart 3.12, Windows desktop. Layers:
+Flutter 3.44 / Dart 3.12, Windows desktop + Android. Layers:
 
 ```
 lib/
@@ -373,16 +469,18 @@ lib/
 │   ├── entities/   # PomoTask, PomoSession, DayLog, Sprint, AppSettings
 │   └── repositories.dart
 ├── data/
-│   ├── markdown_codec.dart      # pure serialize/parse (test-covered)
-│   ├── json_task_repository.dart# tasks.json + migration + vault mirror
-│   ├── vault_repositories.dart  # file access, inbox, atomic writes
+│   ├── markdown_codec.dart       # pure serialize/parse (test-covered)
+│   ├── data_merge.dart           # merging two data.json snapshots (pure)
+│   ├── json_data_repository.dart # data.json: truth, migration, tombstones, mirrors
+│   ├── vault_repositories.dart   # vault access, inbox, settings
 │   └── timer_state_store.dart
 ├── presentation/
-│   ├── cubits/     # timer, tasks, journal, sprint, stats, settings
+│   ├── cubits/     # timer, tasks, journal, sprint, stats, settings, sync
 │   ├── screens/    # timer, tasks, sprint, stats, planner_dialog, settings_dialog
 │   ├── widgets/    # common.dart
 │   └── home_shell.dart
-├── services/       # sound_service (WAV-synthesized sounds), notify_service
+├── services/       # sound_service (WAV-synthesized sounds), notify_service,
+│                   # sync_auth (per-platform OAuth), drive_sync_service
 └── main.dart       # dependency wiring, 🐸/⭐ rollover
 ```
 
@@ -390,7 +488,16 @@ lib/
 - **Errors**: `Either<Failure, T>` (`fpdart`) at the repository boundary.
 - **Colors** live only in `theme.dart`, **text** only in `strings.dart`.
 - **File writes are atomic** (temp + rename) so Obsidian/Drive never see a
-  half-written file.
+  half-written file. The repository and the sync use **different** temp names:
+  a shared one already caused spliced content and broken JSON.
+- **`JsonDataRepository` implements three interfaces at once** (tasks, journal,
+  sprints): they read one document, so the in-memory state must be one. Hence
+  `saveTasks`/`saveSprint` instead of a single `save`.
+- **Merging is a pure function with no IO** — the nastiest part of syncing is
+  covered by tests instead of by hand on two devices.
+- **The repository writes what arrives from Drive** (`applyRemote`), not the
+  sync service: otherwise the in-memory document would drift from disk and the
+  next write would tombstone everything that had just arrived.
 
 ---
 
@@ -399,16 +506,27 @@ lib/
 ```bash
 flutter pub get
 flutter analyze          # should be clean
-flutter test             # 38 tests
+flutter test             # 82 tests
 flutter run -d windows   # debug
 flutter build windows --release
+flutter build apk --release
+```
+
+### Android
+
+The signing key is configured in `android/key.properties` (not in git). The
+fingerprint of that exact key is registered in Google Cloud — **changing the
+key breaks Google sign-in**:
+
+```bash
+cd android && ./gradlew signingReport   # SHA-1 for the Cloud Console
 ```
 
 ### App icon
 
 ```bash
 # assets/icon/logo.png (square, transparent background, some padding)
-python tool/make_icon.py     # → windows/runner/resources/app_icon.ico (16..256)
+python tool/make_icon.py     # → Windows .ico + mipmap-*/ic_launcher.png
 flutter build windows --release
 ```
 
@@ -425,25 +543,46 @@ may need to clear the Windows icon cache (`IconCache.db` + restart Explorer).
 - `test/stats_frog_test.dart` — counting days with a frog.
 - `test/strings_test.dart` — interface language switching, localized time
   units.
-- `test/json_task_repository_test.dart` — migration from `Задачи.md`,
-  `tasks.json` round-trip, duplicate-id resolution, the mirror, the inbox
-  file.
-- `test/tasks_cubit_planner_test.dart` — bucket reordering, editing,
-  undo restore.
+- `test/json_data_repository_test.dart` — migration of tasks and journal,
+  round-trip, deterministic ids on migration, tombstones, synthesized empty
+  days, mirrors, the inbox file, `applyRemote`.
+- `test/data_merge_test.dart` — merging: union by id, delete-wins in both
+  directions, survival of unknown sections, idempotence.
+- `test/tasks_cubit_planner_test.dart` — bucket reordering, editing, the
+  trash, serialized disk writes.
+- `test/drive_sync_test.dart` — the Drive sync algorithm: push/pull, merge on
+  first connect and on conflict, dirty-flag survival, sign-in called exactly
+  once.
+- `test/sync_auth_test.dart` — decisions made before Google sign-in is
+  initialized (it can't be initialized twice per launch).
+- `test/stats_screen_test.dart` — the stats screen lays out at phone and wide
+  widths (a layout mistake once broke the whole screen).
 
 ---
 
 ## Known limitations
 
-- **`Задачи.md` is a mirror only**: edits to it are never read back. Add
-  tasks from Obsidian via `Входящие.md`; move and edit them in the app.
+- **Markdown files are mirrors only**: edits to `Задачи.md`, `Журнал/*.md` and
+  `Спринты/*.md` are never read back and get overwritten on the next write.
+  Add tasks from Obsidian via `Входящие.md`; do everything else in the app.
 - **Flowtime overtime doesn't survive a restart** — closing the app during
   overtime loses that pomodoro.
-- In the sprint file, only "its own" sections survive an overwrite (goal,
-  milestone, "Done this week"); any sections you add by hand will be erased.
+- **Android**: no notifications, and the timer only runs while the app is open
+  (no background service, deliberately). The storage folder is fixed — picking
+  a directory would yield a `content://` URI rather than a path.
+- **Day notes and "Done this week" merge by text**, not by id: two literally
+  identical lines added on different devices collapse into one. They have no
+  delete action in the UI, so giving them ids wasn't worth it.
+- **`data.json` grows** — roughly a third of a megabyte per year at ten
+  pomodoros a day, and it's uploaded whole on every sync. When that starts to
+  hurt, the cheap ways out are compression or moving old years into a separate
+  unsynced file. Sharding now would be a bet on a future that may not arrive.
+- **Changing the Android signing key breaks Google sign-in**: the Cloud
+  Console has the fingerprint of one specific key.
 - Deliberately without server-side features: accounts, leaderboards,
-  sharing, integrations (Slack/Trello/Todoist/Google), email reports,
-  recurring tasks — this is a focused local tool, not a SaaS platform.
+  sharing, integrations (Slack/Trello/Todoist, apart from the Google Drive
+  sync), email reports, recurring tasks — this is a focused local tool, not
+  a SaaS platform.
 
 ---
 
