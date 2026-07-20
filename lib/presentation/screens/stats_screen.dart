@@ -29,6 +29,49 @@ class StatsScreen extends StatelessWidget {
   }
 }
 
+/// Плитки статистики по [perRow] в ряд. StatTile — Expanded, поэтому живёт
+/// только внутри Row; неполный последний ряд добиваем пустотой, иначе
+/// одинокая плитка растянулась бы на всю ширину.
+class _StatGrid extends StatelessWidget {
+  const _StatGrid({required this.tiles, required this.perRow});
+
+  final List<Widget> tiles;
+  final int perRow;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < tiles.length; i += perRow) {
+      final slice = tiles.skip(i).take(perRow).toList();
+      rows.add(
+        // Без CrossAxisAlignment.stretch: высота внутри прокручиваемой
+        // колонки не ограничена, растягивание даёт бесконечность и рушит
+        // всю раскладку экрана.
+        Row(
+          children: [
+            for (var j = 0; j < slice.length; j++) ...[
+              if (j > 0) const SizedBox(width: 8),
+              slice[j],
+            ],
+            for (var j = slice.length; j < perRow; j++) ...[
+              const SizedBox(width: 8),
+              const Expanded(child: SizedBox()),
+            ],
+          ],
+        ),
+      );
+    }
+    return Column(
+      children: [
+        for (var i = 0; i < rows.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          rows[i],
+        ],
+      ],
+    );
+  }
+}
+
 class _StatsBody extends StatelessWidget {
   const _StatsBody({required this.state});
 
@@ -52,67 +95,72 @@ class _StatsBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SegmentedButton<StatsPeriod>(
-                segments: [
-                  ButtonSegment(
-                    value: StatsPeriod.today,
-                    label: Text(S.periodToday),
-                  ),
-                  ButtonSegment(
-                    value: StatsPeriod.week,
-                    label: Text(S.periodWeek),
-                  ),
-                  ButtonSegment(
-                    value: StatsPeriod.month,
-                    label: Text(S.periodMonth),
-                  ),
-                  ButtonSegment(
-                    value: StatsPeriod.year,
-                    label: Text(S.periodYear),
-                  ),
-                  ButtonSegment(
-                    value: StatsPeriod.custom,
-                    label: Text(S.periodCustom),
-                  ),
-                ],
-                selected: {state.period},
-                onSelectionChanged: (selection) async {
-                  final cubit = context.read<StatsCubit>();
-                  final period = selection.first;
-                  if (period == StatsPeriod.custom) {
-                    final now = DateTime.now();
-                    final range = await showDateRangePicker(
-                      context: context,
-                      firstDate: DateTime(now.year - 3),
-                      lastDate: now,
-                    );
-                    if (range != null) {
-                      await cubit.setPeriod(
-                        period,
-                        from: range.start,
-                        to: range.end,
+              // 5 сегментов не влезают в ширину телефона — даём прокрутку,
+              // иначе подписи ужимаются до букв в столбик.
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SegmentedButton<StatsPeriod>(
+                  segments: [
+                    ButtonSegment(
+                      value: StatsPeriod.today,
+                      label: Text(S.periodToday),
+                    ),
+                    ButtonSegment(
+                      value: StatsPeriod.week,
+                      label: Text(S.periodWeek),
+                    ),
+                    ButtonSegment(
+                      value: StatsPeriod.month,
+                      label: Text(S.periodMonth),
+                    ),
+                    ButtonSegment(
+                      value: StatsPeriod.year,
+                      label: Text(S.periodYear),
+                    ),
+                    ButtonSegment(
+                      value: StatsPeriod.custom,
+                      label: Text(S.periodCustom),
+                    ),
+                  ],
+                  selected: {state.period},
+                  onSelectionChanged: (selection) async {
+                    final cubit = context.read<StatsCubit>();
+                    final period = selection.first;
+                    if (period == StatsPeriod.custom) {
+                      final now = DateTime.now();
+                      final range = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(now.year - 3),
+                        lastDate: now,
                       );
+                      if (range != null) {
+                        await cubit.setPeriod(
+                          period,
+                          from: range.start,
+                          to: range.end,
+                        );
+                      }
+                      return;
                     }
-                    return;
-                  }
-                  await cubit.setPeriod(period);
-                },
+                    await cubit.setPeriod(period);
+                  },
+                ),
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
+              // На телефоне пять плиток в одну строку дают по ~60dp на каждую —
+              // подписи превращаются в «По…». Раскладываем по две в ряд.
+              _StatGrid(
+                perRow: MediaQuery.sizeOf(context).width < 600 ? 2 : 5,
+                tiles: [
                   StatTile(
                     label: S.statPomodoros,
                     value: '${state.periodPomodoros} 🍅',
                   ),
-                  const SizedBox(width: 8),
                   StatTile(
                     label: S.statTime,
                     value: formatMinutesUi(state.periodMinutes),
                   ),
-                  const SizedBox(width: 8),
                   StatTile(label: S.statFocus, value: '${state.periodFocus}%'),
-                  const SizedBox(width: 8),
                   // Мягкая стата: дней с лягушкой из активных дней. Без стрика —
                   // «текущей серии» здесь намеренно нет.
                   StatTile(
@@ -121,7 +169,6 @@ class _StatsBody extends StatelessWidget {
                         ? '—'
                         : '${state.frogDays} / ${state.activeDays}',
                   ),
-                  const SizedBox(width: 8),
                   // ponytail: плитки «Серия дней» нет сознательно — рваный стрик
                   // кормит самокритику (см. систему фокуса пользователя).
                   StatTile(

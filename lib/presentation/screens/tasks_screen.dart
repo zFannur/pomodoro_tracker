@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
+import '../../domain/entities/app_settings.dart';
+import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
+import '../cubits/journal_cubit.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/sprint_cubit.dart';
 import '../cubits/tasks_cubit.dart';
@@ -122,10 +125,23 @@ class _TasksScreenState extends State<TasksScreen> {
         ),
         const SizedBox(height: 12),
       ],
+      _DoneTodayGroup(
+        sessions: context.watch<JournalCubit>().state.visible,
+        timeFmt: settings.timeFmt,
+        collapsed: collapsed.contains('doneToday'),
+        onToggle: () => _toggleGroup('doneToday'),
+      ),
+      const SizedBox(height: 12),
       _DoneWeekGroup(
         lines: sprint?.doneWeek ?? const [],
         collapsed: collapsed.contains('doneWeek'),
         onToggle: () => _toggleGroup('doneWeek'),
+      ),
+      const SizedBox(height: 12),
+      _TrashGroup(
+        trash: tasksState.trash,
+        collapsed: collapsed.contains('trash'),
+        onToggle: () => _toggleGroup('trash'),
       ),
     ];
 
@@ -201,50 +217,61 @@ class _TasksScreenState extends State<TasksScreen> {
         categories.isNotEmpty) {
       _category = categories.first;
     }
+    final picker = DropdownMenu<String>(
+      initialSelection: _category,
+      width: 140,
+      requestFocusOnTap: false,
+      label: Text(S.categoryHint),
+      dropdownMenuEntries: [
+        for (final c in categories) DropdownMenuEntry(value: c, label: c),
+      ],
+      onSelected: (v) => setState(() => _category = v ?? _category),
+    );
+    final field = CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.enter, control: true):
+            _submitToday,
+        const SingleActivator(LogicalKeyboardKey.numpadEnter, control: true):
+            _submitToday,
+      },
+      child: TextField(
+        controller: _text,
+        focusNode: _inputFocus,
+        decoration: InputDecoration(
+          hintText: S.descriptionHint,
+          isDense: true,
+          border: const OutlineInputBorder(),
+        ),
+        onSubmitted: (_) => _submitInbox(),
+      ),
+    );
+    final button = FilledButton.tonal(
+      onPressed: _submitInbox,
+      child: Text(S.add),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            DropdownMenu<String>(
-              initialSelection: _category,
-              width: 140,
-              requestFocusOnTap: false,
-              label: Text(S.categoryHint),
-              dropdownMenuEntries: [
-                for (final c in categories)
-                  DropdownMenuEntry(value: c, label: c),
-              ],
-              onSelected: (v) => setState(() => _category = v ?? _category),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: CallbackShortcuts(
-                bindings: {
-                  const SingleActivator(
-                    LogicalKeyboardKey.enter,
-                    control: true,
-                  ): _submitToday,
-                  const SingleActivator(
-                    LogicalKeyboardKey.numpadEnter,
-                    control: true,
-                  ): _submitToday,
-                },
-                child: TextField(
-                  controller: _text,
-                  focusNode: _inputFocus,
-                  decoration: InputDecoration(
-                    hintText: S.descriptionHint,
-                    isDense: true,
-                    border: const OutlineInputBorder(),
-                  ),
-                  onSubmitted: (_) => _submitInbox(),
+        // На телефоне в одну строку полю ввода остаётся ~90dp — переносим
+        // категорию и кнопку под него.
+        LayoutBuilder(
+          builder: (context, c) => c.maxWidth < 460
+              ? Column(
+                  children: [
+                    field,
+                    const SizedBox(height: 8),
+                    Row(children: [picker, const Spacer(), button]),
+                  ],
+                )
+              : Row(
+                  children: [
+                    picker,
+                    const SizedBox(width: 8),
+                    Expanded(child: field),
+                    const SizedBox(width: 8),
+                    button,
+                  ],
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.tonal(onPressed: _submitInbox, child: Text(S.add)),
-          ],
         ),
         const SizedBox(height: 4),
         Text(
@@ -262,6 +289,11 @@ class _TasksScreenState extends State<TasksScreen> {
 // ---------------------------------------------------------------------------
 // Группы
 // ---------------------------------------------------------------------------
+
+/// Тесно ли строке списка. Считается по ДОСТУПНОЙ ширине, а не по ширине
+/// экрана: на десктопе колонка «Сегодня» шириной 460 так же тесна, как
+/// телефон, и раскладка там должна быть та же.
+bool _isNarrowRow(BoxConstraints c) => c.maxWidth < 520;
 
 /// Карточка-группа с кликабельным заголовком и шевроном.
 class _Group extends StatelessWidget {
@@ -294,10 +326,7 @@ class _Group extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               onTap: onToggle,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                 child: Row(
                   children: [
                     AnimatedRotation(
@@ -465,75 +494,115 @@ class _TodayRow extends StatelessWidget {
       if (i >= 0) fn(i);
     }
 
-    return ListTile(
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-      minLeadingWidth: 20,
-      shape: isNow
-          ? RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(color: theme.colorScheme.primary, width: 1),
-            )
-          : null,
-      leading: ReorderableDragStartListener(
-        index: viewIndex,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.grab,
-          child: Icon(
-            Icons.drag_indicator,
-            size: 16,
-            color: theme.colorScheme.outline,
-          ),
+    final chip = CategoryChip(
+      task.category,
+      onTap: () => _edit(context, cubit),
+    );
+    final description = Text(
+      task.description,
+      style: task.frog
+          ? theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)
+          : theme.textTheme.bodyMedium,
+    );
+    const nowPad = EdgeInsets.only(left: 6);
+    final nowBadge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        S.nowLabel,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.primary,
+          fontWeight: FontWeight.w600,
         ),
       ),
-      title: Row(
-        children: [
-          CategoryChip(task.category, onTap: () => _edit(context, cubit)),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              task.description,
-              style: task.frog
-                  ? theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    )
-                  : theme.textTheme.bodyMedium,
-            ),
-          ),
-          if (isNow)
-            Padding(
-              padding: const EdgeInsets.only(left: 6),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 1,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  S.nowLabel,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w600,
+    );
+
+    final frog = FrogToggle(
+      active: task.frog,
+      onTap: () => act(cubit.toggleFrog),
+    );
+    final star = StarToggle(
+      active: task.week,
+      onTap: () => act(cubit.toggleWeek),
+    );
+
+    // Раскладка по доступной ширине, а не по ширине экрана: на десктопе
+    // колонка «Сегодня» такая же тесная, как телефон.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = _isNarrowRow(constraints);
+        return ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          minLeadingWidth: 20,
+          shape: isNow
+              ? RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(color: theme.colorScheme.primary, width: 1),
+                )
+              : null,
+          // На телефоне ручки нет: список и так тянется долгим нажатием, а
+          // каждый лишний элемент отъедает ширину у описания.
+          leading: narrow
+              ? null
+              : ReorderableDragStartListener(
+                  index: viewIndex,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Icon(
+                      Icons.drag_indicator,
+                      size: 16,
+                      color: theme.colorScheme.outline,
+                    ),
                   ),
                 ),
-              ),
-            ),
-        ],
-      ),
-      onTap: () => _edit(context, cubit),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FrogToggle(active: task.frog, onTap: () => act(cubit.toggleFrog)),
-          StarToggle(active: task.week, onTap: () => act(cubit.toggleWeek)),
-          const SizedBox(width: 4),
-          PomosBadge(task: task, pomodoro: pomodoro),
-          TaskMenu(task: task),
-        ],
-      ),
+          // На телефоне описание занимает всю строку, а чип категории и «СЕЙЧАС»
+          // уезжают под него: в один ряд с кнопками описанию оставалось ~40dp,
+          // и текст рассыпался по букве на строку.
+          title: narrow
+              ? description
+              : Row(
+                  children: [
+                    chip,
+                    const SizedBox(width: 8),
+                    Flexible(child: description),
+                    if (isNow) Padding(padding: nowPad, child: nowBadge),
+                  ],
+                ),
+          subtitle: narrow
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  // Wrap: длинная категория вместе с меткой «сейчас» в одну
+                  // строку не помещается.
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      chip,
+                      if (isNow) nowBadge,
+                      // Переключатели 🐸/⭐ на телефоне живут здесь: справа они
+                      // вместе со счётчиком и меню не оставляли описанию места.
+                      frog,
+                      star,
+                    ],
+                  ),
+                )
+              : null,
+          onTap: () => _edit(context, cubit),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!narrow) ...[frog, star, const SizedBox(width: 4)],
+              PomosBadge(task: task, pomodoro: pomodoro),
+              TaskMenu(task: task),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -652,84 +721,121 @@ class _BucketRow extends StatelessWidget {
       if (i >= 0) fn(i);
     }
 
-    return ListTile(
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-      minLeadingWidth: 20,
-      leading: ReorderableDragStartListener(
-        index: viewIndex,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.grab,
-          child: Icon(
-            Icons.drag_indicator,
-            size: 16,
-            color: theme.colorScheme.outline,
-          ),
-        ),
-      ),
-      title: Row(
-        children: [
-          CategoryChip(task.category, onTap: () => _edit(context, cubit)),
-          const SizedBox(width: 8),
-          Flexible(child: Text(task.description)),
-          if (task.due != null)
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: Text(
-                '📅 ${task.due!.day.toString().padLeft(2, '0')}.'
-                '${task.due!.month.toString().padLeft(2, '0')}',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-        ],
-      ),
+    final chip = CategoryChip(
+      task.category,
       onTap: () => _edit(context, cubit),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          StarToggle(
-            active: task.week,
-            onTap: () => act((i) => cubit.toggleWeek(i, inPlanner: true)),
-          ),
-          const SizedBox(width: 4),
-          PomosBadge(task: task, pomodoro: pomodoro, inPlanner: true),
-          IconButton(
-            tooltip: S.toToday,
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.today, size: 16),
-            onPressed: () => act(cubit.plannerToToday),
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, size: 16),
-            onSelected: (value) {
-              if (value == 'delete') {
-                final i = cubit.plannerIndexOf(task);
-                if (i < 0) return;
-                cubit.plannerRemove(i);
-                showUndoSnack(
-                  context,
-                  onUndo: () => cubit.insertPlannerAt(i, task),
-                );
-                return;
-              }
-              final tab = PlannerTab.values.asNameMap()[value];
-              if (tab != null) act((i) => cubit.plannerMove(i, tab));
-            },
-            itemBuilder: (context) => [
-              for (final tab in PlannerTab.values)
-                if (tab != bucket)
-                  PopupMenuItem(
-                    value: tab.name,
-                    child: Text('→ ${plannerTabLabel(tab)}'),
+    );
+    const duePad = EdgeInsets.only(left: 8);
+    final due = task.due == null
+        ? null
+        : Text(
+            '📅 ${task.due!.day.toString().padLeft(2, '0')}.'
+            '${task.due!.month.toString().padLeft(2, '0')}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          );
+
+    final star = StarToggle(
+      active: task.week,
+      onTap: () => act((i) => cubit.toggleWeek(i, inPlanner: true)),
+    );
+
+    // См. _TodayRow: раскладка по доступной ширине, а не по ширине экрана.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = _isNarrowRow(constraints);
+        return ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          minLeadingWidth: 20,
+          // См. _TodayRow: на телефоне ручки нет, место уходит описанию.
+          leading: narrow
+              ? null
+              : ReorderableDragStartListener(
+                  index: viewIndex,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Icon(
+                      Icons.drag_indicator,
+                      size: 16,
+                      color: theme.colorScheme.outline,
+                    ),
                   ),
-              const PopupMenuDivider(),
-              PopupMenuItem(value: 'delete', child: Text(S.delete)),
+                ),
+          // См. _TodayRow: на телефоне описание получает всю строку целиком.
+          title: narrow
+              ? Text(task.description)
+              : Row(
+                  children: [
+                    chip,
+                    const SizedBox(width: 8),
+                    Flexible(child: Text(task.description)),
+                    if (due != null) Padding(padding: duePad, child: due),
+                  ],
+                ),
+          subtitle: narrow
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  // Wrap: длинная категория вместе с датой в одну строку
+                  // не помещается.
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 4,
+                    // ⭐ на телефоне здесь: справа он вместе со счётчиком,
+                    // кнопкой «в сегодня» и меню не оставлял описанию места.
+                    children: [chip, ?due, star],
+                  ),
+                )
+              : null,
+          onTap: () => _edit(context, cubit),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!narrow) ...[star, const SizedBox(width: 4)],
+              PomosBadge(task: task, pomodoro: pomodoro, inPlanner: true),
+              IconButton(
+                tooltip: S.toToday,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.today, size: 16),
+                onPressed: () => act(cubit.plannerToToday),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, size: 16),
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    final i = cubit.plannerIndexOf(task);
+                    if (i < 0) return;
+                    cubit.plannerRemove(i);
+                    // plannerRemove пишет в корзину синхронно — уже здесь.
+                    final trash = cubit.state.trash;
+                    if (trash.isNotEmpty) {
+                      showUndoSnack(
+                        context,
+                        onUndo: () => cubit.restoreFromTrash(trash.first),
+                      );
+                    }
+                    return;
+                  }
+                  final tab = PlannerTab.values.asNameMap()[value];
+                  if (tab != null) act((i) => cubit.plannerMove(i, tab));
+                },
+                itemBuilder: (context) => [
+                  for (final tab in PlannerTab.values)
+                    if (tab != bucket)
+                      PopupMenuItem(
+                        value: tab.name,
+                        child: Text('→ ${plannerTabLabel(tab)}'),
+                      ),
+                  const PopupMenuDivider(),
+                  PopupMenuItem(value: 'delete', child: Text(S.delete)),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -783,6 +889,128 @@ class _DoneWeekGroup extends StatelessWidget {
                     ),
                 ],
               ),
+            ),
+    );
+  }
+}
+
+/// «Сделано сегодня»: записи журнала за текущий логический день — и от
+/// таймера, и от ручной отметки. Только чтение; правки — на «Таймере».
+class _DoneTodayGroup extends StatelessWidget {
+  const _DoneTodayGroup({
+    required this.sessions,
+    required this.timeFmt,
+    required this.collapsed,
+    required this.onToggle,
+  });
+
+  final List<PomoSession> sessions;
+  final TimeFmt timeFmt;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return _Group(
+      title: S.doneTodayTitle,
+      counter: '${sessions.length}',
+      collapsed: collapsed,
+      onToggle: onToggle,
+      icon: Icons.task_alt,
+      child: sessions.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                S.doneTodayEmpty,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final s in sessions)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        '${formatClock(s.start, timeFmt)} · '
+                        '${s.task.isEmpty ? S.noDescription : s.task}'
+                        '${s.category.isEmpty ? '' : ' #${s.category}'}'
+                        ' · ${s.minutes} ${S.minShort}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+/// Корзина: последние удалённые задачи (сессия), каждую можно вернуть.
+class _TrashGroup extends StatelessWidget {
+  const _TrashGroup({
+    required this.trash,
+    required this.collapsed,
+    required this.onToggle,
+  });
+
+  final List<TrashedTask> trash;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return _Group(
+      title: S.trashTitle,
+      counter: '${trash.length}',
+      collapsed: collapsed,
+      onToggle: onToggle,
+      icon: Icons.delete_outline,
+      child: trash.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                S.trashEmpty,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          : Column(
+              children: [
+                for (final entry in trash)
+                  ListTile(
+                    // identityHashCode, не ObjectKey: TrashedTask — Equatable,
+                    // два структурно одинаковых удаления не должны схлопнуться.
+                    key: ValueKey(identityHashCode(entry)),
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    leading: CategoryChip(entry.task.category),
+                    title: Text(
+                      entry.task.description,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        decoration: TextDecoration.lineThrough,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    trailing: IconButton(
+                      tooltip: S.undo,
+                      icon: const Icon(Icons.restore, size: 18),
+                      onPressed: () =>
+                          context.read<TasksCubit>().restoreFromTrash(entry),
+                    ),
+                  ),
+              ],
             ),
     );
   }

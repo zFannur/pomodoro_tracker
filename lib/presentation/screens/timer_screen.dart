@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -145,19 +147,21 @@ class _TimerBlock extends StatelessWidget {
       child: Column(
         children: [
           // Настройки живут внизу NavigationRail; здесь — только полный экран.
-          Row(
-            children: [
-              const Spacer(),
-              IconButton(
-                tooltip: S.fullscreen,
-                icon: const Icon(Icons.fullscreen),
-                onPressed: () async {
-                  final isFull = await windowManager.isFullScreen();
-                  await windowManager.setFullScreen(!isFull);
-                },
-              ),
-            ],
-          ),
+          // На мобильных window_manager нет — кнопки тоже нет.
+          if (Platform.isWindows)
+            Row(
+              children: [
+                const Spacer(),
+                IconButton(
+                  tooltip: S.fullscreen,
+                  icon: const Icon(Icons.fullscreen),
+                  onPressed: () async {
+                    final isFull = await windowManager.isFullScreen();
+                    await windowManager.setFullScreen(!isFull);
+                  },
+                ),
+              ],
+            ),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -211,18 +215,26 @@ class _TimerBlock extends StatelessWidget {
             children: [
               // Симметрия: слева зеркало кнопки «+1 мин» справа.
               const SizedBox(width: 48),
-              Text(
-                timer.inOvertime
-                    ? '+ ${_format(timer.overtime)}'
-                    : _format(timer.remaining),
-                style: theme.textTheme.displayLarge?.copyWith(
-                  fontSize: 92,
-                  fontWeight: FontWeight.w200,
-                  letterSpacing: 2,
-                  color: timer.inOvertime
-                      ? accent
-                      : theme.colorScheme.onSurface,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              // Ужимается по месту: 92pt на узком экране не помещаются, если
+              // счёт трёхзначный или идёт овертайм («+ 25:00»).
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    timer.inOvertime
+                        ? '+ ${_format(timer.overtime)}'
+                        : _format(timer.remaining),
+                    maxLines: 1,
+                    style: theme.textTheme.displayLarge?.copyWith(
+                      fontSize: 92,
+                      fontWeight: FontWeight.w200,
+                      letterSpacing: 2,
+                      color: timer.inOvertime
+                          ? accent
+                          : theme.colorScheme.onSurface,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
                 ),
               ),
               IconButton(
@@ -586,22 +598,24 @@ class _TodoSection extends StatelessWidget {
               },
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            // Wrap, а не Row: две подписи рядом не помещаются в ширину
+            // телефона — на узком экране вторая переносится вниз.
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 16,
+              runSpacing: 4,
               children: [
                 Text(
                   '${S.finishTime} · ${formatClock(forecast.finish, settings.timeFmt)}',
                   style: theme.textTheme.titleSmall,
                 ),
-                if (forecast.nextLongBreak != null) ...[
-                  const SizedBox(width: 16),
+                if (forecast.nextLongBreak != null)
                   Text(
                     '${S.nextLongBreak} · ${formatClock(forecast.nextLongBreak!, settings.timeFmt)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ],
               ],
             ),
           ],
@@ -698,61 +712,92 @@ class _TaskRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cubit = context.read<TasksCubit>();
+    final narrow = MediaQuery.sizeOf(context).width < 600;
+    final chip = CategoryChip(
+      task.category,
+      onTap: () => _editTask(context, cubit),
+    );
+    final description = Text(
+      task.description,
+      style: task.frog
+          ? theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)
+          : theme.textTheme.bodyMedium,
+    );
+    const starPad = EdgeInsets.only(left: 4);
+    final star = Icon(
+      Icons.star,
+      size: 14,
+      color: theme.colorScheme.tertiary,
+    );
+    final finish = endTime == null
+        ? null
+        : Tooltip(
+            message: S.finishTime,
+            child: Text(
+              formatClock(endTime!, timeFmt),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          );
     return ListTile(
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
       minLeadingWidth: 20,
-      leading: ReorderableDragStartListener(
-        index: viewIndex,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.grab,
-          child: Icon(
-            Icons.drag_indicator,
-            size: 16,
-            color: theme.colorScheme.outline,
-          ),
-        ),
-      ),
-      title: Row(
-        children: [
-          if (task.frog) const Text('🐸 '),
-          CategoryChip(task.category, onTap: () => _editTask(context, cubit)),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              task.description,
-              style: task.frog
-                  ? theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    )
-                  : theme.textTheme.bodyMedium,
-            ),
-          ),
-          if (task.week)
-            Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: Icon(
-                Icons.star,
-                size: 14,
-                color: theme.colorScheme.tertiary,
+      // На телефоне ручки нет: там список и так перетаскивается долгим
+      // нажатием, а каждый лишний элемент отъедает ширину у описания.
+      leading: narrow
+          ? null
+          : ReorderableDragStartListener(
+              index: viewIndex,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.grab,
+                child: Icon(
+                  Icons.drag_indicator,
+                  size: 16,
+                  color: theme.colorScheme.outline,
+                ),
               ),
             ),
-        ],
-      ),
+      // На телефоне описание занимает всю строку, а метки уезжают под него:
+      // между чипом категории и колонкой времени ему оставалось ~40dp, и
+      // текст рвался по слогам.
+      title: narrow
+          ? description
+          : Row(
+              children: [
+                if (task.frog) const Text('🐸 '),
+                chip,
+                const SizedBox(width: 8),
+                Flexible(child: description),
+                if (task.week) Padding(padding: starPad, child: star),
+              ],
+            ),
+      subtitle: narrow
+          ? Padding(
+              padding: const EdgeInsets.only(top: 4),
+              // Wrap: длинная категория вместе со звездой и временем финиша
+              // не всегда помещается в одну строку.
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  if (task.frog) const Text('🐸'),
+                  chip,
+                  if (task.week) star,
+                  // Время финиша тоже вниз: справа оно давило на ширину,
+                  // и строка переполнялась.
+                  ?finish,
+                ],
+              ),
+            )
+          : null,
       onTap: () => _editTask(context, cubit),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (endTime != null)
-            Tooltip(
-              message: S.finishTime,
-              child: Text(
-                formatClock(endTime!, timeFmt),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
+          if (!narrow && finish != null) finish,
           const SizedBox(width: 8),
           Tooltip(
             message: S.pomoClickHint(task.durationMinutes),
@@ -912,36 +957,50 @@ class _DoneRow extends StatelessWidget {
     final theme = Theme.of(context);
     final cubit = context.read<JournalCubit>();
     final finish = entry.start.add(Duration(minutes: entry.minutes));
+    final narrow = MediaQuery.sizeOf(context).width < 600;
+    final chip = entry.category.isEmpty ? null : CategoryChip(entry.category);
+    final manual = !entry.manual
+        ? null
+        : Tooltip(
+            message: S.manualMark,
+            child: Icon(
+              Icons.touch_app_outlined,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          );
+    final stamp = Text(
+      '${formatMinutesUi(entry.minutes)} · ${formatClock(finish, settings.timeFmt)}',
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
     return ListTile(
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-      leading: entry.category.isEmpty
-          ? const SizedBox(width: 8)
-          : CategoryChip(entry.category),
+      // На телефоне описание занимает всю ширину, метки — под ним: зажатое
+      // между чипом и временем, оно переносилось по слогам.
+      leading: narrow ? null : (chip ?? const SizedBox(width: 8)),
       title: Text(
         '${entry.frog ? '🐸 ' : ''}${entry.task.isEmpty ? '—' : entry.task}',
         style: theme.textTheme.bodyMedium,
       ),
+      subtitle: narrow
+          ? Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 4,
+                children: [?chip, ?manual, stamp],
+              ),
+            )
+          : null,
       onTap: () => _edit(context, cubit),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (entry.manual)
-            Tooltip(
-              message: S.manualMark,
-              child: Icon(
-                Icons.touch_app_outlined,
-                size: 14,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          const SizedBox(width: 6),
-          Text(
-            '${formatMinutesUi(entry.minutes)} · ${formatClock(finish, settings.timeFmt)}',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+          if (!narrow) ...[?manual, const SizedBox(width: 6), stamp],
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, size: 16),
             onSelected: (value) {
@@ -1168,48 +1227,83 @@ class _AddTaskFormState extends State<_AddTaskForm> {
     if (_category.isEmpty && categories.isNotEmpty) {
       _category = categories.first;
     }
-    return Row(
-      children: [
-        DropdownMenu<String>(
-          initialSelection: _category,
-          width: 140,
-          requestFocusOnTap: false,
-          label: Text(S.categoryHint),
-          dropdownMenuEntries: [
-            for (final c in categories) DropdownMenuEntry(value: c, label: c),
-          ],
-          onSelected: (value) => setState(() => _category = value ?? _category),
+    final narrow = MediaQuery.sizeOf(context).width < 600;
+    final entries = [
+      for (final c in categories) DropdownMenuEntry(value: c, label: c),
+    ];
+    final picker = DropdownMenu<String>(
+      initialSelection: _category,
+      // На телефоне ширину задаёт Expanded: фиксированные 140 вместе с
+      // кнопками не влезали, и ряд уезжал за край.
+      width: narrow ? null : 140,
+      expandedInsets: narrow ? EdgeInsets.zero : null,
+      requestFocusOnTap: false,
+      label: Text(S.categoryHint),
+      dropdownMenuEntries: entries,
+      onSelected: (value) => setState(() => _category = value ?? _category),
+    );
+    final field = TextField(
+      controller: _text,
+      decoration: InputDecoration(
+        hintText: S.descriptionHint,
+        isDense: true,
+        border: const OutlineInputBorder(),
+      ),
+      onSubmitted: (_) => _submit(),
+    );
+    final actions = <Widget>[
+      if (widget.onSubmitInbox != null) ...[
+        const SizedBox(width: 4),
+        IconButton(
+          tooltip: S.toInbox,
+          icon: const Icon(Icons.move_to_inbox_outlined, size: 20),
+          onPressed: _submitInbox,
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: TextField(
-            controller: _text,
-            decoration: InputDecoration(
-              hintText: S.descriptionHint,
-              isDense: true,
-              border: const OutlineInputBorder(),
-            ),
-            onSubmitted: (_) => _submit(),
-          ),
-        ),
-        const SizedBox(width: 8),
-        FilledButton.tonal(onPressed: _submit, child: Text(S.add)),
-        if (widget.onSubmitInbox != null) ...[
-          const SizedBox(width: 4),
+      ],
+      if (widget.plannerButton) ...[
+        const SizedBox(width: 4),
+        // На телефоне без подписи: с ней ряд не помещался по ширине.
+        if (narrow)
           IconButton(
-            tooltip: S.toInbox,
-            icon: const Icon(Icons.move_to_inbox_outlined, size: 20),
-            onPressed: _submitInbox,
-          ),
-        ],
-        if (widget.plannerButton) ...[
-          const SizedBox(width: 4),
+            tooltip: S.planner,
+            icon: const Icon(Icons.inbox_outlined, size: 20),
+            onPressed: () => showPlannerDialog(context),
+          )
+        else
           OutlinedButton.icon(
             icon: const Icon(Icons.inbox_outlined, size: 16),
             label: Text(S.planner),
             onPressed: () => showPlannerDialog(context),
           ),
+      ],
+    ];
+    final add = FilledButton.tonal(onPressed: _submit, child: Text(S.add));
+    // На телефоне поле, категория и кнопки в одну строку не влезают: поле
+    // сверху, под ним категория на весь остаток и компактные кнопки.
+    if (narrow) {
+      return Column(
+        children: [
+          field,
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: picker),
+              ...actions,
+              const SizedBox(width: 4),
+              add,
+            ],
+          ),
         ],
+      );
+    }
+    return Row(
+      children: [
+        picker,
+        const SizedBox(width: 8),
+        Expanded(child: field),
+        const SizedBox(width: 8),
+        add,
+        ...actions,
       ],
     );
   }

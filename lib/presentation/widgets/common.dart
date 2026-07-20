@@ -121,18 +121,30 @@ class DaysBarChart extends StatelessWidget {
                           style: Theme.of(context).textTheme.labelSmall,
                         ),
                       const SizedBox(height: 2),
-                      Container(
-                        height: day.count == 0
-                            ? 3
-                            : (height - 40) * day.count / maxCount,
-                        decoration: BoxDecoration(
-                          color: day.count == 0
-                              ? scheme.surfaceContainerHighest
-                              : (goal > 0 && day.count >= goal
-                                    ? scheme.primary
-                                    : scheme.primary.withValues(alpha: 0.45)),
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(3),
+                      // Столбик берёт то, что осталось после подписей, а не
+                      // фиксированную долю от «height − 40»: запас в 40 точек
+                      // был угадан под обычный шрифт и переполнял колонку,
+                      // когда подписи выше (крупный системный шрифт).
+                      Flexible(
+                        child: FractionallySizedBox(
+                          heightFactor: day.count == 0
+                              ? null
+                              : day.count / maxCount,
+                          alignment: Alignment.bottomCenter,
+                          child: Container(
+                            height: day.count == 0 ? 3 : null,
+                            decoration: BoxDecoration(
+                              color: day.count == 0
+                                  ? scheme.surfaceContainerHighest
+                                  : (goal > 0 && day.count >= goal
+                                        ? scheme.primary
+                                        : scheme.primary.withValues(
+                                            alpha: 0.45,
+                                          )),
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(3),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -370,10 +382,15 @@ class TaskMenu extends StatelessWidget {
             cubit.postpone(index, PlannerTab.later);
           case 'delete':
             cubit.removeAt(index);
-            showUndoSnack(
-              context,
-              onUndo: () => cubit.insertTodoAt(index, task),
-            );
+            // removeAt пишет в корзину синхронно (до реального disk I/O),
+            // поэтому свежая запись уже здесь.
+            final trash = cubit.state.trash;
+            if (trash.isNotEmpty) {
+              showUndoSnack(
+                context,
+                onUndo: () => cubit.restoreFromTrash(trash.first),
+              );
+            }
         }
       },
       itemBuilder: (context) => [
