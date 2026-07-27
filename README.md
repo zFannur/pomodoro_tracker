@@ -18,7 +18,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Android-0078D6?logo=windows&logoColor=white)](#быстрый-старт)
 [![Storage](https://img.shields.io/badge/Storage-Markdown-3FA45B?logo=markdown&logoColor=white)](#хранение-данных)
-[![Tests](https://img.shields.io/badge/tests-82%20passing-3FA45B.svg)](#тесты)
+[![Tests](https://img.shields.io/badge/tests-104%20passing-3FA45B.svg)](#тесты)
 
 <img src="docs/screenshot-timer.png" width="820" alt="Экран таймера">
 
@@ -484,7 +484,7 @@ lib/
 ```bash
 flutter pub get
 flutter analyze          # должно быть чисто
-flutter test             # 82 теста
+flutter test             # 104 теста
 flutter run -d windows   # дебаг
 flutter build windows --release
 flutter build apk --release
