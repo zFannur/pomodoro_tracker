@@ -14,6 +14,8 @@ class TimerSnapshot {
     required this.interruptions,
     required this.delaysMs,
     required this.savedAt,
+    this.overtime = 0,
+    this.startedAt,
   });
 
   final String mode;
@@ -25,6 +27,14 @@ class TimerSnapshot {
   final int delaysMs;
   final DateTime savedAt;
 
+  /// Овертайм Flowtime. Без него снимок «run=running, remaining=0» при
+  /// восстановлении всегда попадал в ветку «дотикал» и молча выбрасывался —
+  /// вместе со всем отработанным сверх нормы временем.
+  final int overtime;
+
+  /// Реальное начало фазы: нужно, чтобы дописать помидор задним числом.
+  final DateTime? startedAt;
+
   Map<String, dynamic> toJson() => {
     'mode': mode,
     'run': run,
@@ -34,6 +44,8 @@ class TimerSnapshot {
     'interruptions': interruptions,
     'delaysMs': delaysMs,
     'savedAt': savedAt.millisecondsSinceEpoch,
+    if (overtime != 0) 'overtime': overtime,
+    if (startedAt != null) 'startedAt': startedAt!.millisecondsSinceEpoch,
   };
 
   static TimerSnapshot? fromJson(Object? json) {
@@ -49,6 +61,10 @@ class TimerSnapshot {
       savedAt: DateTime.fromMillisecondsSinceEpoch(
         json['savedAt'] as int? ?? 0,
       ),
+      overtime: json['overtime'] as int? ?? 0,
+      startedAt: json['startedAt'] is int
+          ? DateTime.fromMillisecondsSinceEpoch(json['startedAt'] as int)
+          : null,
     );
   }
 }
@@ -81,7 +97,9 @@ class TimerStateStore {
   Future<void> save(TimerSnapshot snapshot) async {
     try {
       final file = await _stateFile();
-      await file.writeAsString(jsonEncode(snapshot.toJson()));
+      final tmp = File('${file.path}.tmp');
+      await tmp.writeAsString(jsonEncode(snapshot.toJson()), flush: true);
+      await tmp.rename(file.path);
     } on FileSystemException {
       // Потеря снимка таймера не критична — молча пропускаем.
     }

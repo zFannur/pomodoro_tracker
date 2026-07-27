@@ -152,6 +152,14 @@ class DayLog extends Equatable {
   List<Object?> get props => [date, goal, sessions, notes];
 }
 
+/// Час начала суток. Единственное место, где живёт эта граница: раньше «5»
+/// была вписана в четыре разных файла, и один из них (сортировка при слиянии)
+/// про неё не знал.
+const int dayStartHour = 5;
+
 /// Логическая дата дня: сутки начинаются в 05:00.
-DateTime logicalDate(DateTime moment) =>
-    DateTime(moment.year, moment.month, moment.day - (moment.hour < 5 ? 1 : 0));
+DateTime logicalDate(DateTime moment) => DateTime(
+  moment.year,
+  moment.month,
+  moment.day - (moment.hour < dayStartHour ? 1 : 0),
+);

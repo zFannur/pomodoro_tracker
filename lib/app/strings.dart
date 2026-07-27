@@ -25,6 +25,9 @@ abstract final class S {
   static String get shortBreakTitle => _t('КОРОТКИЙ ПЕРЕРЫВ', 'SHORT BREAK');
   static String get longBreakTitle => _t('ДЛИННЫЙ ПЕРЕРЫВ', 'LONG BREAK');
   static String get breakWord => _t('перерыв', 'break');
+
+  static String get onOtherDevice =>
+      _t('идёт на другом устройстве', 'running on another device');
   static String get series => _t('серия', 'series');
   static String get start => _t('Старт', 'Start');
   static String get stop => _t('Стоп', 'Stop');

@@ -162,8 +162,21 @@ String serializeTasksFile(TasksFile file) {
 Map<String, String> parseFrontmatter(String content) {
   final result = <String, String>{};
   final lines = content.split('\n');
-  if (lines.isEmpty || lines.first.trim() != '---') return result;
-  for (final line in lines.skip(1)) {
+  // Пропускаем пустые строки и HTML-комментарии до frontmatter: зеркала
+  // пишутся с шапкой «<!-- Зеркало… -->» первой строкой, и требование «--- на
+  // первой строке» означало, что на РЕАЛЬНЫХ файлах приложения frontmatter не
+  // читался никогда — спринты восстанавливались с нулевой целью и пустой вехой.
+  var start = 0;
+  while (start < lines.length) {
+    final line = lines[start].trim();
+    if (line.isEmpty || line.startsWith('<!--')) {
+      start++;
+      continue;
+    }
+    break;
+  }
+  if (start >= lines.length || lines[start].trim() != '---') return result;
+  for (final line in lines.skip(start + 1)) {
     if (line.trim() == '---') break;
     final idx = line.indexOf(':');
     if (idx <= 0) continue;

@@ -108,11 +108,14 @@ class _TimerBlock extends StatelessWidget {
     final settings = context.watch<SettingsCubit>().state.settings;
 
     final doneCount = journal.sessions.length;
-    final header = switch (timer.mode) {
+    final phase = switch (timer.mode) {
       TimerMode.pomodoro => '${S.pomodoroWord}${doneCount + 1}',
       TimerMode.shortBreak => S.shortBreakTitle,
       TimerMode.longBreak => S.longBreakTitle,
     };
+    // Чужой помидор показываем, но не завершаем: подписываем, чтобы не было
+    // непонятно, почему таймер идёт сам по себе.
+    final header = timer.foreign ? '$phase · ${S.onOtherDevice}' : phase;
     final showDelay =
         timer.stopped &&
         doneCount > 0 &&
@@ -724,11 +727,7 @@ class _TaskRow extends StatelessWidget {
           : theme.textTheme.bodyMedium,
     );
     const starPad = EdgeInsets.only(left: 4);
-    final star = Icon(
-      Icons.star,
-      size: 14,
-      color: theme.colorScheme.tertiary,
-    );
+    final star = Icon(Icons.star, size: 14, color: theme.colorScheme.tertiary);
     final finish = endTime == null
         ? null
         : Tooltip(
@@ -1330,4 +1329,3 @@ Future<bool> _confirmClear(BuildContext context) async {
   );
   return result ?? false;
 }
-

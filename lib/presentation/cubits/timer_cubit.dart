@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:clock/clock.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -40,6 +41,7 @@ class TimerState extends Equatable {
     required this.delaysMs,
     this.overtime = 0,
     this.confirmArmed = false,
+    this.foreign = false,
   });
 
   final TimerMode mode;
@@ -66,6 +68,11 @@ class TimerState extends Equatable {
   /// Первый Esc нажат — кнопка показывает «?» 1.5 секунды.
   final bool confirmArmed;
 
+  /// Помидор идёт на ДРУГОМ устройстве. Показываем его, но не завершаем и
+  /// записи в журнал не делаем — иначе оба устройства записали бы один и тот
+  /// же помидор дважды.
+  final bool foreign;
+
   bool get inOvertime => overtime > 0;
 
   bool get isBreak => mode != TimerMode.pomodoro;
@@ -86,6 +93,7 @@ class TimerState extends Equatable {
     int? delaysMs,
     int? overtime,
     bool? confirmArmed,
+    bool? foreign,
   }) {
     return TimerState(
       mode: mode ?? this.mode,
@@ -97,6 +105,7 @@ class TimerState extends Equatable {
       delaysMs: delaysMs ?? this.delaysMs,
       overtime: overtime ?? this.overtime,
       confirmArmed: confirmArmed ?? this.confirmArmed,
+      foreign: foreign ?? this.foreign,
     );
   }
 
@@ -111,6 +120,7 @@ class TimerState extends Equatable {
     delaysMs,
     overtime,
     confirmArmed,
+    foreign,
   ];
 }
 
@@ -143,11 +153,34 @@ class TimerCubit extends Cubit<TimerState> {
   final bool Function() _hasTodos;
   final Future<void> Function(PomodoroResult result) _onPomodoroComplete;
 
+  /// Состояние таймера сменилось значимо (старт/пауза/стоп/смена фазы) —
+  /// положить снимок в синхронизируемый документ. Периодические сохранения
+  /// сюда НЕ идут: они бы дали по четыре аплоада в Drive на каждую минуту
+  /// работающего помидора.
+  Future<void> Function(Map<String, dynamic>? snap)? onTransition;
+
+  /// Кто это устройство (см. AppSettings.deviceId).
+  String Function()? deviceId;
+
   Timer? _ticker;
   Timer? _confirmTimer;
   DateTime? _startedAt;
-  DateTime _stoppedAt = DateTime.now();
+  DateTime _stoppedAt = clock.now();
   int _sinceSave = 0;
+
+  /// Момент, когда фаза должна закончиться. Отсчёт идёт от него, а не
+  /// вычитанием единицы на тик: при сне машины или заморозке процесса на
+  /// Android Timer.periodic схлопывает пропущенные тики в один, и помидор
+  /// «на 25 минут» реально длился сорок пять.
+  DateTime? _phaseEnd;
+
+  /// Пересчитать остаток от настенных часов.
+  int get _wallRemaining {
+    final end = _phaseEnd;
+    if (end == null) return state.remaining;
+    final left = end.difference(clock.now()).inSeconds;
+    return left < 0 ? 0 : left;
+  }
 
   int _modeSeconds(TimerMode mode) {
     final scheme = _settings().scheme;
@@ -164,16 +197,43 @@ class TimerCubit extends Cubit<TimerState> {
     final saved = await _store.load();
     _ensureTicker();
     if (saved == null) return;
-    final now = DateTime.now();
+    final now = clock.now();
     final age = now.difference(saved.savedAt);
     if (age > const Duration(hours: 1)) return;
+    // Часы могли уехать назад (NTP, ручная правка) — отрицательный возраст
+    // давал remaining > total и отрицательный простой в журнале. Обнуляем
+    // возраст, но состояние не выбрасываем: терять помидор из-за коррекции
+    // часов на пару секунд — размен в минус.
+    final elapsed = age.isNegative ? Duration.zero : age;
     final mode = TimerMode.values.asNameMap()[saved.mode] ?? TimerMode.pomodoro;
     final run = TimerRun.values.asNameMap()[saved.run] ?? TimerRun.stopped;
     if (run == TimerRun.running) {
+      // Овертайм Flowtime проверяем ДО расчёта остатка: там remaining == 0,
+      // и общий путь всегда уводил бы в ветку «дотикал».
+      if (saved.overtime > 0) {
+        _startedAt = saved.startedAt;
+        _phaseEnd = saved.savedAt.subtract(Duration(seconds: saved.overtime));
+        emit(
+          TimerState(
+            mode: mode,
+            run: TimerRun.running,
+            remaining: 0,
+            total: saved.total,
+            series: saved.series,
+            interruptions: saved.interruptions,
+            delaysMs: saved.delaysMs,
+            overtime: saved.overtime + elapsed.inSeconds,
+          ),
+        );
+        return;
+      }
       final endtime = saved.savedAt.add(Duration(seconds: saved.remaining));
-      final left = endtime.difference(now).inSeconds;
+      final left = endtime.difference(now).inSeconds.clamp(0, saved.total);
       if (left > 1) {
-        _startedAt = now.subtract(Duration(seconds: saved.total - left));
+        _startedAt =
+            saved.startedAt ??
+            now.subtract(Duration(seconds: saved.total - left));
+        _phaseEnd = endtime;
         emit(
           TimerState(
             mode: mode,
@@ -187,9 +247,28 @@ class TimerCubit extends Cubit<TimerState> {
         );
         return;
       }
-      // Дотикал, пока приложение было закрыто, — считаем фазу завершённой
-      // без записи (запись требует живого списка задач на момент финиша).
-      emit(state.copyWith(series: saved.series));
+      // Дотикал, пока приложение было закрыто. Раньше здесь фаза молча
+      // выбрасывалась — отработанное время не попадало ни в журнал, ни в серию.
+      _startedAt =
+          saved.startedAt ?? endtime.subtract(Duration(seconds: saved.total));
+      _phaseEnd = endtime;
+      emit(
+        TimerState(
+          mode: mode,
+          run: TimerRun.running,
+          remaining: 0,
+          total: saved.total,
+          series: saved.series,
+          interruptions: saved.interruptions,
+          delaysMs: saved.delaysMs,
+        ),
+      );
+      if (mode == TimerMode.pomodoro) {
+        await _completePomodoro(workedSeconds: saved.total, silent: true);
+      } else {
+        _next();
+        _save();
+      }
       return;
     }
     if (run == TimerRun.paused) {
@@ -201,9 +280,11 @@ class TimerCubit extends Cubit<TimerState> {
           total: saved.total,
           series: saved.series,
           interruptions: saved.interruptions,
-          delaysMs: saved.delaysMs + age.inMilliseconds,
+          delaysMs: saved.delaysMs + elapsed.inMilliseconds,
+          overtime: saved.overtime,
         ),
       );
+      _startedAt = saved.startedAt;
       return;
     }
     // Остановленный таймер: в пределах часа переживает только серия.
@@ -250,26 +331,32 @@ class TimerCubit extends Cubit<TimerState> {
 
   void start() {
     if (state.running) return;
+    _claim();
     _ensureTicker();
     var series = state.series;
     // Простой дольше длинного перерыва сжигает серию.
     if (state.mode == TimerMode.pomodoro &&
-        DateTime.now().difference(_stoppedAt).inSeconds >
+        clock.now().difference(_stoppedAt).inSeconds >
             _settings().scheme.longBreak * 60) {
       series = 0;
     }
-    _startedAt ??= DateTime.now().subtract(
+    _startedAt ??= clock.now().subtract(
       Duration(seconds: state.total - state.remaining),
     );
+    _phaseEnd = clock.now().add(Duration(seconds: state.remaining));
     // Простой перед стартом остаётся накопленным — уйдёт в запись помидора.
     emit(state.copyWith(run: TimerRun.running, series: series));
     _save();
+    _publish();
   }
 
   void pause() {
     if (!state.running) return;
+    _claim();
+    _phaseEnd = null;
     emit(
       state.copyWith(
+        remaining: state.inOvertime ? state.remaining : _wallRemaining,
         run: TimerRun.paused,
         interruptions: state.mode == TimerMode.pomodoro
             ? state.interruptions + 1
@@ -277,18 +364,24 @@ class TimerCubit extends Cubit<TimerState> {
       ),
     );
     _save();
+    _publish();
   }
 
   void resume() {
     if (!state.paused) return;
+    _claim();
+    _phaseEnd = clock.now().add(Duration(seconds: state.remaining));
     emit(state.copyWith(run: TimerRun.running));
     _save();
+    _publish();
   }
 
   /// СТОП: сброс текущей фазы к началу; режим и серия не меняются.
   void stop() {
+    _claim();
     _startedAt = null;
-    _stoppedAt = DateTime.now();
+    _phaseEnd = null;
+    _stoppedAt = clock.now();
     final seconds = _modeSeconds(state.mode);
     emit(
       state.copyWith(
@@ -301,16 +394,22 @@ class TimerCubit extends Cubit<TimerState> {
       ),
     );
     _save();
+    _publish();
   }
 
   /// Продлить текущую фазу (по умолчанию на 1 минуту, Shift — на 5).
   void prolong([int minutes = 1]) {
+    final end = _phaseEnd;
+    if (end != null) _phaseEnd = end.add(Duration(minutes: minutes));
     emit(
       state.copyWith(
         remaining: state.remaining + minutes * 60,
         total: state.total + minutes * 60,
       ),
     );
+    // Без записи снимка продление терялось при убийстве процесса, и помидор
+    // заканчивался на N минут раньше, чем рассчитывал пользователь.
+    _save();
   }
 
   /// Прокрутить фазу вперёд без запуска (стрелка при остановленном таймере).
@@ -362,12 +461,23 @@ class TimerCubit extends Cubit<TimerState> {
     }
     // Flowtime: помидор дотикал — тихо считаем вверх, поток не выбиваем.
     if (state.inOvertime) {
-      emit(state.copyWith(overtime: state.overtime + 1));
+      final end = _phaseEnd;
+      final grown = end == null
+          ? state.overtime + 1
+          : clock.now().difference(end).inSeconds;
+      emit(state.copyWith(overtime: grown < 1 ? 1 : grown));
       _periodicSave();
       return;
     }
-    final remaining = state.remaining - 1;
+    final remaining = _wallRemaining;
     if (remaining <= 0) {
+      // Чужой помидор дотикал — просто гасим показ. Запись сделает то
+      // устройство, на котором он шёл.
+      if (state.foreign) {
+        _phaseEnd = null;
+        emit(state.copyWith(run: TimerRun.stopped, foreign: false));
+        return;
+      }
       if (settings.flowtime && state.mode == TimerMode.pomodoro) {
         emit(state.copyWith(remaining: 0, overtime: 1));
         return;
@@ -419,34 +529,41 @@ class TimerCubit extends Cubit<TimerState> {
     }
   }
 
-  Future<void> _completePomodoro({required int workedSeconds}) async {
+  Future<void> _completePomodoro({
+    required int workedSeconds,
+    bool silent = false,
+  }) async {
     final settings = _settings();
     final result = PomodoroResult(
       workedMinutes: math.max(1, (workedSeconds / 60).ceil()),
       delayMs: state.delaysMs,
       interruptions: state.interruptions,
       startedAt:
-          _startedAt ??
-          DateTime.now().subtract(Duration(seconds: workedSeconds)),
+          _startedAt ?? clock.now().subtract(Duration(seconds: workedSeconds)),
     );
-    if (settings.finishSoundEnabled) {
+    // silent — помидор дотикал, пока приложения не было: запись нужна,
+    // звонок через час после факта — нет.
+    if (settings.finishSoundEnabled && !silent) {
       unawaited(_sound.playFinish(settings.finishSound, settings.volume));
     }
     final nextIsLong = state.series + 1 >= settings.scheme.longEvery;
-    unawaited(
-      _notify.event(
-        settings,
-        title: S.notifyPomodoroDone,
-        body: _notify.pickMessage(
-          settings.msgPomodoroDone,
-          nextIsLong ? S.takeLongBreak : S.takeShortBreak,
+    if (!silent) {
+      unawaited(
+        _notify.event(
+          settings,
+          title: S.notifyPomodoroDone,
+          body: _notify.pickMessage(
+            settings.msgPomodoroDone,
+            nextIsLong ? S.takeLongBreak : S.takeShortBreak,
+          ),
+          raise: true,
         ),
-        raise: true,
-      ),
-    );
+      );
+    }
     _next();
-    if (settings.autostartBreak) start();
+    if (settings.autostartBreak && !silent) start();
     _save();
+    _publish();
     await _onPomodoroComplete(result);
   }
 
@@ -454,7 +571,8 @@ class TimerCubit extends Cubit<TimerState> {
   /// (после длинного серия сбрасывается).
   void _next() {
     _startedAt = null;
-    _stoppedAt = DateTime.now();
+    _phaseEnd = null;
+    _stoppedAt = clock.now();
     final settings = _settings();
     TimerMode mode;
     var series = state.series;
@@ -490,6 +608,70 @@ class TimerCubit extends Cubit<TimerState> {
 
   // -- персистентность -------------------------------------------------------
 
+  /// Снимок для синка: чужому устройству хватит конца фазы и длительности —
+  /// остаток оно досчитает по своим настенным часам.
+  void _publish() {
+    final publish = onTransition;
+    if (publish == null || state.foreign) return;
+    if (state.stopped) {
+      unawaited(publish(null));
+      return;
+    }
+    unawaited(
+      publish({
+        'device': deviceId?.call() ?? '',
+        'savedAt': clock.now().millisecondsSinceEpoch,
+        'mode': state.mode.name,
+        'run': state.run.name,
+        'remaining': state.remaining,
+        'total': state.total,
+        'overtime': state.overtime,
+        if (_phaseEnd != null) 'endsAt': _phaseEnd!.millisecondsSinceEpoch,
+      }),
+    );
+  }
+
+  /// Синк принёс снимок таймера. Свой игнорируем, чужой показываем — но
+  /// только когда здесь ничего не идёт: перебивать локальный помидор нельзя.
+  void adoptRemote(Map<String, dynamic>? snap) {
+    if (snap == null) {
+      if (state.foreign) {
+        _phaseEnd = null;
+        emit(state.copyWith(run: TimerRun.stopped, foreign: false));
+      }
+      return;
+    }
+    if (snap['device'] == (deviceId?.call() ?? '')) return;
+    if (!state.stopped && !state.foreign) return;
+    final mode =
+        TimerMode.values.asNameMap()[snap['mode']] ?? TimerMode.pomodoro;
+    final run = TimerRun.values.asNameMap()[snap['run']] ?? TimerRun.stopped;
+    final total = (snap['total'] as num?)?.toInt() ?? _modeSeconds(mode);
+    final ends = snap['endsAt'];
+    _phaseEnd = ends is int ? DateTime.fromMillisecondsSinceEpoch(ends) : null;
+    final left = run == TimerRun.running
+        ? _wallRemaining
+        : (snap['remaining'] as num?)?.toInt() ?? total;
+    emit(
+      TimerState(
+        mode: mode,
+        run: run,
+        remaining: left.clamp(0, total),
+        total: total,
+        series: state.series,
+        interruptions: 0,
+        delaysMs: 0,
+        overtime: (snap['overtime'] as num?)?.toInt() ?? 0,
+        foreign: true,
+      ),
+    );
+  }
+
+  /// Взять управление себе: любое локальное действие снимает «чужой».
+  void _claim() {
+    if (state.foreign) emit(state.copyWith(foreign: false));
+  }
+
   void _periodicSave() {
     _sinceSave += 1;
     if (_sinceSave >= 15) _save();
@@ -507,7 +689,9 @@ class TimerCubit extends Cubit<TimerState> {
           series: state.series,
           interruptions: state.interruptions,
           delaysMs: state.delaysMs,
-          savedAt: DateTime.now(),
+          overtime: state.overtime,
+          startedAt: _startedAt,
+          savedAt: clock.now(),
         ),
       ),
     );

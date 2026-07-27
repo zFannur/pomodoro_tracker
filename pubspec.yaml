@@ -42,6 +42,8 @@ dependencies:
   window_manager: ^0.5.2
   file_picker: ^11.0.2
   path_provider: ^2.1.6
+  # Настенное время таймера: fake_async подменяет clock.now(), но не DateTime.now()
+  clock: ^1.1.2
   intl: ^0.20.3
   # Защита от второго экземпляра (named mutex): два процесса пишут
   # tasks.json целиком и молча воскрешают удалённые задачи.
