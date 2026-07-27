@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../domain/entities/pomo_session.dart' show dayStartHour;
+
 /// Слияние двух снимков data.json — задачи, журнал, спринты и надгробия.
 ///
 /// Чистая функция без IO: её проще всего проверить тестами, а вся неприятная
@@ -42,6 +44,15 @@ String mergeData(String? local, String remote, {required bool localWins}) {
   result['sprints'] = _mergeSprints(winner['sprints'], loser['sprints']);
   result['rollover'] = _mergeRollover(winner['rollover'], loser['rollover']);
 
+  // Таймер — не список: у него ровно одно актуальное состояние, побеждает
+  // более свежий снимок независимо от localWins.
+  final timer = _laterTimer(winner['timer'], loser['timer']);
+  if (timer == null) {
+    result.remove('timer');
+  } else {
+    result['timer'] = timer;
+  }
+
   final graves = _mergeGraves(winner['graves'], loser['graves']);
   result['graves'] = graves;
 
@@ -80,13 +91,20 @@ List<Map<String, dynamic>> _mergeById(Object? win, Object? lose) {
 /// «сделано за неделю» идентификаторов не имеют: они пишутся со штампом
 /// времени в тексте, а удаления у них в интерфейсе нет.
 List<String> _mergeValues(Object? win, Object? lose) {
-  final result = <String>[
-    if (win is List) ...win.whereType<String>(),
-  ];
+  final result = <String>[if (win is List) ...win.whereType<String>()];
   for (final v in lose is List ? lose.whereType<String>() : const <String>[]) {
     if (!result.contains(v)) result.add(v);
   }
   return result;
+}
+
+/// Минута внутри логического дня для строки времени `HH:mm`.
+/// Часы 0–4 принадлежат концу дня — та же граница, что в [dayStartHour].
+int _slot(Object? raw) {
+  final parts = '$raw'.split(':');
+  final h = int.tryParse(parts.first) ?? 0;
+  final m = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+  return ((h < dayStartHour ? h + 24 : h) * 60) + m;
 }
 
 Map<String, dynamic> _mergeDays(Object? win, Object? lose) {
@@ -106,8 +124,10 @@ Map<String, dynamic> _mergeDays(Object? win, Object? lose) {
     }
     final sessions = _mergeById(w['s'], l['s'])
       // Порядок восстанавливается сортировкой по времени — одинаково на
-      // обоих устройствах, поэтому хранить его не нужно.
-      ..sort((a, b) => '${a['t']}'.compareTo('${b['t']}'));
+      // обоих устройствах, поэтому хранить его не нужно. Сортируем по
+      // ЛОГИЧЕСКОМУ времени: день длится 05:00→05:00, и запись в 00:30 стоит
+      // в конце дня, а не в начале, как решила бы сортировка строк.
+      ..sort((a, b) => _slot(a['t']).compareTo(_slot(b['t'])));
     result[key] = {...w, 's': sessions, 'n': _mergeValues(w['n'], l['n'])};
   }
   return result;
@@ -128,10 +148,24 @@ Map<String, dynamic> _mergeSprints(Object? win, Object? lose) {
       result[key] = w;
       continue;
     }
-    // goal и milestone — скаляры победителя, done объединяется.
-    result[key] = {...w, 'done': _mergeValues(w['done'], l['done'])};
+    // goal и milestone — скаляры победителя, done объединяется. Базой идёт
+    // {...l, ...w}, а не {...w}: encode опускает пустую веху, поэтому у
+    // победителя ключа могло просто не быть — и непустая веха проигравшего
+    // не «проигрывала скаляр», а молча исчезала у обоих устройств.
+    result[key] = {...l, ...w, 'done': _mergeValues(w['done'], l['done'])};
   }
   return result;
+}
+
+/// Снимок таймера: тот, у кого `savedAt` больше.
+Map<String, dynamic>? _laterTimer(Object? a, Object? b) {
+  final x = a is Map<String, dynamic> ? a : null;
+  final y = b is Map<String, dynamic> ? b : null;
+  if (x == null) return y;
+  if (y == null) return x;
+  final xs = (x['savedAt'] as num?)?.toInt() ?? 0;
+  final ys = (y['savedAt'] as num?)?.toInt() ?? 0;
+  return ys > xs ? y : x;
 }
 
 /// Надгробия: объединение по id, время — более позднее.
@@ -141,8 +175,7 @@ Map<String, dynamic> _mergeGraves(Object? win, Object? lose) {
     for (final e in source.entries) {
       if (e.value is! String) continue;
       final existing = result[e.key];
-      if (existing is! String ||
-          (e.value as String).compareTo(existing) > 0) {
+      if (existing is! String || (e.value as String).compareTo(existing) > 0) {
         result[e.key] = e.value;
       }
     }

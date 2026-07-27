@@ -155,6 +155,16 @@ class DriveSyncService {
   int _dirtyEpoch = 0;
   bool _running = false;
 
+  /// Идёт ли проход прямо сейчас — кубиту нужно, чтобы не повторять впустую.
+  bool get running => _running;
+
+  /// Потолок на сеть. Без него зависший сокет оставлял `_running` навсегда:
+  /// дальше каждый вызов возвращал busy, и синк умирал до перезапуска.
+  static const _netTimeout = Duration(seconds: 30);
+
+  /// Вход ждёт человека, поэтому дольше — но всё равно конечно.
+  static const _authTimeout = Duration(minutes: 3);
+
   Future<File> _metaFile() async =>
       File('${(await localFile()).path}.sync.json');
 
@@ -205,7 +215,8 @@ class DriveSyncService {
       // Интерактив идёт сразу в signIn: на Android «тихое» restore() само
       // показывает системный диалог, и при его неудаче пользователь видел
       // окно входа дважды подряд. Нажали «Подключить» — значит вход нужен.
-      final client = interactive ? await auth.signIn() : await auth.restore();
+      final client = await (interactive ? auth.signIn() : auth.restore())
+          .timeout(interactive ? _authTimeout : _netTimeout);
       if (client == null) return SyncOutcome.notConnected;
 
       final store = _storeFactory(client);
@@ -218,7 +229,7 @@ class DriveSyncService {
       final localBytes = await local.exists()
           ? await local.readAsBytes()
           : null;
-      final remote = await store.find(remoteName);
+      final remote = await store.find(remoteName).timeout(_netTimeout);
       final now = DateTime.now();
 
       // В Drive ещё пусто — просто отдать своё.
@@ -227,7 +238,9 @@ class DriveSyncService {
           await _saveMeta(meta.copy(lastSync: now));
           return SyncOutcome.noChanges;
         }
-        final info = await store.create(remoteName, localBytes);
+        final info = await store
+            .create(remoteName, localBytes)
+            .timeout(_netTimeout);
         await _finish(info.revision, epoch, now);
         return SyncOutcome.pushed;
       }
@@ -235,7 +248,7 @@ class DriveSyncService {
       // Это устройство ещё не синкалось, а в Drive файл уже есть:
       // объединяем и кладём результат в обе стороны.
       if (meta.rev == null) {
-        final remoteJson = await store.download(remote.id);
+        final remoteJson = await store.download(remote.id).timeout(_netTimeout);
         if (_dirtyEpoch != epoch) return SyncOutcome.busy;
         final merged = mergeData(
           localBytes == null ? null : utf8.decode(localBytes),
@@ -243,7 +256,9 @@ class DriveSyncService {
           localWins: true,
         );
         await applyRemote(merged);
-        final info = await store.update(remote.id, utf8.encode(merged));
+        final info = await store
+            .update(remote.id, utf8.encode(merged))
+            .timeout(_netTimeout);
         await _finish(info.revision, epoch, now);
         await onRemoteApplied();
         return SyncOutcome.merged;
@@ -255,7 +270,9 @@ class DriveSyncService {
           await _saveMeta((await _loadMeta()).copy(lastSync: now));
           return SyncOutcome.noChanges;
         }
-        final info = await store.update(remote.id, localBytes);
+        final info = await store
+            .update(remote.id, localBytes)
+            .timeout(_netTimeout);
         await _finish(info.revision, epoch, now);
         return SyncOutcome.pushed;
       }
@@ -264,7 +281,7 @@ class DriveSyncService {
       // Всё равно через слияние: забытый где-нибудь markDirty тогда просто
       // не сможет стать причиной потери данных.
       if (!meta.dirty || localBytes == null) {
-        final remoteJson = await store.download(remote.id);
+        final remoteJson = await store.download(remote.id).timeout(_netTimeout);
         // Правка успела прилететь, пока качали: не затираем свежее стейлом —
         // следующий синк разрулит это как обычный конфликт (dirty уже стоит).
         if (_dirtyEpoch != epoch) return SyncOutcome.busy;
@@ -282,7 +299,7 @@ class DriveSyncService {
 
       // Конфликт: менялись оба. Сливаем, ничего не выбрасывая; более свежая
       // сторона решает только спорные скаляры. Проигравшая версия — в бэкап.
-      final remoteJson = await store.download(remote.id);
+      final remoteJson = await store.download(remote.id).timeout(_netTimeout);
       if (_dirtyEpoch != epoch) return SyncOutcome.busy;
       final localTime = await local.lastModified();
       final remoteTime =
@@ -295,7 +312,9 @@ class DriveSyncService {
         localWins: localWins,
       );
       await applyRemote(merged);
-      final info = await store.update(remote.id, utf8.encode(merged));
+      final info = await store
+          .update(remote.id, utf8.encode(merged))
+          .timeout(_netTimeout);
       await _finish(info.revision, epoch, now);
       await onRemoteApplied();
       return SyncOutcome.merged;

@@ -89,6 +89,11 @@ class JournalCubit extends Cubit<JournalState> {
   final NotifyService _notify;
   final Future<void> Function() _onDayChanged;
 
+  /// Журнал правили вручную (удалили запись, поправили минуты, очистили день).
+  /// Без этого «Статистика» и «Спринт» показывали старые цифры до перезапуска —
+  /// у TasksCubit такой колбэк есть, у журнала не было.
+  Future<void> Function()? onJournalChanged;
+
   late Timer _dayWatch;
   late DateTime _shownDate;
 
@@ -148,8 +153,7 @@ class JournalCubit extends Cubit<JournalState> {
   Future<void> deleteEntry(PomoSession entry) async {
     final log = state.log;
     if (log == null) return;
-    final sessions = [...log.sessions]
-      ..removeWhere((s) => s.id == entry.id);
+    final sessions = [...log.sessions]..removeWhere((s) => s.id == entry.id);
     await _saveDay(sessions);
   }
 
@@ -188,6 +192,7 @@ class JournalCubit extends Cubit<JournalState> {
       ),
       (_) {},
     );
+    await onJournalChanged?.call();
   }
 
   Future<void> _saveDay(List<PomoSession> sessions) async {
@@ -205,6 +210,7 @@ class JournalCubit extends Cubit<JournalState> {
       ),
       (_) {},
     );
+    await onJournalChanged?.call();
   }
 
   @override

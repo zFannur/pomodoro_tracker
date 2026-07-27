@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -58,10 +59,32 @@ class JsonDataRepository
   static const _mirrorNote =
       '<!-- Зеркало Помодоро Трекера: правки здесь не читаются. -->\n';
 
+  /// Очередь записи. `_write`, `applyRemote` и миграция ходят в ОДИН файл, и
+  /// раньше — через один и тот же `.tmp`: два вызова перекрывались на open с
+  /// усечением, и на диск ложился битый JSON, а второй rename падал.
+  Future<void> _io = Future.value();
+  int _tmpSeq = 0;
+
+  Future<T> _serial<T>(Future<T> Function() body) {
+    final next = _io.then((_) => body());
+    _io = next.then((_) {}, onError: (_) {});
+    return next;
+  }
+
+  /// Что репозиторий в последний раз отдал наружу. Нужно, чтобы отличить
+  /// «пользователь удалил» от «приехало синком, пока вызывающий держал старый
+  /// снимок»: хоронить (и выбрасывать) можно только первое. Без этого правка
+  /// в окне между applyRemote и перечитыванием стейта ставила надгробия на
+  /// записи другого устройства — и delete-wins убивал их у всех навсегда.
+  Set<String> _servedTasks = const {};
+  final Map<String, Set<String>> _servedDays = {};
+
   Future<File> jsonFile() async {
     final cached = _file;
     if (cached != null) return cached;
-    final file = File('${await _dirProvider()}${Platform.pathSeparator}data.json');
+    final file = File(
+      '${await _dirProvider()}${Platform.pathSeparator}data.json',
+    );
     _file = file;
     return file;
   }
@@ -95,8 +118,15 @@ class JsonDataRepository
       final content = await _store.read(_store.tasksFile());
       if (content != null) {
         final parsed = parseTasksFile(content);
-        doc.todo.addAll(parsed.todo);
-        doc.planner.addAll(parsed.planner);
+        // id детерминированные (как у сессий журнала): в зеркале их нет, а со
+        // случайными два устройства, мигрировавшие один и тот же файл,
+        // получали разные id — и после синка каждая задача удваивалась.
+        for (var i = 0; i < parsed.todo.length; i++) {
+          doc.todo.add(parsed.todo[i].copyWith(id: 'md-t$i'));
+        }
+        for (var i = 0; i < parsed.planner.length; i++) {
+          doc.planner.add(parsed.planner[i].copyWith(id: 'md-p$i'));
+        }
       }
     }
     await _migrateJournal(doc);
@@ -123,7 +153,11 @@ class JsonDataRepository
       if (date == null) continue;
       // id сессий детерминированные (см. parseDayLog) — два устройства,
       // мигрировавшие одну историю независимо, получат одинаковые.
-      doc.days[dateKey(date)] = parseDayLog(await entry.readAsString(), date, 0);
+      doc.days[dateKey(date)] = parseDayLog(
+        await entry.readAsString(),
+        date,
+        0,
+      );
     }
   }
 
@@ -158,17 +192,21 @@ class JsonDataRepository
   /// Записать документ: атомарно на диск, обновить надгробия, дёрнуть синк,
   /// затем обновить зеркала. Порядок важен — синк узнаёт о правке сразу,
   /// зеркало может отставать.
-  Future<void> _write(_Doc doc, {Set<String>? before}) async {
+  Future<void> _write(_Doc doc, {Set<String>? before}) => _serial(() async {
     if (before != null) _updateGraves(doc, before);
+    await _dump(doc);
+    onSaved?.call();
+  });
+
+  /// Атомарная запись документа. Имя временного файла уникально на вызов:
+  /// общий `.tmp` склеивал содержимое двух параллельных писателей.
+  Future<void> _dump(_Doc doc) async {
     final file = await jsonFile();
     await file.parent.create(recursive: true);
-    // Своё имя .tmp: у синка своё (.sync.tmp) — на общем уже ловили склейку
-    // контента и битый JSON.
-    final tmp = File('${file.path}.tmp');
+    final tmp = File('${file.path}.${_tmpSeq++}.tmp');
     await tmp.writeAsString(doc.encode(), flush: true);
     await tmp.rename(file.path);
     _doc = doc;
-    onSaved?.call();
   }
 
   /// Надгробия ставятся диффом при записи, а не в кубитах: так покрыты разом
@@ -190,17 +228,49 @@ class JsonDataRepository
     });
   }
 
+  /// Отметки о смене дня и недели. Живут в документе, а не в локальных
+  /// настройках: иначе второе устройство, открытое позже, повторно сбрасывало
+  /// 🐸/⭐ — стирая флаги, только что расставленные на первом.
+  Future<Either<Failure, ({String? day, String? week})>> rollover() =>
+      _guard(() async {
+        final doc = await _load();
+        return (day: doc.rollover['day'], week: doc.rollover['week']);
+      });
+
+  Future<Either<Failure, Unit>> markRollover({String? day, String? week}) =>
+      _guard(() async {
+        final doc = await _load();
+        if (day != null) doc.rollover['day'] = day;
+        if (week != null) doc.rollover['week'] = week;
+        await _write(doc);
+        return unit;
+      });
+
+  /// Снимок таймера пишется ТОЛЬКО на переходах (старт/пауза/стоп/смена фазы):
+  /// периодические сохранения раз в 15 секунд идут в локальный
+  /// timer_state.json, иначе каждый идущий помидор давал бы четыре аплоада
+  /// в Drive в минуту. Для чужого устройства (phaseEnd + total) достаточно,
+  /// чтобы досчитать остаток по настенным часам.
+  Future<Either<Failure, Unit>> saveTimer(Map<String, dynamic>? snap) =>
+      _guard(() async {
+        final doc = await _load();
+        doc.timer = snap;
+        await _write(doc);
+        return unit;
+      });
+
+  Future<Either<Failure, Map<String, dynamic>?>> loadTimer() =>
+      _guard(() async => (await _load()).timer);
+
   /// Синк принёс удалённую версию — принять её как есть и перечитать.
   Future<void> applyRemote(String content) async {
     final doc = _Doc.decode(content);
-    final file = await jsonFile();
-    await file.parent.create(recursive: true);
-    final tmp = File('${file.path}.tmp');
-    await tmp.writeAsString(doc.encode(), flush: true);
-    await tmp.rename(file.path);
-    _doc = doc;
     // onSaved не зовём: правка пришла снаружи, отправлять её обратно незачем.
-    await _mirrorAll(doc);
+    await _serial(() => _dump(doc));
+    // Зеркала — вне критического пути. На длинной истории это файловая
+    // операция на КАЖДЫЙ день, и всё это время кубиты держали бы доsync-снимок:
+    // именно эта часть окна, а не сеть, была самой длинной.
+    unawaited(_mirrorAll(doc));
   }
 
   // -- задачи -----------------------------------------------------------------
@@ -208,6 +278,10 @@ class JsonDataRepository
   @override
   Future<Either<Failure, TasksFile>> load() => _guard(() async {
     final doc = await _load();
+    _servedTasks = {
+      for (final t in [...doc.todo, ...doc.planner])
+        if (t.id != null) t.id!,
+    };
     return TasksFile(todo: [...doc.todo], planner: [...doc.planner]);
   });
 
@@ -215,12 +289,36 @@ class JsonDataRepository
   Future<Either<Failure, Unit>> saveTasks(TasksFile file) => _guard(() async {
     final doc = await _load();
     final before = doc.ids();
+    final todo = _withIds(file.todo);
+    final planner = _withIds(file.planner);
+    final known = {
+      for (final t in [...todo, ...planner])
+        if (t.id != null) t.id!,
+    };
+    // Задача, которой нет ни в снимке вызывающего, ни в том, что мы ему
+    // отдавали, — это прилёт синка. Его снимок не свидетельство удаления.
+    bool arrived(PomoTask t) =>
+        t.id != null && !known.contains(t.id) && !_servedTasks.contains(t.id!);
+    final keepTodo = [
+      for (final t in doc.todo)
+        if (arrived(t)) t,
+    ];
+    final keepPlanner = [
+      for (final t in doc.planner)
+        if (arrived(t)) t,
+    ];
     doc.todo
       ..clear()
-      ..addAll(_withIds(file.todo));
+      ..addAll(todo)
+      ..addAll(keepTodo);
     doc.planner
       ..clear()
-      ..addAll(_withIds(file.planner));
+      ..addAll(planner)
+      ..addAll(keepPlanner);
+    // Только то, что вызывающий реально видел. Если записать сюда и
+    // приехавшее, второе подряд сохранение того же устаревшего снимка
+    // сочло бы его удалённым — и дыра вернулась бы через один шаг.
+    _servedTasks = known;
     await _write(doc, before: before);
     await _mirrorTasks(doc);
     return unit;
@@ -267,8 +365,14 @@ class JsonDataRepository
   Future<Either<Failure, DayLog>> day(DateTime date, int dailyGoal) =>
       _guard(() async {
         final doc = await _load();
-        return _dayOf(doc, date, dailyGoal);
+        return _serve(_dayOf(doc, date, dailyGoal));
       });
+
+  /// Запомнить, какие записи дня вызывающий видел (см. [_servedDays]).
+  DayLog _serve(DayLog log) {
+    _servedDays[dateKey(log.date)] = {for (final s in log.sessions) s.id};
+    return log;
+  }
 
   DayLog _dayOf(_Doc doc, DateTime date, int dailyGoal) {
     final normalized = DateTime(date.year, date.month, date.day);
@@ -284,26 +388,44 @@ class JsonDataRepository
   Future<Either<Failure, Unit>> saveDay(DayLog log) => _guard(() async {
     final doc = await _load();
     final before = doc.ids();
-    doc.days[dateKey(log.date)] = log;
+    final key = dateKey(log.date);
+    final stored = doc.days[key];
+    final known = {for (final s in log.sessions) s.id};
+    final served = _servedDays[key] ?? const <String>{};
+    // Записи, появившиеся после того, как вызывающий прочитал день (синк или
+    // только что дотикавший помидор), сохраняем: их отсутствие в его снимке
+    // означает «не знал», а не «удалил».
+    final arrived = [
+      if (stored != null)
+        for (final s in stored.sessions)
+          if (!known.contains(s.id) && !served.contains(s.id)) s,
+    ];
+    final merged = arrived.isEmpty
+        ? log
+        : log.copyWith(sessions: [...log.sessions, ...arrived]);
+    doc.days[key] = merged;
+    _servedDays[key] = known;
     await _write(doc, before: before);
-    await _mirrorDay(log);
+    await _mirrorDay(merged);
     return unit;
   });
 
   @override
-  Future<Either<Failure, Unit>> addSession(PomoSession session, int dailyGoal) =>
-      _guard(() async {
-        final doc = await _load();
-        final before = doc.ids();
-        // День 05:00–05:00: помидор в 00:30 идёт во вчерашний день.
-        final log = _dayOf(doc, logicalDate(session.start), dailyGoal);
-        // copyWith — иначе потеряются заметки «на чём встал».
-        final updated = log.copyWith(sessions: [...log.sessions, session]);
-        doc.days[dateKey(log.date)] = updated;
-        await _write(doc, before: before);
-        await _mirrorDay(updated);
-        return unit;
-      });
+  Future<Either<Failure, Unit>> addSession(
+    PomoSession session,
+    int dailyGoal,
+  ) => _guard(() async {
+    final doc = await _load();
+    final before = doc.ids();
+    // День 05:00–05:00: помидор в 00:30 идёт во вчерашний день.
+    final log = _dayOf(doc, logicalDate(session.start), dailyGoal);
+    // copyWith — иначе потеряются заметки «на чём встал».
+    final updated = log.copyWith(sessions: [...log.sessions, session]);
+    doc.days[dateKey(log.date)] = updated;
+    await _write(doc, before: before);
+    await _mirrorDay(updated);
+    return unit;
+  });
 
   @override
   Future<Either<Failure, List<DayLog>>> range(
@@ -383,9 +505,8 @@ class JsonDataRepository
       var fact = 0;
       var minutes = 0;
       for (var i = 0; i < 7; i++) {
-        final day = doc.days[dateKey(
-          DateTime(monday.year, monday.month, monday.day + i),
-        )];
+        final day = doc
+            .days[dateKey(DateTime(monday.year, monday.month, monday.day + i))];
         if (day == null) continue;
         fact += day.count;
         minutes += day.minutes;
@@ -466,6 +587,7 @@ class _Doc {
     required this.sprints,
     required this.graves,
     required this.rollover,
+    required this.extra,
   });
 
   factory _Doc.empty() => _Doc(
@@ -475,12 +597,30 @@ class _Doc {
     sprints: {},
     graves: {},
     rollover: {},
+    extra: {},
   );
+
+  /// Ключи, которые _Doc знает. Всё остальное проносится через [extra]:
+  /// mergeData специально сохраняет незнакомые секции победителя, но decode →
+  /// encode в applyRemote стирал их в ту же секунду, и защита не работала.
+  static const _known = {
+    'schema',
+    'todo',
+    'planner',
+    'days',
+    'sprints',
+    'graves',
+    'rollover',
+    'timer',
+  };
 
   factory _Doc.decode(String raw) {
     final json = jsonDecode(raw);
     if (json is! Map<String, dynamic>) return _Doc.empty();
     final doc = _Doc.empty();
+    for (final e in json.entries) {
+      if (!_known.contains(e.key)) doc.extra[e.key] = e.value;
+    }
     doc.todo.addAll(_taskList(json['todo']));
     doc.planner.addAll(_taskList(json['planner']));
     final days = json['days'];
@@ -514,6 +654,8 @@ class _Doc {
         if (e.value is String) doc.graves[e.key] = e.value as String;
       }
     }
+    final timer = json['timer'];
+    if (timer is Map<String, dynamic>) doc.timer = timer;
     final rollover = json['rollover'];
     if (rollover is Map<String, dynamic>) {
       for (final e in rollover.entries) {
@@ -530,6 +672,12 @@ class _Doc {
   final Map<String, String> graves;
   final Map<String, String> rollover;
 
+  /// Секции будущих версий, о которых этот код ещё не знает.
+  final Map<String, dynamic> extra;
+
+  /// Снимок таймера последнего устройства, которое его трогало.
+  Map<String, dynamic>? timer;
+
   /// Все живые id — база для диффа надгробий.
   Set<String> ids() => {
     for (final t in todo)
@@ -541,6 +689,7 @@ class _Doc {
   };
 
   String encode() => jsonEncode({
+    ...extra,
     'schema': 2,
     'todo': [for (final t in todo) _taskJson(t)],
     'planner': [for (final t in planner) _taskJson(t)],
@@ -562,6 +711,7 @@ class _Doc {
     },
     'graves': graves,
     if (rollover.isNotEmpty) 'rollover': rollover,
+    if (timer != null) 'timer': timer,
   });
 
   static List<PomoTask> _taskList(Object? raw) => [
@@ -572,7 +722,9 @@ class _Doc {
           description: e['desc'] as String? ?? '',
           category: e['cat'] as String? ?? 'прочее',
           durationMinutes: ((e['min'] as num?)?.toInt() ?? 1).clamp(1, 1 << 30),
-          due: e['due'] is String ? DateTime.tryParse(e['due'] as String) : null,
+          due: e['due'] is String
+              ? DateTime.tryParse(e['due'] as String)
+              : null,
           frog: e['frog'] == true,
           week: e['week'] == true,
         ),
@@ -616,7 +768,7 @@ class _Doc {
       start: DateTime(
         date.year,
         date.month,
-        hour < 5 ? date.day + 1 : date.day,
+        hour < dayStartHour ? date.day + 1 : date.day,
         hour,
         minute,
       ),

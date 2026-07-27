@@ -383,10 +383,7 @@ class TasksCubit extends Cubit<TasksState> {
     final todo = [...state.todo];
     if (index < 0 || index >= todo.length) return;
     final removed = todo.removeAt(index);
-    await _persist(
-      todo: todo,
-      trash: _trashed(removed, fromPlanner: false),
-    );
+    await _persist(todo: todo, trash: _trashed(removed, fromPlanner: false));
   }
 
   Future<void> reorder(int oldIndex, int newIndex) async {
@@ -514,16 +511,21 @@ class TasksCubit extends Cubit<TasksState> {
     // запись) вставил бы задачу дважды — filter ниже сам по себе не спасает.
     if (!state.trash.any((t) => identical(t, entry))) return;
     final trash = state.trash.where((t) => !identical(t, entry)).toList();
+    // Новый id, а не исходный: надгробие удаления уже могло уехать на другое
+    // устройство, а снятие надгробия слияние не переживает (оно union'ит
+    // надгробия обеих сторон). Со старым id задача воскресала локально и
+    // умирала снова при первом же синке.
+    final revived = entry.task.copyWith(id: newId());
     if (entry.fromPlanner) {
-      await _persist(planner: [entry.task, ...state.planner], trash: trash);
+      await _persist(planner: [revived, ...state.planner], trash: trash);
       return;
     }
     final todo = [...state.todo];
     // Пока задача лежала в корзине, лягушку могли передать другой — инвариант
     // «одна 🐸» важнее восстановления флага (последний выбор побеждает).
-    final restored = entry.task.frog && todo.any((t) => t.frog)
-        ? entry.task.copyWith(frog: false)
-        : entry.task;
+    final restored = revived.frog && todo.any((t) => t.frog)
+        ? revived.copyWith(frog: false)
+        : revived;
     todo.insert(0, restored);
     await _persist(todo: todo, trash: trash);
   }
@@ -658,9 +660,7 @@ class TasksCubit extends Cubit<TasksState> {
       TrashedTask(task: task, fromPlanner: fromPlanner),
       ...(into ?? state.trash),
     ];
-    return updated.length > _trashCap
-        ? updated.sublist(0, _trashCap)
-        : updated;
+    return updated.length > _trashCap ? updated.sublist(0, _trashCap) : updated;
   }
 
   // Очередь записи на диск: без неё параллельные _persist (например, быстрые
