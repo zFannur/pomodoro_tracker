@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:equatable/equatable.dart';
 
 /// Схема таймера: длительности в минутах.
@@ -156,6 +158,7 @@ class AppSettings extends Equatable {
     this.syncClientId = '',
     this.syncClientSecret = '',
     this.syncServerClientId = '',
+    this.deviceId = '',
   });
 
   factory AppSettings.fromJson(
@@ -221,10 +224,14 @@ class AppSettings extends Equatable {
       collapsedGroups:
           (json['collapsedGroups'] as List?)?.whereType<String>().toList() ??
           defaultCollapsedGroups,
-      mirrorToVault: json['mirrorToVault'] as bool? ?? true,
+      // По умолчанию только там, где валт реально есть: на Android корнем
+      // становится приватный каталог приложения, и зеркала — чистые расходы
+      // (файловая операция на каждый день истории при каждом синке).
+      mirrorToVault: json['mirrorToVault'] as bool? ?? Platform.isWindows,
       syncClientId: json['syncClientId'] as String? ?? '',
       syncClientSecret: json['syncClientSecret'] as String? ?? '',
       syncServerClientId: json['syncServerClientId'] as String? ?? '',
+      deviceId: json['deviceId'] as String? ?? '',
     );
   }
 
@@ -345,6 +352,11 @@ class AppSettings extends Equatable {
   /// Google Drive синк: OAuth-клиент типа Web — serverClientId для Android.
   final String syncServerClientId;
 
+  /// Кто это устройство. Живёт в НЕсинхронизируемых настройках: по нему
+  /// второе устройство понимает, что идущий помидор — чужой, и не пишет
+  /// за него запись в журнал.
+  final String deviceId;
+
   TimerScheme get scheme => schemes.firstWhere(
     (s) => s.name == activeScheme,
     orElse: () => schemes.isEmpty ? defaultSchemes.first : schemes.first,
@@ -387,6 +399,7 @@ class AppSettings extends Equatable {
     'syncClientId': syncClientId,
     'syncClientSecret': syncClientSecret,
     'syncServerClientId': syncServerClientId,
+    'deviceId': deviceId,
   };
 
   AppSettings copyWith({
@@ -426,6 +439,7 @@ class AppSettings extends Equatable {
     String? syncClientId,
     String? syncClientSecret,
     String? syncServerClientId,
+    String? deviceId,
   }) {
     return AppSettings(
       schemes: schemes ?? this.schemes,
@@ -464,6 +478,7 @@ class AppSettings extends Equatable {
       syncClientId: syncClientId ?? this.syncClientId,
       syncClientSecret: syncClientSecret ?? this.syncClientSecret,
       syncServerClientId: syncServerClientId ?? this.syncServerClientId,
+      deviceId: deviceId ?? this.deviceId,
     );
   }
 
@@ -512,5 +527,6 @@ class AppSettings extends Equatable {
     syncClientId,
     syncClientSecret,
     syncServerClientId,
+    deviceId,
   ];
 }

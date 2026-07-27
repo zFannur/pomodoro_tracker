@@ -76,7 +76,6 @@ Future<void> main() async {
   }
 
   final sound = SoundService();
-  await sound.init();
   final notify = NotifyService();
   await notify.init(S.appTitle);
 
@@ -96,6 +95,11 @@ Future<void> main() async {
   );
   await settingsCubit.load();
   AppSettings settings() => settingsCubit.state.settings;
+  // Постоянный id устройства: по нему второе устройство отличает чужой
+  // идущий помидор от своего и не пишет за него запись в журнал.
+  if (settings().deviceId.isEmpty) {
+    await settingsCubit.update(settings().copyWith(deviceId: newId()));
+  }
 
   // Всё состояние живёт в data.json (AppData) и синхронизируется целиком;
   // валт получает markdown-зеркало и отдаёт захват через «Входящие.md».
@@ -126,15 +130,21 @@ Future<void> main() async {
   Future<void> rolloverCheck() async {
     final today = dateKey(logicalDate(DateTime.now()));
     final week = sprintId(logicalDate(DateTime.now()));
-    final current = settings();
-    final newDay = current.lastDay != today;
-    final newWeek = current.lastSprintId != week;
+    // Отметки берём из синхронизируемого документа, а не из локальных
+    // настроек: сброс должно делать ровно одно устройство, остальные узнают
+    // о нём через слияние. Раньше телефон, открытый вечером, снимал ⭐,
+    // расставленные утром на ПК, и отправлял это в Drive.
+    final marks = (await dataRepository.rollover()).getOrElse(
+      (_) => (day: null, week: null),
+    );
+    final newDay = marks.day != today;
+    final newWeek = marks.week != week;
     if (!newDay && !newWeek) return;
     if (newDay) await tasksCubit.clearFrogs();
     if (newWeek) await tasksCubit.clearWeekFlags();
-    // Из свежего стейта: за время await настройки могли измениться.
-    await settingsCubit.update(
-      settings().copyWith(lastDay: today, lastSprintId: week),
+    await dataRepository.markRollover(
+      day: newDay ? today : null,
+      week: newWeek ? week : null,
     );
   }
 
@@ -162,17 +172,31 @@ Future<void> main() async {
     },
   );
 
+  // Снимок таймера едет в data.json и обратно: идущий помидор виден
+  // на втором устройстве, но завершает его только то, где он запущен.
+  timerCubit.deviceId = () => settings().deviceId;
+  timerCubit.onTransition = dataRepository.saveTimer;
+
   reloadVault = () async {
     await tasksCubit.load();
     await journalCubit.refresh();
     await statsCubit.refresh();
     await sprintCubit.refresh();
+    timerCubit.adoptRemote(
+      (await dataRepository.loadTimer()).getOrElse((_) => null),
+    );
   };
   // Ручное «сделано» дописало запись в журнал — показать её сразу, иначе
   // задача уходит из «Сегодня», а в «Сделано» появляется только после
   // перезапуска.
   tasksCubit.onHistoryWritten = () async {
     await journalCubit.refresh();
+    await statsCubit.refresh();
+    await sprintCubit.refresh();
+  };
+  // Ручная правка журнала (удалили запись, поправили минуты) — статистика и
+  // спринт иначе показывали старые цифры до перезапуска.
+  journalCubit.onJournalChanged = () async {
     await statsCubit.refresh();
     await sprintCubit.refresh();
   };
@@ -208,19 +232,34 @@ Future<void> main() async {
     await syncCubit.syncIfStale();
   }
 
-  // Rollover — до refresh спринта, чтобы файл новой недели не создался
-  // со звёздами прошлой.
-  await tasksCubit.load();
-  await drainInbox();
-  await rolloverCheck();
-  await Future.wait([
-    journalCubit.refresh(),
-    statsCubit.refresh(),
-    sprintCubit.refresh(),
-  ]);
-  await timerCubit.restore();
-  // Синк не блокирует запуск: сеть может думать сколько хочет.
-  unawaited(syncCubit.init());
+  // Поднятие данных идёт ПОСЛЕ первого кадра: раньше здесь стояла цепочка
+  // из миграции, обхода валта и трёх refresh — всё до runApp, и пользователь
+  // смотрел на чёрный экран, пока она не отработает. Кубиты умеют показывать
+  // status: loading, так что показывать есть что.
+  Future<void> bootstrap() async {
+    // Первый запуск синтезирует ~489 000 сэмплов — не на пути к первому кадру.
+    await sound.init();
+    await tasksCubit.load();
+    await drainInbox();
+    // Первый синк — ДО rollover: решать про смену дня и недели, не увидев
+    // правок с другого устройства, значит стирать чужие свежие 🐸/⭐.
+    // Ждём именно ПОПЫТКУ, с потолком: без сети rollover обязан отработать.
+    await syncCubit.init().timeout(
+      const Duration(seconds: 20),
+      onTimeout: () {},
+    );
+    // Rollover — до refresh спринта, чтобы файл новой недели не создался
+    // со звёздами прошлой.
+    await rolloverCheck();
+    await Future.wait([
+      journalCubit.refresh(),
+      statsCubit.refresh(),
+      sprintCubit.refresh(),
+    ]);
+    await timerCubit.restore();
+  }
+
+  unawaited(bootstrap());
 
   runApp(
     MultiBlocProvider(

@@ -142,6 +142,13 @@ class MobileSyncAuth implements SyncAuth {
   Future<void>? _init;
   String? _initedWith;
 
+  /// Кешируем АККАУНТ, а не http.Client. Клиент из
+  /// extension_google_sign_in_as_googleapis_auth строится без refresh-токена и
+  /// с выдуманным сроком «сейчас + 365 дней»: закешированный, он через час
+  /// начал бы молча отдавать 401, и googleapis_auth даже не заметил бы этого.
+  /// Аккаунт же переиспользуется без похода в системный UI.
+  GoogleSignInAccount? _account;
+
   /// initialize() по контракту пакета допустим ровно один раз за процесс —
   /// повторный вызов реально ломает плагин. Поэтому единственный вызов
   /// делаем сразу с настоящим serverClientId: пока поле пусто (например,
@@ -179,20 +186,32 @@ class MobileSyncAuth implements SyncAuth {
     // Тихий путь: не настроено — просто «не подключено», без ошибки.
     if (_init == null && serverClientId().trim().isEmpty) return null;
     await _ensureInit();
-    final account = await (GoogleSignIn.instance
-            .attemptLightweightAuthentication() ??
-        Future<GoogleSignInAccount?>.value());
+    // Без кеша каждый проход синка снова дёргал Credential Manager, а он на
+    // Android рисует системную шторку — она и выглядела как «авторизация
+    // просится по кругу».
+    final account =
+        _account ??
+        await (GoogleSignIn.instance.attemptLightweightAuthentication() ??
+            Future<GoogleSignInAccount?>.value());
     if (account == null) return null;
+    _account = account;
     final authz = await account.authorizationClient.authorizationForScopes(
       kDriveScopes,
     );
-    return authz?.authClient(scopes: kDriveScopes);
+    if (authz == null) {
+      // Разрешение отозвали — аккаунт из кеша убираем, иначе следующий проход
+      // будет бесконечно строить клиента на мёртвой авторизации.
+      _account = null;
+      return null;
+    }
+    return authz.authClient(scopes: kDriveScopes);
   }
 
   @override
   Future<http.Client?> signIn() async {
     await _ensureInit();
     final account = await GoogleSignIn.instance.authenticate();
+    _account = account;
     final authz = await account.authorizationClient.authorizeScopes(
       kDriveScopes,
     );
@@ -201,6 +220,7 @@ class MobileSyncAuth implements SyncAuth {
 
   @override
   Future<void> signOut() async {
+    _account = null;
     // Не инициализировались — и выходить неоткуда.
     if (_init == null) return;
     await _ensureInit();

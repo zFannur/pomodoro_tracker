@@ -167,9 +167,15 @@ class SettingsRepositoryImpl implements SettingsRepository {
     try {
       final file = await _settingsFile();
       await file.parent.create(recursive: true);
-      await file.writeAsString(
+      // Атомарно: обрыв процесса на полуслове оставлял обрезанный JSON, а
+      // load() молча подменял ВСЕ настройки дефолтами — включая ключи синка,
+      // после чего синк тихо переставал работать.
+      final tmp = File('${file.path}.tmp');
+      await tmp.writeAsString(
         const JsonEncoder.withIndent('  ').convert(settings.toJson()),
+        flush: true,
       );
+      await tmp.rename(file.path);
       return Either.right(unit);
     } on FileSystemException catch (e) {
       return Either.left(

@@ -19,25 +19,29 @@ class SoundService {
 
   Future<void> init() async {
     final dir = await getApplicationSupportDirectory();
-    final sounds = <String, List<double>>{
-      FinishSound.bell.name: _bell(),
-      FinishSound.beep.name: _beep(),
-      FinishSound.chime.name: _chime(),
-      FinishSound.cuckoo.name: _cuckoo(),
-      FinishSound.guitar.name: _guitar(),
-      FinishSound.maramba.name: _maramba(),
-      FinishSound.organ.name: _organ(),
-      FinishSound.rise.name: _rise(),
-      FinishSound.satellite.name: _satellite(),
-      FinishSound.school.name: _school(),
-      'tick': _tick(),
+    // Значения — функции, а не готовые сэмплы: литерал вычислялся целиком и
+    // сразу, то есть ~489 000 сэмплов синтезировались на КАЖДОМ запуске (и на
+    // втором же выбрасывались, потому что файлы уже на диске) — прямо на
+    // старте, до первого кадра.
+    final sounds = <String, List<double> Function()>{
+      FinishSound.bell.name: _bell,
+      FinishSound.beep.name: _beep,
+      FinishSound.chime.name: _chime,
+      FinishSound.cuckoo.name: _cuckoo,
+      FinishSound.guitar.name: _guitar,
+      FinishSound.maramba.name: _maramba,
+      FinishSound.organ.name: _organ,
+      FinishSound.rise.name: _rise,
+      FinishSound.satellite.name: _satellite,
+      FinishSound.school.name: _school,
+      'tick': _tick,
     };
     for (final entry in sounds.entries) {
       final file = File(
         '${dir.path}${Platform.pathSeparator}sound_${entry.key}.wav',
       );
       if (!await file.exists()) {
-        await file.writeAsBytes(_wav(entry.value), flush: true);
+        await file.writeAsBytes(_wav(entry.value()), flush: true);
       }
       _paths[entry.key] = file.path;
     }
