@@ -38,8 +38,21 @@ String mergeData(String? local, String remote, {required bool localWins}) {
   // исчезала бы при первом же слиянии и после каждого переподключения.
   final result = <String, dynamic>{...winner};
 
-  result['todo'] = _mergeById(winner['todo'], loser['todo']);
-  result['planner'] = _mergeById(winner['planner'], loser['planner']);
+  // Задачу, переехавшую между «Сегодня» и планировщиком, нельзя мержить
+  // двумя независимыми списками: переезд — это удаление из одного и вставка
+  // в другой, и union возвращает её на СТАРОЕ место, оставляя разом в обоих.
+  // Поэтому корзину задачи назначает документ-победитель; список проигравшего
+  // решает только для тех id, которых у победителя нет вообще.
+  final winTodo = _idsOf(winner['todo']);
+  final winPlanner = _idsOf(winner['planner']);
+  result['todo'] = _exclude(
+    _mergeById(winner['todo'], loser['todo']),
+    winPlanner,
+  );
+  result['planner'] = _exclude(
+    _mergeById(winner['planner'], loser['planner']),
+    winTodo,
+  );
   result['days'] = _mergeDays(winner['days'], loser['days']);
   result['sprints'] = _mergeSprints(winner['sprints'], loser['sprints']);
   result['rollover'] = _mergeRollover(winner['rollover'], loser['rollover']);
@@ -63,6 +76,20 @@ String mergeData(String? local, String remote, {required bool localWins}) {
 
   return jsonEncode(result);
 }
+
+Set<String> _idsOf(Object? raw) => {
+  for (final e in _list(raw))
+    if (e['id'] is String) e['id'] as String,
+};
+
+/// Убрать записи, чью корзину победитель определил иначе.
+List<Map<String, dynamic>> _exclude(
+  List<Map<String, dynamic>> list,
+  Set<String> foreign,
+) => [
+  for (final e in list)
+    if (e['id'] is! String || !foreign.contains(e['id'])) e,
+];
 
 List<Map<String, dynamic>> _list(Object? raw) => [
   if (raw is List) ...raw.whereType<Map<String, dynamic>>(),

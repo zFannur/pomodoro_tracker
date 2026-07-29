@@ -96,7 +96,12 @@ class JsonDataRepository
     if (cached != null) return cached;
     final file = await jsonFile();
     if (await file.exists()) {
-      return _doc = _Doc.decode(await file.readAsString());
+      final doc = _Doc.decode(await file.readAsString());
+      _doc = doc;
+      // Починку сразу на диск: иначе битый документ так и уезжал бы в Drive
+      // при каждом пуше — на диске-то он не менялся.
+      if (_dedupeBuckets(doc)) await _write(doc);
+      return doc;
     }
     return _doc = await _migrate();
   }
@@ -265,6 +270,7 @@ class JsonDataRepository
   /// Синк принёс удалённую версию — принять её как есть и перечитать.
   Future<void> applyRemote(String content) async {
     final doc = _Doc.decode(content);
+    _dedupeBuckets(doc);
     // onSaved не зовём: правка пришла снаружи, отправлять её обратно незачем.
     await _serial(() => _dump(doc));
     // Зеркала — вне критического пути. На длинной истории это файловая
@@ -324,20 +330,42 @@ class JsonDataRepository
     return unit;
   });
 
-  /// Выдать id новым задачам и развести дубликаты: после «Разбить» копия
-  /// делит id с оригиналом.
+  /// Выдать id новым задачам и ВЫБРОСИТЬ повторы.
+  ///
+  /// Раньше повтор получал свежий id — и любой дубликат, пришедший из
+  /// слияния, превращался в отдельную новую задачу, которая расползалась
+  /// по всем устройствам. Копии, которым нужен свой id (например, после
+  /// «Разбить»), выдают его себе сами на месте.
   List<PomoTask> _withIds(List<PomoTask> list) {
     final seen = <String>{};
-    return [
-      for (final t in list)
-        if (t.id != null && seen.add(t.id!)) t else _fresh(t, seen),
-    ];
+    final result = <PomoTask>[];
+    for (final t in list) {
+      final id = t.id ?? newId();
+      if (!seen.add(id)) continue;
+      result.add(t.id == null ? t.copyWith(id: id) : t);
+    }
+    return result;
   }
 
-  PomoTask _fresh(PomoTask t, Set<String> seen) {
-    final id = newId();
-    seen.add(id);
-    return t.copyWith(id: id);
+  /// Одна задача не может лежать сразу в «Сегодня» и в планировщике.
+  /// Такие документы существуют — их наплодило прежнее слияние, которое
+  /// объединяло два списка независимо. Чиним при чтении: «Сегодня» новее,
+  /// туда задачу переносили осознанно.
+  bool _dedupeBuckets(_Doc doc) {
+    final inTodo = {
+      for (final t in doc.todo)
+        if (t.id != null) t.id!,
+    };
+    if (inTodo.isEmpty) return false;
+    final cleaned = [
+      for (final t in doc.planner)
+        if (t.id == null || !inTodo.contains(t.id)) t,
+    ];
+    if (cleaned.length == doc.planner.length) return false;
+    doc.planner
+      ..clear()
+      ..addAll(cleaned);
+    return true;
   }
 
   List<PomoTask> _tasks(Object? raw) => [

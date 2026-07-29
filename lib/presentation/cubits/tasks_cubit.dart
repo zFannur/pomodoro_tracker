@@ -319,7 +319,10 @@ class TasksCubit extends Cubit<TasksState> {
     if (task.durationMinutes > half) {
       todo[index] = task.copyWith(durationMinutes: task.durationMinutes - half);
     }
-    todo.insert(index + 1, task.copyWith(durationMinutes: half));
+    // Свой id сразу: раньше копия делила его с оригиналом, и развести их
+    // приходилось репозиторию — тем же кодом, который потом плодил задачи
+    // из дубликатов слияния.
+    todo.insert(index + 1, task.copyWith(id: newId(), durationMinutes: half));
     await _persist(todo: todo);
   }
 

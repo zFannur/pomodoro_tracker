@@ -237,6 +237,118 @@ void main() {
     expect((doc['graves'] as Map).keys, contains('b'));
   });
 
+  // -- B25: переезд между «Сегодня» и планировщиком ---------------------------
+
+  test('B25: перенос в «Сегодня» не воскрешает задачу в планировщике', () {
+    Map<String, dynamic> j(String id) => {
+      'id': id,
+      'desc': id,
+      'cat': 'x',
+      'min': 25,
+    };
+    String d({
+      List<Map<String, dynamic>> todo = const [],
+      List<Map<String, dynamic>> planner = const [],
+    }) => jsonEncode({'schema': 2, 'todo': todo, 'planner': planner});
+
+    // ПК перенёс X из планировщика в «Сегодня»; телефон помнит старое.
+    final merged =
+        jsonDecode(
+              mergeData(
+                d(todo: [j('X')], planner: [j('Y')]),
+                d(todo: const [], planner: [j('X'), j('Y')]),
+                localWins: true,
+              ),
+            )
+            as Map<String, dynamic>;
+    final todo = [for (final e in merged['todo'] as List) (e as Map)['id']];
+    final planner = [
+      for (final e in merged['planner'] as List) (e as Map)['id'],
+    ];
+    expect(todo, ['X']);
+    expect(
+      planner,
+      ['Y'],
+      reason: 'X переехал — в планировщике его быть не должно',
+    );
+  });
+
+  test('B25: задачу, известную только проигравшему, не теряем', () {
+    Map<String, dynamic> j(String id) => {
+      'id': id,
+      'desc': id,
+      'cat': 'x',
+      'min': 25,
+    };
+    String d({
+      List<Map<String, dynamic>> todo = const [],
+      List<Map<String, dynamic>> planner = const [],
+    }) => jsonEncode({'schema': 2, 'todo': todo, 'planner': planner});
+
+    final merged =
+        jsonDecode(
+              mergeData(
+                d(todo: [j('X')]),
+                d(planner: [j('Z')]),
+                localWins: true,
+              ),
+            )
+            as Map<String, dynamic>;
+    expect([for (final e in merged['todo'] as List) (e as Map)['id']], ['X']);
+    expect([
+      for (final e in merged['planner'] as List) (e as Map)['id'],
+    ], ['Z']);
+  });
+
+  test('B25: документ с задачей в обоих списках чинится при чтении', () async {
+    final broken = jsonEncode({
+      'schema': 2,
+      'todo': [
+        {'id': 'X', 'desc': 'X', 'cat': 'x', 'min': 25},
+      ],
+      'planner': [
+        {'id': 'X', 'desc': 'X', 'cat': 'x', 'min': 25},
+        {'id': 'Y', 'desc': 'Y', 'cat': 'x', 'min': 25},
+      ],
+      'days': <String, Object>{},
+      'sprints': <String, Object>{},
+      'graves': <String, Object>{},
+    });
+    await File(
+      '${dataDir.path}${Platform.pathSeparator}data.json',
+    ).writeAsString(broken);
+
+    final file = (await repo().load()).getOrElse(
+      (_) => const TasksFile(todo: [], planner: []),
+    );
+    expect(file.todo.map((e) => e.id), ['X']);
+    expect(
+      file.planner.map((e) => e.id),
+      ['Y'],
+      reason: 'дубль в планировщике — артефакт прежнего слияния',
+    );
+  });
+
+  test('B25: повтор id больше не превращается в НОВУЮ задачу', () async {
+    final r = repo();
+    // Тот же id дважды в одном списке — так выглядел результат прежнего бага.
+    await r.saveTasks(
+      TasksFile(
+        todo: [t('дубль', id: 'X'), t('дубль', id: 'X')],
+        planner: const [],
+      ),
+    );
+    final file = (await r.load()).getOrElse(
+      (_) => const TasksFile(todo: [], planner: []),
+    );
+    expect(
+      file.todo.length,
+      1,
+      reason: 'раньше второму повтору выдавался свежий id — и он расползался',
+    );
+    expect(file.todo.single.id, 'X');
+  });
+
   // -- B16: порядок сессий на границе логического дня ------------------------
 
   test('B16: ночная сессия после слияния остаётся в конце дня', () {

@@ -129,7 +129,7 @@ void main() {
     expect(first.sessions.map((x) => x.id).toSet(), hasLength(2));
   });
 
-  test('round-trip задач: поля сохраняются, id выдаются и не дублируются',
+  test('round-trip задач: поля сохраняются, id выдаются, повтор выбрасывается',
       () async {
     final r = repo();
     await r.saveTasks(
@@ -139,7 +139,10 @@ void main() {
       ),
     );
     final loaded = (await repo().load()).getOrElse((f) => fail(f.message));
-    expect(loaded.todo.map((x) => x.description), ['a', 'b', 'c']);
+    // «c» разделяет id с «b» — это не новая задача, а повтор. Раньше ему
+    // выдавался свежий id, и любой дубликат из слияния превращался в
+    // отдельную задачу, расползавшуюся по всем устройствам.
+    expect(loaded.todo.map((x) => x.description), ['a', 'b']);
     expect(loaded.todo[1].week, isTrue);
     expect(loaded.planner.single.due, DateTime(2026, 8, 1));
     final ids = [...loaded.todo, ...loaded.planner].map((x) => x.id!).toList();

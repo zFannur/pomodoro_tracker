@@ -127,7 +127,7 @@ Future<void> main() async {
   tasksCubit.onWeeklyClosed = sprintCubit.addDoneWeek;
   // Смена дня — сброс 🐸 (лягушка выбирается утром заново);
   // смена недели — сброс ⭐ (3 задачи спринта выбираются из вехи заново).
-  Future<void> rolloverCheck() async {
+  Future<bool> rolloverCheck() async {
     final today = dateKey(logicalDate(DateTime.now()));
     final week = sprintId(logicalDate(DateTime.now()));
     // Отметки берём из синхронизируемого документа, а не из локальных
@@ -139,13 +139,14 @@ Future<void> main() async {
     );
     final newDay = marks.day != today;
     final newWeek = marks.week != week;
-    if (!newDay && !newWeek) return;
+    if (!newDay && !newWeek) return false;
     if (newDay) await tasksCubit.clearFrogs();
     if (newWeek) await tasksCubit.clearWeekFlags();
     await dataRepository.markRollover(
       day: newDay ? today : null,
       week: newWeek ? week : null,
     );
+    return true;
   }
 
   final journalCubit = JournalCubit(
@@ -239,24 +240,23 @@ Future<void> main() async {
   Future<void> bootstrap() async {
     // Первый запуск синтезирует ~489 000 сэмплов — не на пути к первому кадру.
     await sound.init();
+    // Сначала наполняем интерфейс локальными данными. Синк идёт ПОСЛЕ:
+    // на Android он ждёт системный диалог входа, и всё это время журнал,
+    // статистика и спринт стояли бы пустыми — приложение выглядело зависшим.
     await tasksCubit.load();
     await drainInbox();
-    // Первый синк — ДО rollover: решать про смену дня и недели, не увидев
-    // правок с другого устройства, значит стирать чужие свежие 🐸/⭐.
-    // Ждём именно ПОПЫТКУ, с потолком: без сети rollover обязан отработать.
-    await syncCubit.init().timeout(
-      const Duration(seconds: 20),
-      onTimeout: () {},
-    );
-    // Rollover — до refresh спринта, чтобы файл новой недели не создался
-    // со звёздами прошлой.
-    await rolloverCheck();
     await Future.wait([
       journalCubit.refresh(),
       statsCubit.refresh(),
       sprintCubit.refresh(),
     ]);
     await timerCubit.restore();
+
+    await syncCubit.init();
+    // Rollover после синка: решать про смену дня и недели, не увидев правок
+    // с другого устройства, значит стирать чужие свежие 🐸/⭐. Выполняется
+    // после ПОПЫТКИ, а не после успеха — без сети сброс обязан работать.
+    if (await rolloverCheck()) await sprintCubit.refresh();
   }
 
   unawaited(bootstrap());
