@@ -120,22 +120,29 @@ class _SprintBody extends StatelessWidget {
                       ),
               ),
               const SizedBox(height: 12),
-              if (sprint.doneWeek.isNotEmpty) ...[
-                SectionCard(
-                  title: S.doneWeekTitle,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final line in sprint.doneWeek)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text(line, style: theme.textTheme.bodyMedium),
+              // Секция показывается всегда: скрытая при пустом списке, она
+              // выглядела как «не работает», а не как «за неделю пока пусто».
+              SectionCard(
+                title: S.doneWeekTitle,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (state.doneLines.isEmpty)
+                      Text(
+                        S.doneWeekEmpty,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                    ],
-                  ),
+                      ),
+                    for (final line in state.doneLines)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text(line, style: theme.textTheme.bodyMedium),
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-              ],
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   StatTile(

@@ -144,6 +144,11 @@ abstract final class S {
         'the sprint is only ⭐: 3 tasks from the current milestone.',
   );
   static String get doneWeekTitle => _t('Сделано за неделю', 'Done this week');
+
+  static String get doneWeekEmpty => _t(
+    'Пока пусто — здесь появится всё, что закроешь на этой неделе.',
+    'Empty so far — everything you close this week shows up here.',
+  );
   static String get doneTodayTitle => _t('Сделано сегодня', 'Done today');
   static String get doneTodayEmpty =>
       _t('Сегодня пока ничего не закрыто', 'Nothing closed today yet');

@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../data/markdown_codec.dart' show sprintId, two;
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../../domain/entities/sprint.dart';
@@ -24,6 +25,30 @@ class SprintState extends Equatable {
   final List<DayLog> fact;
   final List<SprintSummary> history;
   final String error;
+
+  /// Что сделано за неделю. Явные отметки о закрытых ⭐-задачах ПЛЮС всё,
+  /// что реально попало в журнал.
+  ///
+  /// На одни ⭐ полагаться нельзя: список наполнялся только полностью
+  /// закрытыми ⭐-задачами, а сами ⭐ снимаются при каждом переходе недели —
+  /// чтобы сюда что-то попало, надо было заново отметить задачу звездой в
+  /// понедельник и закрыть её целиком до воскресенья. На практике секция
+  /// поэтому почти всегда пустовала.
+  List<String> get doneLines {
+    final result = <String>[...?sprint?.doneWeek];
+    final seen = result.toSet();
+    for (final day in fact) {
+      for (final s in day.sessions) {
+        final task = s.task.trim();
+        if (task.isEmpty) continue;
+        final line =
+            '✅ ${two(day.date.day)}.${two(day.date.month)} $task'
+            '${s.category.isEmpty ? '' : ' #${s.category}'}';
+        if (seen.add(line)) result.add(line);
+      }
+    }
+    return result;
+  }
 
   int get factPomodoros => fact.fold(0, (sum, d) => sum + d.count);
 
@@ -134,11 +159,13 @@ class SprintCubit extends Cubit<SprintState> {
 
   /// Закрытая ⭐-задача уезжает в «Сделано за неделю».
   Future<void> addDoneWeek(String line) async {
+    // Убеждаемся, что в руках спринт ТЕКУЩЕЙ недели. Раньше бралось то, что
+    // лежало в state: после перехода недели закрытие уезжало в прошлую, а
+    // если спринт ещё не загрузился — строка просто терялась.
+    final id = sprintId(logicalDate(DateTime.now()));
+    if (state.sprint?.id != id) await refresh();
     final sprint = state.sprint;
-    if (sprint == null) {
-      await refresh();
-      return;
-    }
+    if (sprint == null || sprint.doneWeek.contains(line)) return;
     await _save(sprint.copyWith(doneWeek: [...sprint.doneWeek, line]));
   }
 
