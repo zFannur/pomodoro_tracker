@@ -324,6 +324,7 @@ class HeatmapCalendar extends StatelessWidget {
 
 /// Имя корзины планировщика.
 String plannerTabLabel(PlannerTab tab) => switch (tab) {
+  PlannerTab.due => S.dueNow,
   PlannerTab.inbox => S.inbox,
   PlannerTab.tomorrow => S.tomorrow,
   PlannerTab.week => S.week,

@@ -25,10 +25,11 @@ void showPlannerDialog(BuildContext context) {
 }
 
 /// Вкладки планировщика: «Сегодня» + четыре корзины по датам.
-enum _Tab { today, inbox, tomorrow, week, later }
+enum _Tab { today, due, inbox, tomorrow, week, later }
 
 String _tabLabel(_Tab tab) => switch (tab) {
   _Tab.today => S.periodToday,
+  _Tab.due => S.dueNow,
   _Tab.inbox => S.inbox,
   _Tab.tomorrow => S.tomorrow,
   _Tab.week => S.week,
@@ -36,6 +37,7 @@ String _tabLabel(_Tab tab) => switch (tab) {
 };
 
 const _tabToPlanner = {
+  _Tab.due: PlannerTab.due,
   _Tab.inbox: PlannerTab.inbox,
   _Tab.tomorrow: PlannerTab.tomorrow,
   _Tab.week: PlannerTab.week,
@@ -77,6 +79,7 @@ class _PlannerDialogState extends State<_PlannerDialog> {
     final counts = <_Tab, int>{_Tab.today: state.todo.length};
     for (final t in state.planner) {
       final tab = switch (t.tab(now)) {
+        PlannerTab.due => _Tab.due,
         PlannerTab.inbox => _Tab.inbox,
         PlannerTab.tomorrow => _Tab.tomorrow,
         PlannerTab.week => _Tab.week,
@@ -329,6 +332,7 @@ class _PlannerDialogState extends State<_PlannerDialog> {
 
   static String _plannerTabLabel(PlannerTab tab) {
     return switch (tab) {
+      PlannerTab.due => S.dueNow,
       PlannerTab.inbox => S.inbox,
       PlannerTab.tomorrow => S.tomorrow,
       PlannerTab.week => S.week,
@@ -359,12 +363,9 @@ class _PlannerDialogState extends State<_PlannerDialog> {
       _text.clear();
       return;
     }
-    final due = switch (_tab) {
-      _Tab.today || _Tab.inbox => null,
-      _Tab.tomorrow => DateTime.now().add(const Duration(days: 1)),
-      _Tab.week => DateTime.now().add(const Duration(days: 2)),
-      _Tab.later => DateTime.now().add(const Duration(days: 8)),
-    };
+    // Тот же расчёт, что и у переноса задачи: раньше здесь были свои правила
+    // («неделя» = +2 дня), и добавленная задача оказывалась в чужой корзине.
+    final due = plannerDueFor(_tabToPlanner[_tab]!, DateTime.now());
     cubit.add(
       _text.text,
       fallbackCategory: _category,

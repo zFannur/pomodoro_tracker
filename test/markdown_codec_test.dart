@@ -52,8 +52,10 @@ void main() {
         due: due,
       );
       expect(withDue(null).tab(now), PlannerTab.inbox);
-      // Просроченное — во «Входящие».
-      expect(withDue(DateTime(2026, 7, 15)).tab(now), PlannerTab.inbox);
+      // Срок наступил или прошёл — отдельная корзина «Пора». Раньше такие
+      // задачи падали во «Входящие» и терялись среди задач вообще без даты.
+      expect(withDue(DateTime(2026, 7, 15)).tab(now), PlannerTab.due);
+      expect(withDue(DateTime(2026, 7, 16)).tab(now), PlannerTab.due);
       expect(withDue(DateTime(2026, 7, 17)).tab(now), PlannerTab.tomorrow);
       // Суббота этой недели.
       expect(withDue(DateTime(2026, 7, 18)).tab(now), PlannerTab.week);

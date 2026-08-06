@@ -431,25 +431,7 @@ class TasksCubit extends Cubit<TasksState> {
     );
   }
 
-  /// Дата для вкладки — как в оригинале: завтра / конец недели / после неё.
-  DateTime? _dueFor(PlannerTab tab) {
-    final now = DateTime.now();
-    return switch (tab) {
-      PlannerTab.inbox => null,
-      PlannerTab.tomorrow => DateTime(now.year, now.month, now.day + 1),
-      PlannerTab.week => DateTime(
-        now.year,
-        now.month,
-        now.day + math.max(1, 7 - now.weekday),
-      ),
-      // Минимум +2 дня: в сб/вс «понедельник» — это завтра, а «позже» ≠ завтра.
-      PlannerTab.later => DateTime(
-        now.year,
-        now.month,
-        now.day + math.max(2, 8 - now.weekday),
-      ),
-    };
-  }
+  DateTime? _dueFor(PlannerTab tab) => plannerDueFor(tab, DateTime.now());
 
   /// Перенести задачу планировщика в «Сегодня».
   Future<void> plannerToToday(int index) async {

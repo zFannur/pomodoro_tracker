@@ -1,7 +1,30 @@
 import 'package:equatable/equatable.dart';
 
 /// Вкладка планировщика — вычисляется из даты `due`, как в оригинале.
-enum PlannerTab { inbox, tomorrow, week, later }
+/// Корзины планировщика. `due` — срок наступил (сегодня или уже просрочено):
+/// без неё запланированная «на завтра» задача назавтра молча проваливалась
+/// во «Входящие» и терялась среди задач вообще без даты.
+enum PlannerTab { due, inbox, tomorrow, week, later }
+
+/// Срок для корзины [tab]. Живёт рядом с [PomoTask.tab], который его читает
+/// обратно: раньше расчёт был в двух местах с РАЗНЫМИ правилами, и задача,
+/// добавленная прямо во вкладку, попадала не туда, куда её клали.
+DateTime? plannerDueFor(PlannerTab tab, DateTime now) => switch (tab) {
+  PlannerTab.inbox => null,
+  PlannerTab.due => DateTime(now.year, now.month, now.day),
+  PlannerTab.tomorrow => DateTime(now.year, now.month, now.day + 1),
+  PlannerTab.week => DateTime(
+    now.year,
+    now.month,
+    now.day + (7 - now.weekday < 1 ? 1 : 7 - now.weekday),
+  ),
+  // Минимум +2 дня: в сб/вс «понедельник» — это завтра, а «позже» ≠ завтра.
+  PlannerTab.later => DateTime(
+    now.year,
+    now.month,
+    now.day + (8 - now.weekday < 2 ? 2 : 8 - now.weekday),
+  ),
+};
 
 /// Задача плана (TODO) или планировщика. Оценка хранится в минутах и
 /// уменьшается по мере выполнения помидоров; флага «выполнено» нет —
@@ -46,7 +69,7 @@ class PomoTask extends Equatable {
     final d = due;
     if (d == null) return PlannerTab.inbox;
     final endOfToday = DateTime(now.year, now.month, now.day + 1);
-    if (d.isBefore(endOfToday)) return PlannerTab.inbox;
+    if (d.isBefore(endOfToday)) return PlannerTab.due;
     final endOfTomorrow = DateTime(now.year, now.month, now.day + 2);
     if (d.isBefore(endOfTomorrow)) return PlannerTab.tomorrow;
     final endOfWeek = DateTime(

@@ -111,6 +111,7 @@ abstract final class S {
   );
 
   // Планировщик (корзины — это СРОКИ, не спринт)
+  static String get dueNow => _t('Пора', 'Due');
   static String get inbox => _t('Входящие', 'Inbox');
   static String get tomorrow => _t('Завтра', 'Tomorrow');
   static String get week => _t('Эта неделя', 'This week');

@@ -626,6 +626,7 @@ class _BucketGroup extends StatelessWidget {
   final VoidCallback onToggle;
 
   static IconData _icon(PlannerTab tab) => switch (tab) {
+    PlannerTab.due => Icons.event_available_outlined,
     PlannerTab.inbox => Icons.inbox_outlined,
     PlannerTab.tomorrow => Icons.wb_sunny_outlined,
     PlannerTab.week => Icons.date_range_outlined,
