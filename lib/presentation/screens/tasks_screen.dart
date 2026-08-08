@@ -1030,6 +1030,21 @@ class PomosBadge extends StatelessWidget {
   final int pomodoro;
   final bool inPlanner;
 
+
+  /// Шаг оценки. Индекс берём в момент нажатия: список мог сдвинуться.
+  void _step(TasksCubit cubit, {required bool add}) {
+    final index = cubit.todoIndexOf(task);
+    if (index < 0) return;
+    // Shift меняет только величину шага, но не направление — залипший Shift
+    // задачу потерять не может.
+    final count = HardwareKeyboard.instance.isShiftPressed ? 4 : 1;
+    if (add) {
+      cubit.plus(index, count: count);
+    } else {
+      cubit.minus(index, count: count);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1052,18 +1067,12 @@ class PomosBadge extends StatelessWidget {
       message: S.pomoClickHint(task.durationMinutes),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          // Индекс в момент клика: список мог сдвинуться.
-          final index = cubit.todoIndexOf(task);
-          if (index < 0) return;
-          final shift = HardwareKeyboard.instance.isShiftPressed;
-          final count = shift ? 4 : 1;
-          if (HardwareKeyboard.instance.isAltPressed) {
-            cubit.minus(index, count: count);
-          } else {
-            cubit.plus(index, count: count);
-          }
-        },
+        // Вычитание — правый клик / долгое нажатие, а не Alt: глобальное
+        // состояние клавиатуры залипает после Alt+Tab, и обычный клик по
+        // цифре начинал вычитать вместо прибавления.
+        onTap: () => _step(cubit, add: true),
+        onSecondaryTap: () => _step(cubit, add: false),
+        onLongPress: () => _step(cubit, add: false),
         child: badge,
       ),
     );

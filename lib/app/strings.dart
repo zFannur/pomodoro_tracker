@@ -276,8 +276,8 @@ abstract final class S {
   static String get colGoal => _t('Цель', 'Goal');
   static String get minutesField => _t('Минуты', 'Minutes');
   static String pomoClickHint(int minutes) => _t(
-    '$minutesм · клик +1 🍅, Alt-клик −1, Shift ×4',
-    '${minutes}m · click +1 🍅, Alt-click −1, Shift ×4',
+    '$minutesм · клик +1 🍅, правый клик −1, Shift ×4',
+    '${minutes}m · click +1 🍅, right-click −1, Shift ×4',
   );
 
   // Экран задач

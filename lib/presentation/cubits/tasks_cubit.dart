@@ -240,22 +240,27 @@ class TasksCubit extends Cubit<TasksState> {
     await _persist(todo: todo);
   }
 
+  /// Убавить оценку. НЕ удаляет: упирается в один помидор.
+  ///
+  /// Раньше минус в ноль удалял задачу целиком — то есть одно нажатие рядом
+  /// с «прибавить» необратимо теряло данные, без подтверждения и без отмены.
+  /// Удаление осталось явным действием в меню ⋮. Заодно ушёл вызов
+  /// _notifyWeeklyClosed: «убавил оценку» — это не «сделал», а он записывал
+  /// задачу в «Сделано за неделю», и отменить эту строку было нечем.
   Future<void> minus(int index, {int count = 1}) async {
     final todo = [...state.todo];
     if (index < 0 || index >= todo.length) return;
     final task = todo[index];
+    final floor = math.min(task.durationMinutes, _pomodoroMinutes);
     final rest = task.durationMinutes - count * _pomodoroMinutes;
-    var trash = state.trash;
-    if (rest <= 0) {
-      todo.removeAt(index);
-      // Минус не пишет в журнал (в отличие от markDone/таймера) — без
-      // корзины удаление здесь было бы никак не отслеживаемым.
-      trash = _trashed(task, fromPlanner: false);
-      if (task.week) await _notifyWeeklyClosed(task);
-    } else {
+    if (rest >= floor) {
       todo[index] = task.copyWith(durationMinutes: rest);
+    } else if (task.durationMinutes != floor) {
+      todo[index] = task.copyWith(durationMinutes: floor);
+    } else {
+      return; // уже на минимуме — клик ничего не меняет
     }
-    await _persist(todo: todo, trash: trash);
+    await _persist(todo: todo);
   }
 
   /// 🐸 Лягушка дня: одна на список, всегда наверху.

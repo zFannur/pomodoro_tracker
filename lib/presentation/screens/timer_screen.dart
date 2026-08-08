@@ -711,6 +711,20 @@ class _TaskRow extends StatelessWidget {
   final int pomodoroMinutes;
   final TimeFmt timeFmt;
 
+  /// Шаг оценки задачи. Индекс берём в момент нажатия: список мог сдвинуться.
+  void _step(TasksCubit cubit, {required bool add}) {
+    final index = cubit.todoIndexOf(task);
+    if (index < 0) return;
+    // Shift множит шаг; даже если он «залипнет», это меняет только величину,
+    // а не направление — потерять задачу этим нельзя.
+    final count = HardwareKeyboard.instance.isShiftPressed ? 4 : 1;
+    if (add) {
+      cubit.plus(index, count: count);
+    } else {
+      cubit.minus(index, count: count);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -802,18 +816,16 @@ class _TaskRow extends StatelessWidget {
             message: S.pomoClickHint(task.durationMinutes),
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                // Индекс в момент клика: список мог сдвинуться.
-                final index = cubit.todoIndexOf(task);
-                if (index < 0) return;
-                final shift = HardwareKeyboard.instance.isShiftPressed;
-                final count = shift ? 4 : 1;
-                if (HardwareKeyboard.instance.isAltPressed) {
-                  cubit.minus(index, count: count);
-                } else {
-                  cubit.plus(index, count: count);
-                }
-              },
+              // Вычитание — правый клик (на телефоне долгое нажатие), а не
+              // Alt-клик. Alt читался из глобального состояния клавиатуры, а
+              // оно залипает после Alt+Tab: окно теряет фокус при зажатом Alt
+              // и события отпускания уже не получает. Вернулся в приложение —
+              // и обычный клик по цифре вычитал вместо прибавления.
+              // syncKeyboardState() тут не помогает: она только ДОБАВЛЯЕТ
+              // клавиши из ответа движка и залипшие не снимает.
+              onTap: () => _step(cubit, add: true),
+              onSecondaryTap: () => _step(cubit, add: false),
+              onLongPress: () => _step(cubit, add: false),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,

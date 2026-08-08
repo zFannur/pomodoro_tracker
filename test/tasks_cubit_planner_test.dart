@@ -67,8 +67,8 @@ class _MemJournal implements JournalRepository {
   ) async => Either.right(const []);
 }
 
-PomoTask t(String d, {DateTime? due}) =>
-    PomoTask(description: d, category: 'x', durationMinutes: 25, due: due);
+PomoTask t(String d, {DateTime? due, int minutes = 25}) =>
+    PomoTask(description: d, category: 'x', durationMinutes: minutes, due: due);
 
 void main() {
   late _MemTasks repo;
@@ -138,12 +138,34 @@ void main() {
     expect(cubit.state.trash, isEmpty);
   });
 
-  test('minus, обнуляющий задачу, кладёт её в корзину', () async {
+  test('minus упирается в один помидор и НЕ удаляет задачу', () async {
     await seed(todo: [t('только один помидор')]);
-    // pomodoroMinutes по умолчанию 25, у задачи ровно 25 — один minus её съест.
+    // Раньше один minus съедал задачу целиком: нажатие рядом с «прибавить»
+    // необратимо теряло данные, без подтверждения и без отмены.
     await cubit.minus(0);
+    expect(cubit.state.todo.single.description, 'только один помидор');
+    expect(cubit.state.todo.single.durationMinutes, 25);
+    expect(cubit.state.trash, isEmpty);
+  });
+
+  test('minus с большим шагом тоже не уводит ниже одного помидора', () async {
+    await seed(todo: [t('две штуки', minutes: 50)]);
+    await cubit.minus(0, count: 4);
+    expect(cubit.state.todo.single.durationMinutes, 25);
+    expect(cubit.state.trash, isEmpty);
+  });
+
+  test('minus у короткой задачи не раздувает её до помидора', () async {
+    await seed(todo: [t('короткая', minutes: 10)]);
+    await cubit.minus(0);
+    expect(cubit.state.todo.single.durationMinutes, 10);
+  });
+
+  test('удаление осталось явным действием', () async {
+    await seed(todo: [t('удалить меня')]);
+    await cubit.removeAt(0);
     expect(cubit.state.todo, isEmpty);
-    expect(cubit.state.trash.single.task.description, 'только один помидор');
+    expect(cubit.state.trash.single.task.description, 'удалить меня');
   });
 
   test('clearTodo переносит все задачи «Сегодня» в корзину разом', () async {
