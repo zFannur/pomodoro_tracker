@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/strings.dart';
 import '../../app/theme.dart';
 import '../../data/markdown_codec.dart';
+import '../../domain/entities/pomo_session.dart';
 import '../cubits/stats_cubit.dart';
 import '../widgets/common.dart';
 
@@ -72,13 +73,48 @@ class _StatGrid extends StatelessWidget {
   }
 }
 
-class _StatsBody extends StatelessWidget {
+class _StatsBody extends StatefulWidget {
   const _StatsBody({required this.state});
 
   final StatsState state;
 
   @override
+  State<_StatsBody> createState() => _StatsBodyState();
+}
+
+class _StatsBodyState extends State<_StatsBody> {
+  /// Раскрытый день. Держим дату, а не сам DayLog: после обновления
+  /// статистики объект пересоздаётся, а выбор пользователя должен остаться.
+  DateTime? _openDay;
+
+  void _toggleDay(DayLog day) => setState(
+    () => _openDay = _openDay == day.date ? null : day.date,
+  );
+
+  DayLog? get _open {
+    final date = _openDay;
+    if (date == null) return null;
+    for (final d in [...widget.state.last14, ...widget.state.periodDays]) {
+      if (d.date == date) return d;
+    }
+    return null;
+  }
+
+  Widget? _openDayCard() {
+    final day = _open;
+    if (day == null) return null;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: SectionCard(
+        title: S.dayDoneTitle(dateHuman(day.date)),
+        child: DayDoneList(day: day),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
     final theme = Theme.of(context);
     final byCategory = state.byCategory;
     final maxCategory = byCategory.values.fold(
@@ -238,7 +274,7 @@ class _StatsBody extends StatelessWidget {
                   title: S.statHeatmap,
                   child: HeatmapCalendar(
                     days: state.periodDays,
-                    onDayTap: (day) => showDayDone(context, day),
+                    onDayTap: _toggleDay,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -249,12 +285,15 @@ class _StatsBody extends StatelessWidget {
                   // Тап по дню — что именно в этот день сделано. График
                   // показывает последние 14 дней в ЛЮБОЙ вкладке фильтра,
                   // поэтому разбор дня доступен везде.
-                  onDayTap: (day) => showDayDone(context, day),
+                  onDayTap: _toggleDay,
                   days: state.last14,
                   goal: state.goal,
                   height: 140,
                 ),
               ),
+              // Раскрытый день — списком под графиком, как неделя на экране
+              // спринта. Повторный тап по тому же дню сворачивает.
+              ?_openDayCard(),
             ],
           ),
         ),

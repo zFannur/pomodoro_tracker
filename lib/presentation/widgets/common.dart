@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
-import '../../data/markdown_codec.dart' show dateHuman;
 import '../../app/theme.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
@@ -196,75 +195,63 @@ class _TapDay extends StatelessWidget {
   }
 }
 
-/// Что сделано за день — список задач с числом помидоров.
-/// Одна строка на задачу: несколько помидоров по одной задаче складываются.
-void showDayDone(BuildContext context, DayLog day) {
-  final counts = <String, ({int pomos, int minutes})>{};
-  for (final s in day.sessions) {
-    final task = s.task.trim();
-    final key = task.isEmpty
-        ? '—'
-        : '$task${s.category.isEmpty ? '' : '  #${s.category}'}';
-    final prev = counts[key];
-    counts[key] = (
-      pomos: (prev?.pomos ?? 0) + 1,
-      minutes: (prev?.minutes ?? 0) + s.minutes,
-    );
-  }
-  showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (context) {
-      final theme = Theme.of(context);
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                S.dayDoneTitle(dateHuman(day.date)),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              if (counts.isEmpty)
-                Text(S.dayDoneEmpty, style: theme.textTheme.bodySmall)
-              else
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      for (final e in counts.entries)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 3),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  e.key,
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${e.value.pomos} 🍅 · '
-                                '${formatMinutesUi(e.value.minutes)}',
-                                style: theme.textTheme.labelMedium,
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+/// Что сделано за день — список задач. Одна строка на задачу: несколько
+/// помидоров по одной задаче складываются, а не дублируются.
+///
+/// Раскрывается прямо под графиком, как список недели на экране спринта:
+/// всплывающая панель для этого не годилась — она перекрывала сам график,
+/// по которому и выбирают день.
+class DayDoneList extends StatelessWidget {
+  const DayDoneList({required this.day, super.key});
+
+  final DayLog day;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final counts = <String, ({int pomos, int minutes})>{};
+    for (final s in day.sessions) {
+      final task = s.task.trim();
+      final key = task.isEmpty
+          ? '—'
+          : '$task${s.category.isEmpty ? '' : '  #${s.category}'}';
+      final prev = counts[key];
+      counts[key] = (
+        pomos: (prev?.pomos ?? 0) + 1,
+        minutes: (prev?.minutes ?? 0) + s.minutes,
+      );
+    }
+    if (counts.isEmpty) {
+      return Text(
+        S.dayDoneEmpty,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
         ),
       );
-    },
-  );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final e in counts.entries)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(e.key, style: theme.textTheme.bodyMedium),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${e.value.pomos} 🍅 · ${formatMinutesUi(e.value.minutes)}',
+                  style: theme.textTheme.labelMedium,
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 /// Плитка показателя.

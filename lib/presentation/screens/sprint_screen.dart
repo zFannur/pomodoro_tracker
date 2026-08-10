@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
 import '../../data/markdown_codec.dart';
+import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/sprint_cubit.dart';
@@ -34,13 +35,42 @@ class SprintScreen extends StatelessWidget {
   }
 }
 
-class _SprintBody extends StatelessWidget {
+class _SprintBody extends StatefulWidget {
   const _SprintBody({required this.state});
 
   final SprintState state;
 
   @override
+  State<_SprintBody> createState() => _SprintBodyState();
+}
+
+class _SprintBodyState extends State<_SprintBody> {
+  /// Раскрытый день недели. Держим дату: факт пересобирается при обновлении.
+  DateTime? _openDay;
+
+  void _toggleDay(DayLog day) => setState(
+    () => _openDay = _openDay == day.date ? null : day.date,
+  );
+
+  Widget? _openDayCard() {
+    final date = _openDay;
+    if (date == null) return null;
+    for (final d in widget.state.fact) {
+      if (d.date != date) continue;
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: SectionCard(
+          title: S.dayDoneTitle(dateHuman(d.date)),
+          child: DayDoneList(day: d),
+        ),
+      );
+    }
+    return null;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
     final theme = Theme.of(context);
     final sprint = state.sprint;
     if (sprint == null) {
@@ -184,9 +214,11 @@ class _SprintBody extends StatelessWidget {
                 child: DaysBarChart(
                   days: state.fact,
                   goal: settings.dailyGoal,
-                  onDayTap: (day) => showDayDone(context, day),
+                  onDayTap: _toggleDay,
                 ),
               ),
+              // Раскрытый день — списком под графиком, повторный тап сворачивает.
+              ?_openDayCard(),
               const SizedBox(height: 12),
               if (state.history.isNotEmpty)
                 SectionCard(

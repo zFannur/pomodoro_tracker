@@ -7,6 +7,7 @@ import 'package:pomodoro_tracker/domain/entities/pomo_session.dart';
 import 'package:pomodoro_tracker/domain/repositories.dart';
 import 'package:pomodoro_tracker/presentation/cubits/stats_cubit.dart';
 import 'package:pomodoro_tracker/presentation/screens/stats_screen.dart';
+import 'package:pomodoro_tracker/presentation/widgets/common.dart';
 
 /// Журнал в памяти: несколько дней с помидорами, чтобы отрисовались все блоки.
 class _MemJournal implements JournalRepository {
@@ -90,5 +91,49 @@ void main() {
     await pumpAt(tester, const Size(1280, 900));
     expect(tester.takeException(), isNull);
     expect(find.byType(StatsScreen), findsOneWidget);
+  });
+
+  testWidgets('тап по дню раскрывает разбор ПОД графиком', (tester) async {
+    await pumpAt(tester, const Size(1280, 900));
+    expect(find.byType(DayDoneList), findsNothing);
+
+    // Столбик дня — внутри графика последних 14 дней.
+    final bar = find.descendant(
+      of: find.byType(DaysBarChart),
+      matching: find.byType(InkWell),
+    );
+    expect(bar, findsWidgets);
+    await tester.tap(bar.first);
+    await tester.pumpAndSettle();
+
+    // Список встроен в экран, а не показан всплывающей панелью поверх него.
+    expect(find.byType(DayDoneList), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(DayDoneList),
+        matching: find.textContaining('задача'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('повторный тап по тому же дню сворачивает разбор', (
+    tester,
+  ) async {
+    await pumpAt(tester, const Size(1280, 900));
+    final bar = find
+        .descendant(
+          of: find.byType(DaysBarChart),
+          matching: find.byType(InkWell),
+        )
+        .first;
+    await tester.tap(bar);
+    await tester.pumpAndSettle();
+    expect(find.byType(DayDoneList), findsOneWidget);
+
+    await tester.tap(bar);
+    await tester.pumpAndSettle();
+    expect(find.byType(DayDoneList), findsNothing);
   });
 }
