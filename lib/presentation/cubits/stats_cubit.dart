@@ -63,16 +63,23 @@ class StatsState extends Equatable {
   /// Активных дней в периоде (хотя бы один помидор) — знаменатель для 🐸.
   int get activeDays => periodDays.where((d) => d.count > 0).length;
 
-  Map<String, int> get byCategory {
-    final result = <String, int>{};
+  /// Категория → сколько помидоров и сколько минут. Минуты не выводятся из
+  /// числа помидоров: длительность у категорий своя (у каждой своя схема),
+  /// да и ручные записи бывают любой длины.
+  Map<String, ({int pomos, int minutes})> get byCategory {
+    final result = <String, ({int pomos, int minutes})>{};
     for (final day in periodDays) {
       for (final s in day.sessions) {
         final name = s.category.isEmpty ? '—' : s.category;
-        result[name] = (result[name] ?? 0) + 1;
+        final prev = result[name];
+        result[name] = (
+          pomos: (prev?.pomos ?? 0) + 1,
+          minutes: (prev?.minutes ?? 0) + s.minutes,
+        );
       }
     }
     final entries = result.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+      ..sort((a, b) => b.value.pomos.compareTo(a.value.pomos));
     return {for (final e in entries) e.key: e.value};
   }
 

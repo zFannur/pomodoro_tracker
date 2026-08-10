@@ -93,6 +93,24 @@ void main() {
     expect(find.byType(StatsScreen), findsOneWidget);
   });
 
+  testWidgets('в разбивке по категориям видно и помидоры, и время', (
+    tester,
+  ) async {
+    await pumpAt(tester, const Size(1280, 900));
+    // По два помидора по 25 минут в день; период «сегодня» — один день.
+    expect(find.textContaining('2 🍅 · '), findsWidgets);
+    expect(find.textContaining('50'), findsWidgets);
+  });
+
+  testWidgets('разбивка по категориям не разъезжается на телефоне', (
+    tester,
+  ) async {
+    await pumpAt(tester, const Size(411, 850));
+    // Строка стала шире из-за колонки времени — проверяем, что влезает.
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('🍅 · '), findsWidgets);
+  });
+
   testWidgets('тап по дню раскрывает разбор ПОД графиком', (tester) async {
     await pumpAt(tester, const Size(1280, 900));
     expect(find.byType(DayDoneList), findsNothing);

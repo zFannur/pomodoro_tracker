@@ -119,7 +119,7 @@ class _StatsBodyState extends State<_StatsBody> {
     final byCategory = state.byCategory;
     final maxCategory = byCategory.values.fold(
       1,
-      (max, v) => v > max ? v : max,
+      (max, v) => v.pomos > max ? v.pomos : max,
     );
     final best = state.bestDay;
     final showHeatmap = state.periodDays.length >= 90;
@@ -245,7 +245,7 @@ class _StatsBodyState extends State<_StatsBody> {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(4),
                                   child: LinearProgressIndicator(
-                                    value: entry.value / maxCategory,
+                                    value: entry.value.pomos / maxCategory,
                                     minHeight: 14,
                                     color: AppTheme.categoryColor(entry.key),
                                     backgroundColor: theme
@@ -255,11 +255,16 @@ class _StatsBodyState extends State<_StatsBody> {
                                 ),
                               ),
                               const SizedBox(width: 8),
+                              // Помидоры и время: одних помидоров мало —
+                              // при разных схемах и ручных записях одно и то
+                              // же число может стоить очень разного времени.
                               SizedBox(
-                                width: 40,
+                                width: 92,
                                 child: Text(
-                                  '${entry.value}',
+                                  '${entry.value.pomos} 🍅 · '
+                                  '${formatMinutesUi(entry.value.minutes)}',
                                   style: theme.textTheme.labelMedium,
+                                  textAlign: TextAlign.right,
                                 ),
                               ),
                             ],
