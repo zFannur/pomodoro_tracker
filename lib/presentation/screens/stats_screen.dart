@@ -236,13 +236,20 @@ class _StatsBody extends StatelessWidget {
               if (showHeatmap) ...[
                 SectionCard(
                   title: S.statHeatmap,
-                  child: HeatmapCalendar(days: state.periodDays),
+                  child: HeatmapCalendar(
+                    days: state.periodDays,
+                    onDayTap: (day) => showDayDone(context, day),
+                  ),
                 ),
                 const SizedBox(height: 12),
               ],
               SectionCard(
                 title: S.statLast14,
                 child: DaysBarChart(
+                  // Тап по дню — что именно в этот день сделано. График
+                  // показывает последние 14 дней в ЛЮБОЙ вкладке фильтра,
+                  // поэтому разбор дня доступен везде.
+                  onDayTap: (day) => showDayDone(context, day),
                   days: state.last14,
                   goal: state.goal,
                   height: 140,

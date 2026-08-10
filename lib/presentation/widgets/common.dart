@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
+import '../../data/markdown_codec.dart' show dateHuman;
 import '../../app/theme.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
@@ -87,6 +88,7 @@ class DaysBarChart extends StatelessWidget {
     required this.days,
     this.goal = 0,
     this.height = 120,
+    this.onDayTap,
     super.key,
   });
 
@@ -95,6 +97,9 @@ class DaysBarChart extends StatelessWidget {
   /// Дневная цель — дни с целью подсвечиваются основным цветом.
   final int goal;
   final double height;
+
+  /// Тап по столбику — показать, что сделано в этот день.
+  final void Function(DayLog day)? onDayTap;
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +115,10 @@ class DaysBarChart extends StatelessWidget {
               child: Tooltip(
                 message:
                     '${day.date.day}.${day.date.month.toString().padLeft(2, '0')} — ${day.count} 🍅',
-                child: Padding(
+                child: _TapDay(
+                  day: day,
+                  onDayTap: onDayTap,
+                  child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -157,6 +165,7 @@ class DaysBarChart extends StatelessWidget {
                       ),
                     ],
                   ),
+                  ),
                 ),
               ),
             ),
@@ -164,6 +173,98 @@ class DaysBarChart extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Оборачивает день в тап, только если обработчик задан: без него столбик
+/// остаётся обычной картинкой и не ловит нажатия впустую.
+class _TapDay extends StatelessWidget {
+  const _TapDay({required this.day, required this.child, this.onDayTap});
+
+  final DayLog day;
+  final Widget child;
+  final void Function(DayLog day)? onDayTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tap = onDayTap;
+    if (tap == null) return child;
+    return InkWell(
+      borderRadius: BorderRadius.circular(4),
+      onTap: () => tap(day),
+      child: child,
+    );
+  }
+}
+
+/// Что сделано за день — список задач с числом помидоров.
+/// Одна строка на задачу: несколько помидоров по одной задаче складываются.
+void showDayDone(BuildContext context, DayLog day) {
+  final counts = <String, ({int pomos, int minutes})>{};
+  for (final s in day.sessions) {
+    final task = s.task.trim();
+    final key = task.isEmpty
+        ? '—'
+        : '$task${s.category.isEmpty ? '' : '  #${s.category}'}';
+    final prev = counts[key];
+    counts[key] = (
+      pomos: (prev?.pomos ?? 0) + 1,
+      minutes: (prev?.minutes ?? 0) + s.minutes,
+    );
+  }
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      final theme = Theme.of(context);
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                S.dayDoneTitle(dateHuman(day.date)),
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              if (counts.isEmpty)
+                Text(S.dayDoneEmpty, style: theme.textTheme.bodySmall)
+              else
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final e in counts.entries)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  e.key,
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${e.value.pomos} 🍅 · '
+                                '${formatMinutesUi(e.value.minutes)}',
+                                style: theme.textTheme.labelMedium,
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 /// Плитка показателя.
@@ -267,9 +368,12 @@ class StarToggle extends StatelessWidget {
 /// Теплокарта активности по дням (стиль календаря коммитов):
 /// колонка — неделя, строка — день недели.
 class HeatmapCalendar extends StatelessWidget {
-  const HeatmapCalendar({required this.days, super.key});
+  const HeatmapCalendar({required this.days, this.onDayTap, super.key});
 
   final List<DayLog> days;
+
+  /// Тап по клетке — показать, что сделано в этот день.
+  final void Function(DayLog day)? onDayTap;
 
   @override
   Widget build(BuildContext context) {
@@ -294,11 +398,7 @@ class HeatmapCalendar extends StatelessWidget {
                     final index = w * 7 + d;
                     final day = index < cells.length ? cells[index] : null;
                     final intensity = day == null ? 0.0 : day.count / maxCount;
-                    return Tooltip(
-                      message: day == null
-                          ? ''
-                          : '${day.date.day}.${day.date.month.toString().padLeft(2, '0')} — ${day.count} 🍅',
-                      child: Container(
+                    final cell = Container(
                         width: 12,
                         height: 12,
                         margin: const EdgeInsets.all(1),
@@ -310,7 +410,14 @@ class HeatmapCalendar extends StatelessWidget {
                                 ),
                           borderRadius: BorderRadius.circular(2),
                         ),
-                      ),
+                      );
+                    return Tooltip(
+                      message: day == null
+                          ? ''
+                          : '${day.date.day}.${day.date.month.toString().padLeft(2, '0')} — ${day.count} 🍅',
+                      child: day == null
+                          ? cell
+                          : _TapDay(day: day, onDayTap: onDayTap, child: cell),
                     );
                   },
                 ),

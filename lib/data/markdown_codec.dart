@@ -31,6 +31,22 @@ int isoWeekYear(DateTime date) {
   return DateTime(d.year, d.month, d.day + (4 - d.weekday)).year;
 }
 
+/// Понедельник недели по её id вида `2026-W29`. Возвращает null, если id
+/// не в этом формате.
+DateTime? mondayOfSprintId(String id) {
+  final m = RegExp(r'^(\d{4})-W(\d{2})$').firstMatch(id);
+  if (m == null) return null;
+  final year = int.parse(m.group(1)!);
+  final week = int.parse(m.group(2)!);
+  // 4 января всегда в первой ISO-неделе года.
+  final firstMonday = mondayOf(DateTime(year, 1, 4));
+  return DateTime(
+    firstMonday.year,
+    firstMonday.month,
+    firstMonday.day + (week - 1) * 7,
+  );
+}
+
 /// Идентификатор спринта вида `2026-W29`.
 String sprintId(DateTime date) =>
     '${isoWeekYear(date)}-W${two(isoWeekNumber(date))}';

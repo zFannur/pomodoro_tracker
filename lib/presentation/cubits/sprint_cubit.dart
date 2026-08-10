@@ -1,13 +1,37 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../data/markdown_codec.dart' show sprintId, two;
+import '../../data/markdown_codec.dart'
+    show mondayOfSprintId, sprintId, two;
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../../domain/entities/sprint.dart';
 import '../../domain/repositories.dart';
 
 enum SprintStatus { loading, ready, failure }
+
+/// Строки «сделано» из журнала: одна на задачу за день.
+///
+/// [explicit] — явные отметки о закрытых ⭐-задачах, они идут первыми и
+/// журналом не дублируются.
+List<String> buildDoneLines(
+  List<DayLog> fact, {
+  List<String> explicit = const [],
+}) {
+  final result = <String>[...explicit];
+  final seen = result.toSet();
+  for (final day in fact) {
+    for (final s in day.sessions) {
+      final task = s.task.trim();
+      if (task.isEmpty) continue;
+      final line =
+          '✅ ${two(day.date.day)}.${two(day.date.month)} $task'
+          '${s.category.isEmpty ? '' : ' #${s.category}'}';
+      if (seen.add(line)) result.add(line);
+    }
+  }
+  return result;
+}
 
 class SprintState extends Equatable {
   const SprintState({
@@ -16,6 +40,8 @@ class SprintState extends Equatable {
     this.fact = const [],
     this.history = const [],
     this.error = '',
+    this.openSprintId,
+    this.openSprintDone = const [],
   });
 
   final SprintStatus status;
@@ -26,6 +52,10 @@ class SprintState extends Equatable {
   final List<SprintSummary> history;
   final String error;
 
+  /// Раскрытая в истории неделя и её список сделанного (грузится по тапу).
+  final String? openSprintId;
+  final List<String> openSprintDone;
+
   /// Что сделано за неделю. Явные отметки о закрытых ⭐-задачах ПЛЮС всё,
   /// что реально попало в журнал.
   ///
@@ -34,21 +64,8 @@ class SprintState extends Equatable {
   /// чтобы сюда что-то попало, надо было заново отметить задачу звездой в
   /// понедельник и закрыть её целиком до воскресенья. На практике секция
   /// поэтому почти всегда пустовала.
-  List<String> get doneLines {
-    final result = <String>[...?sprint?.doneWeek];
-    final seen = result.toSet();
-    for (final day in fact) {
-      for (final s in day.sessions) {
-        final task = s.task.trim();
-        if (task.isEmpty) continue;
-        final line =
-            '✅ ${two(day.date.day)}.${two(day.date.month)} $task'
-            '${s.category.isEmpty ? '' : ' #${s.category}'}';
-        if (seen.add(line)) result.add(line);
-      }
-    }
-    return result;
-  }
+  List<String> get doneLines =>
+      buildDoneLines(fact, explicit: sprint?.doneWeek ?? const []);
 
   int get factPomodoros => fact.fold(0, (sum, d) => sum + d.count);
 
@@ -73,6 +90,9 @@ class SprintState extends Equatable {
     List<DayLog>? fact,
     List<SprintSummary>? history,
     String? error,
+    String? openSprintId,
+    List<String>? openSprintDone,
+    bool closeSprint = false,
   }) {
     return SprintState(
       status: status ?? this.status,
@@ -80,11 +100,23 @@ class SprintState extends Equatable {
       fact: fact ?? this.fact,
       history: history ?? this.history,
       error: error ?? this.error,
+      openSprintId: closeSprint ? null : (openSprintId ?? this.openSprintId),
+      openSprintDone: closeSprint
+          ? const []
+          : (openSprintDone ?? this.openSprintDone),
     );
   }
 
   @override
-  List<Object?> get props => [status, sprint, fact, history, error];
+  List<Object?> get props => [
+    status,
+    sprint,
+    fact,
+    history,
+    error,
+    openSprintId,
+    openSprintDone,
+  ];
 }
 
 /// Неделя: веха + цель в помидорах. Задачи недели живут в общем списке
@@ -142,6 +174,25 @@ class SprintCubit extends Cubit<SprintState> {
           },
         );
       },
+    );
+  }
+
+  /// Тап по неделе в истории: раскрыть её список сделанного либо свернуть.
+  /// Данные берём из журнала — у SprintSummary своих записей нет.
+  Future<void> toggleSprint(String id) async {
+    if (state.openSprintId == id) {
+      emit(state.copyWith(closeSprint: true));
+      return;
+    }
+    final monday = mondayOfSprintId(id);
+    if (monday == null) return;
+    final sunday = DateTime(monday.year, monday.month, monday.day + 6);
+    final result = await _journal.range(monday, sunday, _dailyGoal());
+    emit(
+      state.copyWith(
+        openSprintId: id,
+        openSprintDone: buildDoneLines(result.getOrElse((_) => const [])),
+      ),
     );
   }
 

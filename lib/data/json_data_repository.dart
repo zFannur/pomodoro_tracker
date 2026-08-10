@@ -178,21 +178,7 @@ class JsonDataRepository
     }
   }
 
-  /// Понедельник недели по её id вида `2026-W29`.
-  static DateTime? _mondayOfSprint(String id) {
-    final m = RegExp(r'^(\d{4})-W(\d{2})$').firstMatch(id);
-    if (m == null) return null;
-    final year = int.parse(m.group(1)!);
-    final week = int.parse(m.group(2)!);
-    // 4 января всегда в первой ISO-неделе года.
-    final jan4 = DateTime(year, 1, 4);
-    final firstMonday = mondayOf(jan4);
-    return DateTime(
-      firstMonday.year,
-      firstMonday.month,
-      firstMonday.day + (week - 1) * 7,
-    );
-  }
+  static DateTime? _mondayOfSprint(String id) => mondayOfSprintId(id);
 
   /// Записать документ: атомарно на диск, обновить надгробия, дёрнуть синк,
   /// затем обновить зеркала. Порядок важен — синк узнаёт о правке сразу,

@@ -151,6 +151,12 @@ abstract final class S {
     'Empty so far — everything you close this week shows up here.',
   );
   static String get doneTodayTitle => _t('Сделано сегодня', 'Done today');
+
+  static String dayDoneTitle(String date) =>
+      _t('Сделано $date', 'Done on $date');
+
+  static String get dayDoneEmpty =>
+      _t('В этот день записей нет.', 'Nothing logged that day.');
   static String get doneTodayEmpty =>
       _t('Сегодня пока ничего не закрыто', 'Nothing closed today yet');
   static String get noDescription => _t('без описания', 'no description');

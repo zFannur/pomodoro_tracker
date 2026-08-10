@@ -181,7 +181,11 @@ class _SprintBody extends StatelessWidget {
               const SizedBox(height: 12),
               SectionCard(
                 title: S.sprintByDay,
-                child: DaysBarChart(days: state.fact, goal: settings.dailyGoal),
+                child: DaysBarChart(
+                  days: state.fact,
+                  goal: settings.dailyGoal,
+                  onDayTap: (day) => showDayDone(context, day),
+                ),
               ),
               const SizedBox(height: 12),
               if (state.history.isNotEmpty)
@@ -205,19 +209,60 @@ class _SprintBody extends StatelessWidget {
                       ),
                       for (final s in state.history)
                         TableRow(
+                          decoration: s.id == state.openSprintId
+                              ? BoxDecoration(
+                                  color: theme.colorScheme.surfaceContainerHighest,
+                                )
+                              : null,
                           children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Text(s.id),
-                            ),
-                            Text('${s.goal} 🍅'),
-                            Text('${s.fact} 🍅'),
-                            Text(formatMinutesUi(s.minutes)),
+                            for (final cell in [
+                              Text(s.id),
+                              Text('${s.goal} 🍅'),
+                              Text('${s.fact} 🍅'),
+                              Text(formatMinutesUi(s.minutes)),
+                            ])
+                              // Тап по всей строке: TableRowInkWell ловит
+                              // нажатие на любой ячейке.
+                              TableRowInkWell(
+                                onTap: () => context
+                                    .read<SprintCubit>()
+                                    .toggleSprint(s.id),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 6,
+                                  ),
+                                  child: cell,
+                                ),
+                              ),
                           ],
                         ),
                     ],
                   ),
                 ),
+              // Раскрытая неделя — списком снизу, чтобы не ломать таблицу.
+              if (state.openSprintId != null) ...[
+                const SizedBox(height: 12),
+                SectionCard(
+                  title: '${S.doneWeekTitle} · ${state.openSprintId}',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (state.openSprintDone.isEmpty)
+                        Text(
+                          S.doneWeekEmpty,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      for (final line in state.openSprintDone)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Text(line, style: theme.textTheme.bodyMedium),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
