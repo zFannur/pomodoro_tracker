@@ -139,6 +139,15 @@ List<SessionWindow> parseSessionWindows(List<String> raw) {
   return out;
 }
 
+/// Окна, ещё живые в момент [nowMinutes]: закончившиеся выброшены, текущее
+/// урезано до остатка. Без этого в 14:30 первым блоком висело окно 10:00–13:00
+/// с полной вместимостью — план врал про уже прошедшее время.
+List<SessionWindow> windowsFrom(List<SessionWindow> windows, int nowMinutes) => [
+  for (final w in windows)
+    if (w.end > nowMinutes)
+      (start: w.start < nowMinutes ? nowMinutes : w.start, end: w.end),
+];
+
 /// Бьёт список «Сегодня» на сессии по времени «по стене». Стоимость задачи —
 /// помидоры + перерывы между ними (длинный каждые [longEvery]). Новая сессия
 /// открывается, когда очередная задача не влезает целиком во вместимость

@@ -682,6 +682,10 @@ class SessionedTodoList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final now = DateTime.now();
+    // Расписание считаем от «сейчас»: прошедшие окна не показываем, у текущего
+    // вместимость — остаток. Когда окна кончились, работает длина сессии.
+    final live = windowsFrom(windows, now.hour * 60 + now.minute);
     final marks = sessionSplit(
       tasks,
       pomodoroMinutes: scheme.pomodoro,
@@ -689,7 +693,7 @@ class SessionedTodoList extends StatelessWidget {
       longBreak: scheme.longBreak,
       longEvery: scheme.longEvery,
       limitMinutes: (sessionHours * 60).round(),
-      windows: windows,
+      windows: live,
     );
     // Тоталы по сессии + время окончания.
     final maxSession = marks.isEmpty ? -1 : marks.last.session;
@@ -707,7 +711,7 @@ class SessionedTodoList extends StatelessWidget {
     } else {
       // ponytail: грубая прикидка «если начать сейчас», без учёта идущего
       // помидора и серии таймера.
-      var acc = DateTime.now();
+      var acc = now;
       for (var s = 0; s <= maxSession; s++) {
         acc = acc.add(Duration(minutes: wall[s]));
         ends[s] = acc;
@@ -716,8 +720,8 @@ class SessionedTodoList extends StatelessWidget {
 
     String header(int s) {
       final totals = '${pomos[s]} 🍅 / ${formatMinutesUi(wall[s])}';
-      if (s < windows.length) {
-        final w = windows[s];
+      if (s < live.length) {
+        final w = live[s];
         return '${formatMinutesOfDay(w.start, timeFmt)}–'
             '${formatMinutesOfDay(w.end, timeFmt)} · $totals';
       }

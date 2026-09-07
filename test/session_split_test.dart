@@ -67,5 +67,31 @@ void main() {
       // 100, +30 не влезает → сессия 2 (за расписанием, лимит 180).
       expect(marks.map((m) => m.session).toList(), [0, 0, 1, 2]);
     });
+
+    test('windowsFrom: прошедшие окна выброшены, текущее урезано', () {
+      final all = parseSessionWindows(['10:00-13:00', '13:00-15:00']);
+      // 09:00 — день не начался, расписание как есть.
+      expect(windowsFrom(all, 9 * 60), all);
+      // 14:30 — первое окно позади, во втором осталось полчаса.
+      expect(windowsFrom(all, 14 * 60 + 30), [(start: 870, end: 900)]);
+      // 15:00 — окон нет, дальше работает длина сессии.
+      expect(windowsFrom(all, 15 * 60), isEmpty);
+    });
+
+    test('в остаток текущего окна влезает меньше задач', () {
+      List<TaskSession> at(int nowMinutes) => sessionSplit(
+        [_t(50), _t(50)],
+        pomodoroMinutes: 25,
+        shortBreak: 5,
+        longBreak: 15,
+        longEvery: 4,
+        limitMinutes: 180,
+        windows: windowsFrom(parseSessionWindows(['10:00-13:00']), nowMinutes),
+      );
+      // Целое окно (180): 55+60 = 115 — обе вместе.
+      expect(at(10 * 60).map((m) => m.session).toList(), [0, 0]);
+      // Остался час: 55 влезло, +60 — уже нет.
+      expect(at(12 * 60).map((m) => m.session).toList(), [0, 1]);
+    });
   });
 }
