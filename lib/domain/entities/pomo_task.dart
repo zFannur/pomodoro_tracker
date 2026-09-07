@@ -119,11 +119,34 @@ class PomoTask extends Equatable {
 /// перерывы между ними.
 typedef TaskSession = ({int session, int wallMinutes});
 
+/// Окно сессии в минутах от полуночи: [start; end).
+typedef SessionWindow = ({int start, int end});
+
+/// Разбирает строки «HH:mm-HH:mm» в окна; кривые и пустые пропускает,
+/// оставшиеся сортирует по началу.
+List<SessionWindow> parseSessionWindows(List<String> raw) {
+  final out = <SessionWindow>[];
+  for (final s in raw) {
+    final m = RegExp(r'^\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*$')
+        .firstMatch(s);
+    if (m == null) continue;
+    final start = int.parse(m[1]!) * 60 + int.parse(m[2]!);
+    final end = int.parse(m[3]!) * 60 + int.parse(m[4]!);
+    if (start < 0 || end > 24 * 60 || end <= start) continue;
+    out.add((start: start, end: end));
+  }
+  out.sort((a, b) => a.start.compareTo(b.start));
+  return out;
+}
+
 /// Бьёт список «Сегодня» на сессии по времени «по стене». Стоимость задачи —
 /// помидоры + перерывы между ними (длинный каждые [longEvery]). Новая сессия
-/// открывается, когда очередная задача не влезает целиком в [limitMinutes];
-/// задача длиннее лимита занимает свою сессию одна. Одна запись на задачу,
-/// в исходном порядке.
+/// открывается, когда очередная задача не влезает целиком во вместимость
+/// текущей сессии; задача длиннее её занимает сессию одна. Одна запись на
+/// задачу, в исходном порядке.
+///
+/// Вместимость сессии N — длина окна [windows]`[N]`, а если окон нет или
+/// они кончились, [limitMinutes] (скользящий режим / «хвост» за расписанием).
 ///
 /// ponytail: считает «с нуля» — идущий помидор и серию таймера не знает; это
 /// планировочная прикидка, а не точный прогноз финиша.
@@ -134,7 +157,12 @@ List<TaskSession> sessionSplit(
   required int longBreak,
   required int longEvery,
   required int limitMinutes,
+  List<SessionWindow> windows = const [],
 }) {
+  int capacity(int session) => session < windows.length
+      ? windows[session].end - windows[session].start
+      : limitMinutes;
+
   final result = <TaskSession>[];
   var session = 0;
   var sessionWall = 0;
@@ -150,7 +178,7 @@ List<TaskSession> sessionSplit(
       wall += pomodoroMinutes;
       series++;
     }
-    if (sessionWall > 0 && sessionWall + wall > limitMinutes) {
+    if (sessionWall > 0 && sessionWall + wall > capacity(session)) {
       session++;
       sessionWall = 0;
     }

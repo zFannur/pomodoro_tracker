@@ -651,6 +651,7 @@ class SessionedTodoList extends StatelessWidget {
     required this.sessionHours,
     required this.timeFmt,
     required this.itemBuilder,
+    this.windows = const [],
     this.taskEnds,
     this.onReorder,
     super.key,
@@ -660,6 +661,10 @@ class SessionedTodoList extends StatelessWidget {
   final TimerScheme scheme;
   final double sessionHours;
   final TimeFmt timeFmt;
+
+  /// Явное расписание сессий (минуты от полуночи). Пусто — режим по длине;
+  /// иначе заголовок сессии — границы окна.
+  final List<SessionWindow> windows;
 
   /// Строка задачи. [index] — плоский индекс во всём списке: и ручка drag,
   /// и прогноз на «Таймере», и метка «сейчас».
@@ -684,6 +689,7 @@ class SessionedTodoList extends StatelessWidget {
       longBreak: scheme.longBreak,
       longEvery: scheme.longEvery,
       limitMinutes: (sessionHours * 60).round(),
+      windows: windows,
     );
     // Тоталы по сессии + время окончания.
     final maxSession = marks.isEmpty ? -1 : marks.last.session;
@@ -709,8 +715,13 @@ class SessionedTodoList extends StatelessWidget {
     }
 
     String header(int s) {
-      final base =
-          '${S.session} ${s + 1} · ${pomos[s]} 🍅 / ${formatMinutesUi(wall[s])}';
+      final totals = '${pomos[s]} 🍅 / ${formatMinutesUi(wall[s])}';
+      if (s < windows.length) {
+        final w = windows[s];
+        return '${formatMinutesOfDay(w.start, timeFmt)}–'
+            '${formatMinutesOfDay(w.end, timeFmt)} · $totals';
+      }
+      final base = '${S.session} ${s + 1} · $totals';
       final end = ends[s];
       return end == null
           ? base

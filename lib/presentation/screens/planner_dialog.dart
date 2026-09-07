@@ -187,6 +187,7 @@ class _PlannerDialogState extends State<_PlannerDialog> {
                           tasks: state.todo,
                           scheme: settings.scheme,
                           sessionHours: settings.sessionHours,
+                          windows: parseSessionWindows(settings.sessionWindows),
                           timeFmt: settings.timeFmt,
                           itemBuilder: (context, task, i) =>
                               _todayRow(context, theme, i, task, pomodoro),

@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
 import '../../domain/entities/app_settings.dart';
+import '../../domain/entities/pomo_task.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/sync_cubit.dart';
 
@@ -252,6 +253,12 @@ class _TimerTab extends StatelessWidget {
               settings.copyWith(sessionHours: h.clamp(0.5, 12.0)),
             );
           },
+        ),
+        _SessionWindowsRow(
+          windows: settings.sessionWindows,
+          timeFmt: settings.timeFmt,
+          onChanged: (list) =>
+              _update(context, settings.copyWith(sessionWindows: list)),
         ),
         _NumberRow(
           label: S.sprintGoalDefault,
@@ -799,6 +806,110 @@ class _SyncSection extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Мелкие поля
 // ---------------------------------------------------------------------------
+
+/// Редактор расписания сессий: строки «начало – конец» + «добавить окно».
+/// Хранит `List<String>` вида «HH:mm-HH:mm», редактирует через showTimePicker,
+/// на каждом изменении отдаёт нормализованный (отсортированный) список.
+class _SessionWindowsRow extends StatelessWidget {
+  const _SessionWindowsRow({
+    required this.windows,
+    required this.timeFmt,
+    required this.onChanged,
+  });
+
+  final List<String> windows;
+  final TimeFmt timeFmt;
+  final ValueChanged<List<String>> onChanged;
+
+  static String _hhmm(int m) =>
+      '${(m ~/ 60).toString().padLeft(2, '0')}:'
+      '${(m % 60).toString().padLeft(2, '0')}';
+
+  List<(int, int)> get _ranges {
+    final ws = parseSessionWindows(windows);
+    return [for (final w in ws) (w.start, w.end)];
+  }
+
+  void _commit(List<(int, int)> list) {
+    list.sort((a, b) => a.$1.compareTo(b.$1));
+    onChanged([for (final w in list) '${_hhmm(w.$1)}-${_hhmm(w.$2)}']);
+  }
+
+  Future<void> _pick(BuildContext context, int i, {required bool start}) async {
+    final list = _ranges;
+    if (i >= list.length) return;
+    final cur = start ? list[i].$1 : list[i].$2;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: cur ~/ 60, minute: cur % 60),
+    );
+    if (picked == null) return;
+    final v = picked.hour * 60 + picked.minute;
+    final next = start ? (v, list[i].$2) : (list[i].$1, v);
+    if (next.$2 <= next.$1) return; // конец должен быть позже начала
+    list[i] = next;
+    _commit(list);
+  }
+
+  void _add() {
+    final list = _ranges;
+    final from = list.isEmpty ? 9 * 60 : list.last.$2;
+    list.add((from, (from + 120).clamp(0, 24 * 60 - 1)));
+    _commit(list);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final list = _ranges;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(S.sessionWindowsLabel, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 4),
+          for (var i = 0; i < list.length; i++)
+            Row(
+              children: [
+                OutlinedButton(
+                  onPressed: () => _pick(context, i, start: true),
+                  child: Text(formatMinutesOfDay(list[i].$1, timeFmt)),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('–'),
+                ),
+                OutlinedButton(
+                  onPressed: () => _pick(context, i, start: false),
+                  child: Text(formatMinutesOfDay(list[i].$2, timeFmt)),
+                ),
+                IconButton(
+                  tooltip: S.delete,
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () => _commit(_ranges..removeAt(i)),
+                ),
+              ],
+            ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _add,
+              icon: const Icon(Icons.add, size: 16),
+              label: Text(S.addWindow),
+            ),
+          ),
+          Text(
+            S.sessionWindowsHint,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _NumberRow extends StatelessWidget {
   const _NumberRow({

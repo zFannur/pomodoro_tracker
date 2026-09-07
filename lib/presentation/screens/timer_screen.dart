@@ -573,6 +573,7 @@ class _TodoSection extends StatelessWidget {
               tasks: visible,
               scheme: scheme,
               sessionHours: settings.sessionHours,
+              windows: parseSessionWindows(settings.sessionWindows),
               timeFmt: settings.timeFmt,
               taskEnds: forecast.taskEnds,
               onReorder: (oldIndex, newIndex) {

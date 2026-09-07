@@ -131,6 +131,7 @@ class AppSettings extends Equatable {
     required this.completeRemove,
     this.flowtime = false,
     this.sessionHours = 3.0,
+    this.sessionWindows = const [],
     required this.dailyGoal,
     required this.volume,
     required this.finishSoundEnabled,
@@ -193,6 +194,9 @@ class AppSettings extends Equatable {
       completeRemove: json['completeRemove'] as bool? ?? true,
       flowtime: json['flowtime'] as bool? ?? false,
       sessionHours: (json['sessionHours'] as num? ?? 3).toDouble(),
+      sessionWindows:
+          (json['sessionWindows'] as List?)?.whereType<String>().toList() ??
+          const [],
       dailyGoal: json['dailyGoal'] as int? ?? 8,
       volume: (json['volume'] as num? ?? 0.4).toDouble(),
       finishSoundEnabled: json['finishSoundEnabled'] as bool? ?? true,
@@ -296,7 +300,13 @@ class AppSettings extends Equatable {
 
   /// Длина рабочей сессии в часах: списки «Сегодня» бьются на сессии по
   /// времени «по стене» (помидоры + перерывы), каждая — в своей рамке.
+  /// Используется, когда [sessionWindows] пуст, и для «хвоста» за окнами.
   final double sessionHours;
+
+  /// Явное расписание сессий: строки «HH:mm-HH:mm». Если не пусто — списки
+  /// «Сегодня» бьются по этим окнам (вместимость сессии = длина окна),
+  /// а не по [sessionHours].
+  final List<String> sessionWindows;
 
   /// Цель на день в помидорах; 0 — без цели.
   final int dailyGoal;
@@ -378,6 +388,7 @@ class AppSettings extends Equatable {
     'completeRemove': completeRemove,
     'flowtime': flowtime,
     'sessionHours': sessionHours,
+    'sessionWindows': sessionWindows,
     'dailyGoal': dailyGoal,
     'volume': volume,
     'finishSoundEnabled': finishSoundEnabled,
@@ -419,6 +430,7 @@ class AppSettings extends Equatable {
     bool? completeRemove,
     bool? flowtime,
     double? sessionHours,
+    List<String>? sessionWindows,
     int? dailyGoal,
     double? volume,
     bool? finishSoundEnabled,
@@ -459,6 +471,7 @@ class AppSettings extends Equatable {
       completeRemove: completeRemove ?? this.completeRemove,
       flowtime: flowtime ?? this.flowtime,
       sessionHours: sessionHours ?? this.sessionHours,
+      sessionWindows: sessionWindows ?? this.sessionWindows,
       dailyGoal: dailyGoal ?? this.dailyGoal,
       volume: volume ?? this.volume,
       finishSoundEnabled: finishSoundEnabled ?? this.finishSoundEnabled,
@@ -509,6 +522,7 @@ class AppSettings extends Equatable {
     completeRemove,
     flowtime,
     sessionHours,
+    sessionWindows,
     dailyGoal,
     volume,
     finishSoundEnabled,

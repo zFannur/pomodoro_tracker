@@ -233,6 +233,15 @@ abstract final class S {
   static String get dailyGoal => _t('Цель на день, 🍅 (0 — без цели)', 'Daily goal, 🍅 (0 — no goal)');
   static String get sessionHoursLabel =>
       _t('Длина сессии, ч (список «Сегодня»)', 'Session length, h (Today list)');
+  static String get sessionWindowsLabel =>
+      _t('Расписание сессий', 'Session schedule');
+  static String get sessionWindowsHint => _t(
+    'Задай окна (напр. 10:00–13:00) — список «Сегодня» будет биться по ним, '
+        'а не по длине сессии. Хвост за расписанием — по длине сессии.',
+    'Set windows (e.g. 10:00–13:00) — the Today list splits by them instead '
+        'of the session length. Overflow past the schedule uses the length.',
+  );
+  static String get addWindow => _t('Добавить окно', 'Add window');
   static String get volume => _t('Громкость', 'Volume');
   static String get finishSound => _t('Финишный звук', 'Finish sound');
   static String get finishMelody => _t('Мелодия финиша', 'Finish melody');
@@ -367,6 +376,12 @@ abstract final class S {
 
 /// Длительность для UI (в отличие от [formatMinutes] в markdown_codec.dart,
 /// который пишет формат в файлы данных — тот всегда русский, это интерфейс).
+/// «HH:mm» из минут от полуночи, с учётом 12/24ч.
+String formatMinutesOfDay(int minOfDay, TimeFmt fmt) => formatClock(
+  DateTime(2000, 1, 1, minOfDay ~/ 60, minOfDay % 60),
+  fmt,
+);
+
 String formatMinutesUi(int minutes) {
   final h = minutes ~/ 60;
   final m = minutes % 60;

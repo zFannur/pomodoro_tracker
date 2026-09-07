@@ -112,6 +112,7 @@ class _TasksScreenState extends State<TasksScreen> {
       pomodoro: pomodoro,
       scheme: settings.scheme,
       sessionHours: settings.sessionHours,
+      sessionWindows: parseSessionWindows(settings.sessionWindows),
       timeFmt: settings.timeFmt,
       collapsed: collapsed.contains('today'),
       onToggle: () => _toggleGroup('today'),
@@ -382,6 +383,7 @@ class _TodayGroup extends StatelessWidget {
     required this.pomodoro,
     required this.scheme,
     required this.sessionHours,
+    required this.sessionWindows,
     required this.timeFmt,
     required this.collapsed,
     required this.onToggle,
@@ -391,6 +393,7 @@ class _TodayGroup extends StatelessWidget {
   final int pomodoro;
   final TimerScheme scheme;
   final double sessionHours;
+  final List<SessionWindow> sessionWindows;
   final TimeFmt timeFmt;
   final bool collapsed;
   final VoidCallback onToggle;
@@ -438,6 +441,7 @@ class _TodayGroup extends StatelessWidget {
               tasks: todo,
               scheme: scheme,
               sessionHours: sessionHours,
+              windows: sessionWindows,
               timeFmt: timeFmt,
               onReorder: (oldIndex, newIndex) {
                 // identical — после split в списке бывают равные копии.
