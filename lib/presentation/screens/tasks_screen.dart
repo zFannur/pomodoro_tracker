@@ -546,7 +546,7 @@ class _TodayRow extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final narrow = _isNarrowRow(constraints);
-        return ListTile(
+        final tile = ListTile(
           dense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
           minLeadingWidth: 20,
@@ -556,8 +556,8 @@ class _TodayRow extends StatelessWidget {
                   side: BorderSide(color: theme.colorScheme.primary, width: 1),
                 )
               : null,
-          // На телефоне ручки нет: список и так тянется долгим нажатием, а
-          // каждый лишний элемент отъедает ширину у описания.
+          // На узком экране явной ручки нет (место уходит описанию), поэтому
+          // ниже вся строка оборачивается в drag-по-долгому-нажатию.
           leading: narrow
               ? null
               : ReorderableDragStartListener(
@@ -614,6 +614,12 @@ class _TodayRow extends StatelessWidget {
             ],
           ),
         );
+        return narrow
+            ? ReorderableDelayedDragStartListener(
+                index: viewIndex,
+                child: tile,
+              )
+            : tile;
       },
     );
   }
@@ -821,11 +827,12 @@ class _BucketRow extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final narrow = _isNarrowRow(constraints);
-        return ListTile(
+        final tile = ListTile(
           dense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
           minLeadingWidth: 20,
-          // См. _TodayRow: на телефоне ручки нет, место уходит описанию.
+          // На узком экране явной ручки нет (место уходит описанию), поэтому
+          // ниже вся строка оборачивается в drag-по-долгому-нажатию.
           leading: narrow
               ? null
               : ReorderableDragStartListener(
@@ -911,6 +918,12 @@ class _BucketRow extends StatelessWidget {
             ],
           ),
         );
+        return narrow
+            ? ReorderableDelayedDragStartListener(
+                index: viewIndex,
+                child: tile,
+              )
+            : tile;
       },
     );
   }
