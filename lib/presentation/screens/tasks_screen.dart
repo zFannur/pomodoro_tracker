@@ -123,6 +123,7 @@ class _TasksScreenState extends State<TasksScreen> {
           tab: tab,
           items: buckets[tab]!,
           pomodoro: pomodoro,
+          categories: settings.categories.keys.toList(),
           collapsed: collapsed.contains(tab.name),
           onToggle: () => _toggleGroup(tab.name),
         ),
@@ -620,6 +621,7 @@ class _BucketGroup extends StatelessWidget {
     required this.tab,
     required this.items,
     required this.pomodoro,
+    required this.categories,
     required this.collapsed,
     required this.onToggle,
   });
@@ -629,6 +631,9 @@ class _BucketGroup extends StatelessWidget {
   /// Пары (реальный индекс в planner, задача).
   final List<(int, PomoTask)> items;
   final int pomodoro;
+
+  /// Порядок категорий для блоков (как в настройках).
+  final List<String> categories;
   final bool collapsed;
   final VoidCallback onToggle;
 
@@ -661,29 +666,88 @@ class _BucketGroup extends StatelessWidget {
                 ),
               ),
             )
-          : ReorderableListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              buildDefaultDragHandles: false,
-              itemCount: items.length,
-              onReorderItem: (oldIndex, newIndex) {
-                final cubit = context.read<TasksCubit>();
-                final from = cubit.plannerIndexOf(items[oldIndex].$2);
-                final target = cubit.plannerIndexOf(
-                  items[newIndex.clamp(0, items.length - 1)].$2,
-                );
-                if (from >= 0 && target >= 0) {
-                  cubit.plannerReorder(from, target);
-                }
-              },
-              itemBuilder: (context, i) => _BucketRow(
-                key: ObjectKey(items[i].$2),
-                task: items[i].$2,
-                viewIndex: i,
-                bucket: tab,
-                pomodoro: pomodoro,
-              ),
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [for (final c in _byCategory()) _catBlock(c.$1, c.$2)],
             ),
+    );
+  }
+
+  /// Задачи корзины, сгруппированные по категории. Порядок блоков — как в
+  /// настройках; категории вне настроек (удалённые) — следом, в порядке
+  /// появления. Внутри блока — порядок задач в planner.
+  List<(String, List<(int, PomoTask)>)> _byCategory() {
+    final byCat = <String, List<(int, PomoTask)>>{};
+    for (final e in items) {
+      byCat.putIfAbsent(e.$2.category, () => []).add(e);
+    }
+    return [
+      for (final c in categories)
+        if (byCat[c] != null) (c, byCat[c]!),
+      for (final e in byCat.entries)
+        if (!categories.contains(e.key)) (e.key, e.value),
+    ];
+  }
+
+  Widget _catBlock(String label, List<(int, PomoTask)> catItems) {
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        final pomos = catItems.fold(0, (s, e) => s + e.$2.pomos(pomodoro));
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(11),
+                  ),
+                ),
+                child: Text(
+                  '${label.isEmpty ? '—' : label} · ${catItems.length} · '
+                  '$pomos 🍅',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                itemCount: catItems.length,
+                onReorderItem: (oldIndex, newIndex) {
+                  final cubit = context.read<TasksCubit>();
+                  final from = cubit.plannerIndexOf(catItems[oldIndex].$2);
+                  final target = cubit.plannerIndexOf(
+                    catItems[newIndex.clamp(0, catItems.length - 1)].$2,
+                  );
+                  if (from >= 0 && target >= 0) {
+                    cubit.plannerReorder(from, target);
+                  }
+                },
+                itemBuilder: (context, i) => _BucketRow(
+                  key: ObjectKey(catItems[i].$2),
+                  task: catItems[i].$2,
+                  viewIndex: i,
+                  bucket: tab,
+                  pomodoro: pomodoro,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
