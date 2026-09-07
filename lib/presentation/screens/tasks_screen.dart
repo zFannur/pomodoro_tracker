@@ -110,6 +110,9 @@ class _TasksScreenState extends State<TasksScreen> {
     Widget todayCard() => _TodayGroup(
       todo: tasksState.todo,
       pomodoro: pomodoro,
+      scheme: settings.scheme,
+      sessionHours: settings.sessionHours,
+      timeFmt: settings.timeFmt,
       collapsed: collapsed.contains('today'),
       onToggle: () => _toggleGroup('today'),
     );
@@ -376,12 +379,18 @@ class _TodayGroup extends StatelessWidget {
   const _TodayGroup({
     required this.todo,
     required this.pomodoro,
+    required this.scheme,
+    required this.sessionHours,
+    required this.timeFmt,
     required this.collapsed,
     required this.onToggle,
   });
 
   final List<PomoTask> todo;
   final int pomodoro;
+  final TimerScheme scheme;
+  final double sessionHours;
+  final TimeFmt timeFmt;
   final bool collapsed;
   final VoidCallback onToggle;
 
@@ -424,12 +433,12 @@ class _TodayGroup extends StatelessWidget {
               ),
             )
           else
-            ReorderableListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              buildDefaultDragHandles: false,
-              itemCount: todo.length,
-              onReorderItem: (oldIndex, newIndex) {
+            SessionedTodoList(
+              tasks: todo,
+              scheme: scheme,
+              sessionHours: sessionHours,
+              timeFmt: timeFmt,
+              onReorder: (oldIndex, newIndex) {
                 // identical — после split в списке бывают равные копии.
                 final cubit = context.read<TasksCubit>();
                 final from = cubit.todoIndexOf(todo[oldIndex]);
@@ -438,9 +447,8 @@ class _TodayGroup extends StatelessWidget {
                 );
                 if (from >= 0 && target >= 0) cubit.reorder(from, target);
               },
-              itemBuilder: (context, i) => _TodayRow(
-                key: ObjectKey(todo[i]),
-                task: todo[i],
+              itemBuilder: (context, task, i) => _TodayRow(
+                task: task,
                 viewIndex: i,
                 pomodoro: pomodoro,
                 isNow: i == 0,
@@ -458,7 +466,6 @@ class _TodayRow extends StatelessWidget {
     required this.viewIndex,
     required this.pomodoro,
     required this.isNow,
-    super.key,
   });
 
   final PomoTask task;

@@ -130,6 +130,7 @@ class AppSettings extends Equatable {
     required this.tasksTop,
     required this.completeRemove,
     this.flowtime = false,
+    this.sessionHours = 3.0,
     required this.dailyGoal,
     required this.volume,
     required this.finishSoundEnabled,
@@ -191,6 +192,7 @@ class AppSettings extends Equatable {
       tasksTop: json['tasksTop'] as bool? ?? true,
       completeRemove: json['completeRemove'] as bool? ?? true,
       flowtime: json['flowtime'] as bool? ?? false,
+      sessionHours: (json['sessionHours'] as num? ?? 3).toDouble(),
       dailyGoal: json['dailyGoal'] as int? ?? 8,
       volume: (json['volume'] as num? ?? 0.4).toDouble(),
       finishSoundEnabled: json['finishSoundEnabled'] as bool? ?? true,
@@ -292,6 +294,10 @@ class AppSettings extends Equatable {
   /// пока не завершишь сам (помодоро для старта, поток не выбивается).
   final bool flowtime;
 
+  /// Длина рабочей сессии в часах: списки «Сегодня» бьются на сессии по
+  /// времени «по стене» (помидоры + перерывы), каждая — в своей рамке.
+  final double sessionHours;
+
   /// Цель на день в помидорах; 0 — без цели.
   final int dailyGoal;
 
@@ -371,6 +377,7 @@ class AppSettings extends Equatable {
     'tasksTop': tasksTop,
     'completeRemove': completeRemove,
     'flowtime': flowtime,
+    'sessionHours': sessionHours,
     'dailyGoal': dailyGoal,
     'volume': volume,
     'finishSoundEnabled': finishSoundEnabled,
@@ -411,6 +418,7 @@ class AppSettings extends Equatable {
     bool? tasksTop,
     bool? completeRemove,
     bool? flowtime,
+    double? sessionHours,
     int? dailyGoal,
     double? volume,
     bool? finishSoundEnabled,
@@ -450,6 +458,7 @@ class AppSettings extends Equatable {
       tasksTop: tasksTop ?? this.tasksTop,
       completeRemove: completeRemove ?? this.completeRemove,
       flowtime: flowtime ?? this.flowtime,
+      sessionHours: sessionHours ?? this.sessionHours,
       dailyGoal: dailyGoal ?? this.dailyGoal,
       volume: volume ?? this.volume,
       finishSoundEnabled: finishSoundEnabled ?? this.finishSoundEnabled,
@@ -499,6 +508,7 @@ class AppSettings extends Equatable {
     tasksTop,
     completeRemove,
     flowtime,
+    sessionHours,
     dailyGoal,
     volume,
     finishSoundEnabled,

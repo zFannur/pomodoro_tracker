@@ -187,6 +187,8 @@ abstract final class S {
   );
   static String get notesTitle => _t('Заметки', 'Notes');
   static String get overtime => _t('поток', 'flow');
+  static String get session => _t('Сессия', 'Session');
+  static String get until => _t('до', 'by');
 
   // Статистика
   static String get periodToday => _t('Сегодня', 'Today');
@@ -229,6 +231,8 @@ abstract final class S {
     "Flowtime: don't break the flow (pomodoro ends — the timer quietly keeps counting)",
   );
   static String get dailyGoal => _t('Цель на день, 🍅 (0 — без цели)', 'Daily goal, 🍅 (0 — no goal)');
+  static String get sessionHoursLabel =>
+      _t('Длина сессии, ч (список «Сегодня»)', 'Session length, h (Today list)');
   static String get volume => _t('Громкость', 'Volume');
   static String get finishSound => _t('Финишный звук', 'Finish sound');
   static String get finishMelody => _t('Мелодия финиша', 'Finish melody');

@@ -239,6 +239,20 @@ class _TimerTab extends StatelessWidget {
           max: 32,
           onChanged: (v) => _update(context, settings.copyWith(dailyGoal: v)),
         ),
+        _TextRow(
+          label: S.sessionHoursLabel,
+          value: settings.sessionHours == settings.sessionHours.roundToDouble()
+              ? settings.sessionHours.toStringAsFixed(0)
+              : settings.sessionHours.toString(),
+          onChanged: (v) {
+            final h = double.tryParse(v.replaceAll(',', '.'));
+            if (h == null) return;
+            _update(
+              context,
+              settings.copyWith(sessionHours: h.clamp(0.5, 12.0)),
+            );
+          },
+        ),
         _NumberRow(
           label: S.sprintGoalDefault,
           value: settings.sprintGoal,

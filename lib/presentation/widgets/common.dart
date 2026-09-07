@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
 import '../../app/theme.dart';
+import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../cubits/settings_cubit.dart';
@@ -634,6 +635,145 @@ class ErrorPane extends StatelessWidget {
           FilledButton(onPressed: onRetry, child: Text(S.retry)),
         ],
       ),
+    );
+  }
+}
+
+/// Список «Сегодня», разбитый на сессии по времени «по стене» (помидоры +
+/// перерывы): каждая сессия — в прямоугольной рамке с заголовком
+/// «Сессия N · X 🍅 / Hч Mм · до HH:MM». Один плоский [ReorderableListView],
+/// так что задачи перетаскиваются и между сессиями; граница сессии
+/// пересчитывается сама, когда меняешь оценку задачи.
+class SessionedTodoList extends StatelessWidget {
+  const SessionedTodoList({
+    required this.tasks,
+    required this.scheme,
+    required this.sessionHours,
+    required this.timeFmt,
+    required this.itemBuilder,
+    this.taskEnds,
+    this.onReorder,
+    super.key,
+  });
+
+  final List<PomoTask> tasks;
+  final TimerScheme scheme;
+  final double sessionHours;
+  final TimeFmt timeFmt;
+
+  /// Строка задачи. [index] — плоский индекс во всём списке: и ручка drag,
+  /// и прогноз на «Таймере», и метка «сейчас».
+  final Widget Function(BuildContext context, PomoTask task, int index)
+  itemBuilder;
+
+  /// Точное время окончания каждой задачи (прогноз «Таймера», индекс = [index]).
+  /// null — время сессии прикидывается «от сейчас» по её длине.
+  final List<DateTime>? taskEnds;
+
+  /// Перестановка: (oldIndex, newIndex) по правилам onReorderItem поверх всего
+  /// списка. null — список без перетаскивания.
+  final void Function(int oldIndex, int newIndex)? onReorder;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final marks = sessionSplit(
+      tasks,
+      pomodoroMinutes: scheme.pomodoro,
+      shortBreak: scheme.shortBreak,
+      longBreak: scheme.longBreak,
+      longEvery: scheme.longEvery,
+      limitMinutes: (sessionHours * 60).round(),
+    );
+    // Тоталы по сессии + время окончания.
+    final maxSession = marks.isEmpty ? -1 : marks.last.session;
+    final pomos = List<int>.filled(maxSession + 1, 0);
+    final wall = List<int>.filled(maxSession + 1, 0);
+    for (var i = 0; i < tasks.length; i++) {
+      pomos[marks[i].session] += tasks[i].pomos(scheme.pomodoro);
+      wall[marks[i].session] += marks[i].wallMinutes;
+    }
+    final ends = List<DateTime?>.filled(maxSession + 1, null);
+    if (taskEnds != null) {
+      for (var i = 0; i < tasks.length; i++) {
+        if (i < taskEnds!.length) ends[marks[i].session] = taskEnds![i];
+      }
+    } else {
+      // ponytail: грубая прикидка «если начать сейчас», без учёта идущего
+      // помидора и серии таймера.
+      var acc = DateTime.now();
+      for (var s = 0; s <= maxSession; s++) {
+        acc = acc.add(Duration(minutes: wall[s]));
+        ends[s] = acc;
+      }
+    }
+
+    String header(int s) {
+      final base =
+          '${S.session} ${s + 1} · ${pomos[s]} 🍅 / ${formatMinutesUi(wall[s])}';
+      final end = ends[s];
+      return end == null
+          ? base
+          : '$base · ${S.until} ${formatClock(end, timeFmt)}';
+    }
+
+    Widget row(int i) {
+      final s = marks[i].session;
+      final first = i == 0 || marks[i - 1].session != s;
+      final last = i == tasks.length - 1 || marks[i + 1].session != s;
+      final line = BorderSide(color: theme.colorScheme.outlineVariant);
+      // Рамка без скругления: неоднородный Border несовместим с borderRadius,
+      // а прямоугольник тут и просили. Во время перетаскивания поднятая
+      // строка показывает свой кусок рамки — это ок.
+      return Container(
+        key: ObjectKey(tasks[i]),
+        margin: EdgeInsets.only(bottom: last ? 10 : 0),
+        decoration: BoxDecoration(
+          border: Border(
+            left: line,
+            right: line,
+            top: first ? line : BorderSide.none,
+            bottom: last ? line : BorderSide.none,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (first)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: Text(
+                  header(s),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: itemBuilder(context, tasks[i], i),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (onReorder == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [for (var i = 0; i < tasks.length; i++) row(i)],
+      );
+    }
+    return ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      itemCount: tasks.length,
+      onReorderItem: (oldIndex, newIndex) => onReorder!(oldIndex, newIndex),
+      itemBuilder: (context, i) => row(i),
     );
   }
 }

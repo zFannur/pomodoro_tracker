@@ -114,6 +114,52 @@ class PomoTask extends Equatable {
   ];
 }
 
+/// Задача из списка «Сегодня» + куда она попала при разбивке на сессии.
+/// [wallMinutes] — стоимость задачи по настенным часам: её помидоры плюс
+/// перерывы между ними.
+typedef TaskSession = ({int session, int wallMinutes});
+
+/// Бьёт список «Сегодня» на сессии по времени «по стене». Стоимость задачи —
+/// помидоры + перерывы между ними (длинный каждые [longEvery]). Новая сессия
+/// открывается, когда очередная задача не влезает целиком в [limitMinutes];
+/// задача длиннее лимита занимает свою сессию одна. Одна запись на задачу,
+/// в исходном порядке.
+///
+/// ponytail: считает «с нуля» — идущий помидор и серию таймера не знает; это
+/// планировочная прикидка, а не точный прогноз финиша.
+List<TaskSession> sessionSplit(
+  List<PomoTask> tasks, {
+  required int pomodoroMinutes,
+  required int shortBreak,
+  required int longBreak,
+  required int longEvery,
+  required int limitMinutes,
+}) {
+  final result = <TaskSession>[];
+  var session = 0;
+  var sessionWall = 0;
+  var series = 0; // сквозной счётчик помидоров — для длинных перерывов
+  for (final task in tasks) {
+    var wall = 0;
+    for (var p = 0; p < task.pomos(pomodoroMinutes); p++) {
+      if (series > 0) {
+        wall += (longEvery > 0 && series % longEvery == 0)
+            ? longBreak
+            : shortBreak;
+      }
+      wall += pomodoroMinutes;
+      series++;
+    }
+    if (sessionWall > 0 && sessionWall + wall > limitMinutes) {
+      session++;
+      sessionWall = 0;
+    }
+    result.add((session: session, wallMinutes: wall));
+    sessionWall += wall;
+  }
+  return result;
+}
+
 /// Содержимое файла задач: TODO («Сегодня») + планировщик.
 class TasksFile extends Equatable {
   const TasksFile({required this.todo, required this.planner});

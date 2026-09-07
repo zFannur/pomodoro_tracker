@@ -181,19 +181,28 @@ class _PlannerDialogState extends State<_PlannerDialog> {
                           style: theme.textTheme.bodySmall,
                         ),
                       )
+                    : _tab == _Tab.today
+                    ? SingleChildScrollView(
+                        child: SessionedTodoList(
+                          tasks: state.todo,
+                          scheme: settings.scheme,
+                          sessionHours: settings.sessionHours,
+                          timeFmt: settings.timeFmt,
+                          itemBuilder: (context, task, i) =>
+                              _todayRow(context, theme, i, task, pomodoro),
+                        ),
+                      )
                     : ListView.builder(
                         itemCount: items.length,
                         itemBuilder: (context, i) {
                           final (index, task) = items[i];
-                          return _tab == _Tab.today
-                              ? _todayRow(context, theme, index, task, pomodoro)
-                              : _plannerRow(
-                                  context,
-                                  theme,
-                                  index,
-                                  task,
-                                  pomodoro,
-                                );
+                          return _plannerRow(
+                            context,
+                            theme,
+                            index,
+                            task,
+                            pomodoro,
+                          );
                         },
                       ),
               ),

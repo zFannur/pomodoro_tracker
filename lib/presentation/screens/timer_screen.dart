@@ -569,13 +569,13 @@ class _TodoSection extends StatelessWidget {
               ),
             )
           else ...[
-            ReorderableListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              // Своя ручка слева: стандартная накладывается на меню ⋮.
-              buildDefaultDragHandles: false,
-              itemCount: visible.length,
-              onReorderItem: (oldIndex, newIndex) {
+            SessionedTodoList(
+              tasks: visible,
+              scheme: scheme,
+              sessionHours: settings.sessionHours,
+              timeFmt: settings.timeFmt,
+              taskEnds: forecast.taskEnds,
+              onReorder: (oldIndex, newIndex) {
                 // identical — после split в списке бывают равные копии.
                 final cubit = context.read<TasksCubit>();
                 final from = cubit.todoIndexOf(visible[oldIndex]);
@@ -586,19 +586,15 @@ class _TodoSection extends StatelessWidget {
                   cubit.reorder(from, target);
                 }
               },
-              itemBuilder: (context, i) {
-                final task = visible[i];
-                return _TaskRow(
-                  key: ObjectKey(task),
-                  task: task,
-                  viewIndex: i,
-                  endTime: forecast.taskEnds.length > i
-                      ? forecast.taskEnds[i]
-                      : null,
-                  pomodoroMinutes: scheme.pomodoro,
-                  timeFmt: settings.timeFmt,
-                );
-              },
+              itemBuilder: (context, task, i) => _TaskRow(
+                task: task,
+                viewIndex: i,
+                endTime: forecast.taskEnds.length > i
+                    ? forecast.taskEnds[i]
+                    : null,
+                pomodoroMinutes: scheme.pomodoro,
+                timeFmt: settings.timeFmt,
+              ),
             ),
             const SizedBox(height: 8),
             // Wrap, а не Row: две подписи рядом не помещаются в ширину
@@ -700,7 +696,6 @@ class _TaskRow extends StatelessWidget {
     required this.endTime,
     required this.pomodoroMinutes,
     required this.timeFmt,
-    super.key,
   });
 
   final PomoTask task;
