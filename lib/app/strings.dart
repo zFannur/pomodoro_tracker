@@ -368,6 +368,93 @@ abstract final class S {
         'and synced across devices.',
   );
 
+  // Курс
+  static String get navCourse => _t('Курс', 'Course');
+  static String get courseDirections => _t('Направления', 'Directions');
+  static String get coursePaused => _t('На паузе', 'Paused');
+  static String get courseFinished => _t('Закрытые', 'Closed');
+  static String get courseLadder => _t('Лестница вех', 'Milestone ladder');
+  static String get courseClosures => _t('Лента закрытий', 'Closure feed');
+  static String get courseAttention =>
+      _t('Внимание за 30 дней', 'Attention over 30 days');
+  static String get monthReviewTitle =>
+      _t('Месячный разбор', 'Monthly review');
+
+  static String get courseEmptyDirections => _t(
+    'Пока ни одного направления. Направление — это цель на 3–12 месяцев; '
+        'держи 2–4 активных, остальное — на паузу.',
+    'No directions yet. A direction is a 3–12 month goal; '
+        'keep 2–4 active, pause the rest.',
+  );
+  static String get courseEmptyLadder => _t(
+    'Лестница пуста. Веха — проверяемый результат на 1–3 недели, а не занятие: '
+        '«бот отвечает на 3 команды в проде», а не «работать над ботом».',
+    'The ladder is empty. A milestone is a verifiable outcome for 1–3 weeks, not an activity: '
+        '"bot responds to 3 commands in prod", not "work on the bot".',
+  );
+
+  static String get courseDirection => _t('Направление', 'Direction');
+  static String get courseMilestone => _t('Веха', 'Milestone');
+  static String get courseAddDirection =>
+      _t('Добавить направление', 'Add direction');
+  static String get courseAddMilestone =>
+      _t('Добавить веху', 'Add milestone');
+  static String get coursePause => _t('Пауза', 'Pause');
+  static String get courseResume => _t('Вернуть в работу', 'Resume');
+  static String get courseCloseDirection =>
+      _t('Закрыть направление', 'Close direction');
+  static String get courseCloseMilestone =>
+      _t('Закрыть веху', 'Close milestone');
+  static String get courseReopen => _t('Открыть заново', 'Reopen');
+  static String get courseCategories => _t('Категории', 'Categories');
+  static String get courseObsidianNote =>
+      _t('Заметка в Obsidian', 'Obsidian note');
+  static String get courseHorizon => _t('Горизонт', 'Horizon');
+  static String get courseNoHorizon => _t('Без горизонта', 'No horizon');
+  static String get courseRename => _t('Переименовать', 'Rename');
+  static String get courseLadderPassed =>
+      _t('лестница пройдена', 'ladder completed');
+  static String get courseDeleteMilestoneConfirm =>
+      _t('Удалить веху?', 'Delete milestone?');
+
+  static String tooManyDirections(int n) => _t(
+    'Активных направлений: $n. Работает 2–4 — остальное лучше на паузу.',
+    'Active directions: $n. 2–4 works best — pause the rest.',
+  );
+
+  static String ladderProgress(int done, int total) =>
+      _t('веха $done из $total', 'milestone $done of $total');
+
+  static String paceLabel(String value) =>
+      _t('темп $value вех/мес', 'pace $value milestones/mo');
+  static String get noPace => _t('темпа пока нет', 'no pace yet');
+  static String etaLabel(String date) =>
+      _t('при текущем темпе — к $date', 'at current pace — by $date');
+
+  static String get courseThreadNoDirection =>
+      _t('Без направления', 'No direction');
+
+  static String monthReviewClosed(int n) =>
+      _t('Закрыто вех за месяц: $n', 'Milestones closed this month: $n');
+  static String monthReviewStale(String name, int weeks) => _t(
+    '$name не двигалось $weeks недель — пауза или №1?',
+    '$name had no movement for $weeks weeks — pause or #1?',
+  );
+  static String get monthReviewDismiss => _t('Понял', 'Got it');
+
+  static String get customMilestone =>
+      _t('Своя формулировка', 'Custom wording');
+  static String get makeNumberOne => _t('Сделать №1', 'Make #1');
+  static String get toPause => _t('На паузу', 'Pause');
+  static String get pickMilestone => _t('Выбрать веху', 'Pick milestone');
+  static String get takeNextMilestone =>
+      _t('Взять следующую ступень', 'Take next milestone');
+
+  static String deleteDirectionConfirm(String name) => _t(
+    'Удалить направление $name вместе с его вехами?',
+    'Delete direction $name along with its milestones?',
+  );
+
   // Общее
   static String get retry => _t('Повторить', 'Retry');
   static String get errorPrefix => _t('Ошибка: ', 'Error: ');

@@ -16,6 +16,7 @@ import 'data/timer_state_store.dart';
 import 'data/vault_repositories.dart';
 import 'domain/entities/app_settings.dart';
 import 'domain/entities/pomo_session.dart' show logicalDate;
+import 'presentation/cubits/directions_cubit.dart';
 import 'presentation/cubits/journal_cubit.dart';
 import 'presentation/cubits/settings_cubit.dart';
 import 'presentation/cubits/sprint_cubit.dart';
@@ -123,6 +124,7 @@ Future<void> main() async {
     () => settings().dailyGoal,
     tasksCubit.weekTasks,
   );
+  final directionsCubit = DirectionsCubit(dataRepository, dataRepository);
   // Закрытая ⭐-задача недели уезжает в «Сделано за неделю» спринта.
   tasksCubit.onWeeklyClosed = sprintCubit.addDoneWeek;
   // Смена дня — сброс 🐸 (лягушка выбирается утром заново);
@@ -157,6 +159,7 @@ Future<void> main() async {
       await rolloverCheck();
       await statsCubit.refresh();
       await sprintCubit.refresh();
+      await directionsCubit.refresh();
     },
   );
   final timerCubit = TimerCubit(
@@ -170,6 +173,7 @@ Future<void> main() async {
       await journalCubit.refresh();
       await statsCubit.refresh();
       await sprintCubit.refresh();
+      await directionsCubit.refresh();
     },
   );
 
@@ -183,6 +187,7 @@ Future<void> main() async {
     await journalCubit.refresh();
     await statsCubit.refresh();
     await sprintCubit.refresh();
+    await directionsCubit.refresh();
     timerCubit.adoptRemote(
       (await dataRepository.loadTimer()).getOrElse((_) => null),
     );
@@ -194,12 +199,14 @@ Future<void> main() async {
     await journalCubit.refresh();
     await statsCubit.refresh();
     await sprintCubit.refresh();
+    await directionsCubit.refresh();
   };
   // Ручная правка журнала (удалили запись, поправили минуты) — статистика и
   // спринт иначе показывали старые цифры до перезапуска.
   journalCubit.onJournalChanged = () async {
     await statsCubit.refresh();
     await sprintCubit.refresh();
+    await directionsCubit.refresh();
   };
 
   // Google Drive синк: data.json целиком — задачи, журнал, спринты.
@@ -249,6 +256,7 @@ Future<void> main() async {
       journalCubit.refresh(),
       statsCubit.refresh(),
       sprintCubit.refresh(),
+      directionsCubit.refresh(),
     ]);
     await timerCubit.restore();
 
@@ -256,7 +264,10 @@ Future<void> main() async {
     // Rollover после синка: решать про смену дня и недели, не увидев правок
     // с другого устройства, значит стирать чужие свежие 🐸/⭐. Выполняется
     // после ПОПЫТКИ, а не после успеха — без сети сброс обязан работать.
-    if (await rolloverCheck()) await sprintCubit.refresh();
+    if (await rolloverCheck()) {
+      await sprintCubit.refresh();
+      await directionsCubit.refresh();
+    }
   }
 
   unawaited(bootstrap());
@@ -269,6 +280,7 @@ Future<void> main() async {
         BlocProvider.value(value: journalCubit),
         BlocProvider.value(value: statsCubit),
         BlocProvider.value(value: sprintCubit),
+        BlocProvider.value(value: directionsCubit),
         BlocProvider.value(value: timerCubit),
         BlocProvider.value(value: syncCubit),
       ],

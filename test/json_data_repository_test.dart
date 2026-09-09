@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_tracker/data/json_data_repository.dart';
 import 'package:pomodoro_tracker/data/markdown_codec.dart';
 import 'package:pomodoro_tracker/data/vault_repositories.dart';
+import 'package:pomodoro_tracker/domain/entities/direction.dart';
 import 'package:pomodoro_tracker/domain/entities/pomo_session.dart';
 import 'package:pomodoro_tracker/domain/entities/pomo_task.dart';
 import 'package:pomodoro_tracker/domain/entities/sprint.dart';
@@ -295,16 +296,37 @@ void main() {
     final r = repo();
     await r.saveTasks(TasksFile(todo: [t('a')], planner: []));
     await r.addSession(s('p1', DateTime(2026, 7, 20, 9)), 8);
+    await r.saveCourse(
+      (
+        directions: [const Direction(id: 'd1', name: 'Курс 1')],
+        milestones: [
+          const Milestone(id: 'm1', directionId: 'd1', title: 'Веха 1'),
+        ],
+      ),
+    );
     expect(store.tasksFile().existsSync(), isFalse);
     expect(store.journalFile(DateTime(2026, 7, 20)).existsSync(), isFalse);
+    expect(store.courseFile().existsSync(), isFalse);
 
     mirror = true;
     await r.saveTasks(TasksFile(todo: [t('a')], planner: []));
     await r.addSession(s('p2', DateTime(2026, 7, 20, 10)), 8);
+    await r.saveCourse(
+      (
+        directions: [const Direction(id: 'd1', name: 'Курс 1')],
+        milestones: [
+          const Milestone(id: 'm1', directionId: 'd1', title: 'Веха 1'),
+        ],
+      ),
+    );
     expect(store.tasksFile().readAsStringSync(), contains('<!--'));
     final journal = store.journalFile(DateTime(2026, 7, 20)).readAsStringSync();
     expect(journal, contains('<!--'));
     expect(journal, contains('задача p2'));
+    final course = store.courseFile().readAsStringSync();
+    expect(course, contains('<!--'));
+    expect(course, contains('Курс 1'));
+    expect(course, contains('Веха 1'));
   });
 
   group('InboxImporter', () {

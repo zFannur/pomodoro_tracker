@@ -2,6 +2,7 @@ import 'package:fpdart/fpdart.dart';
 
 import '../core/failure.dart';
 import 'entities/app_settings.dart';
+import 'entities/direction.dart';
 import 'entities/pomo_session.dart';
 import 'entities/pomo_task.dart';
 import 'entities/sprint.dart';
@@ -52,3 +53,13 @@ abstract interface class SettingsRepository {
 
   Future<Either<Failure, Unit>> save(AppSettings settings);
 }
+
+/// Направления и их лестницы вех — уровень выше недели.
+typedef Course = ({List<Direction> directions, List<Milestone> milestones});
+
+abstract interface class DirectionRepository {
+  Future<Either<Failure, Course>> loadCourse();
+
+  Future<Either<Failure, Unit>> saveCourse(Course course);
+}
+

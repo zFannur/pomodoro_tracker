@@ -9,6 +9,7 @@ import '../app/strings.dart';
 import 'cubits/settings_cubit.dart';
 import 'cubits/tasks_cubit.dart';
 import 'cubits/timer_cubit.dart';
+import 'screens/course_screen.dart';
 import 'screens/settings_dialog.dart';
 import 'screens/sprint_screen.dart';
 import 'screens/stats_screen.dart';
@@ -113,6 +114,18 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  /// Иконка «Курс»: Material в цвет темы (своего 3D-ассета у раздела нет).
+  Widget _courseIcon({required bool selected}) {
+    return Opacity(
+      opacity: selected ? 1 : 0.45,
+      child: Icon(
+        selected ? Icons.route : Icons.route_outlined,
+        size: 30,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    );
+  }
+
   /// Заголовок окна: при работающем таймере — «MM:SS контекст».
   void _updateTitle(TimerState timer) {
     if (!Platform.isWindows) return;
@@ -158,6 +171,7 @@ class _HomeShellState extends State<HomeShell> {
         TimerScreen(),
         TasksScreen(),
         SprintScreen(),
+        CourseScreen(),
         StatsScreen(),
       ],
     );
@@ -200,6 +214,11 @@ class _HomeShellState extends State<HomeShell> {
             icon: _navIcon('assets/nav/sprint.png', selected: false),
             selectedIcon: _navIcon('assets/nav/sprint.png', selected: true),
             label: S.navSprint,
+          ),
+          NavigationDestination(
+            icon: _courseIcon(selected: false),
+            selectedIcon: _courseIcon(selected: true),
+            label: S.navCourse,
           ),
           NavigationDestination(
             icon: _navIcon('assets/nav/stats.png', selected: false),
@@ -251,6 +270,11 @@ class _HomeShellState extends State<HomeShell> {
                 icon: _navIcon('assets/nav/sprint.png', selected: false),
                 selectedIcon: _navIcon('assets/nav/sprint.png', selected: true),
                 label: Text(S.navSprint),
+              ),
+              NavigationRailDestination(
+                icon: _courseIcon(selected: false),
+                selectedIcon: _courseIcon(selected: true),
+                label: Text(S.navCourse),
               ),
               NavigationRailDestination(
                 icon: _navIcon('assets/nav/stats.png', selected: false),

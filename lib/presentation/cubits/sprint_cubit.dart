@@ -202,10 +202,29 @@ class SprintCubit extends Cubit<SprintState> {
     await _save(sprint.copyWith(goal: goal));
   }
 
-  Future<void> setMilestone(String milestone) async {
+  Future<void> setMilestone(String milestone, {bool clearRef = false}) async {
     final sprint = state.sprint;
     if (sprint == null) return;
-    await _save(sprint.copyWith(milestone: milestone.trim()));
+    await _save(
+      sprint.copyWith(
+        milestone: milestone.trim(),
+        clearMilestoneId: clearRef,
+      ),
+    );
+  }
+
+  /// Установить ссылку на веху направления из лестницы.
+  Future<void> setMilestoneRef(String milestoneId) async {
+    final sprint = state.sprint;
+    if (sprint == null) return;
+    await _save(sprint.copyWith(milestoneId: milestoneId));
+  }
+
+  /// Очистить ссылку на веху направления (лестница пройдена или свободный текст).
+  Future<void> clearMilestoneRef() async {
+    final sprint = state.sprint;
+    if (sprint == null) return;
+    await _save(sprint.copyWith(clearMilestoneId: true));
   }
 
   /// Закрытая ⭐-задача уезжает в «Сделано за неделю».

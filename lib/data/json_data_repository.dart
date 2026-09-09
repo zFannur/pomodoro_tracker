@@ -7,6 +7,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../core/failure.dart';
+import '../domain/entities/direction.dart';
 import '../domain/entities/pomo_session.dart';
 import '../domain/entities/pomo_task.dart';
 import '../domain/entities/sprint.dart';
@@ -33,7 +34,11 @@ String newId() {
 /// Истина — этот JSON. Markdown в валте (Задачи/Журнал/Спринты) пишется как
 /// одностороннее зеркало для чтения в Obsidian и обратно не читается.
 class JsonDataRepository
-    implements TaskRepository, JournalRepository, SprintRepository {
+    implements
+        TaskRepository,
+        JournalRepository,
+        SprintRepository,
+        DirectionRepository {
   JsonDataRepository(
     this._store, {
     required this.mirrorEnabled,
@@ -78,6 +83,7 @@ class JsonDataRepository
   /// записи другого устройства — и delete-wins убивал их у всех навсегда.
   Set<String> _servedTasks = const {};
   final Map<String, Set<String>> _servedDays = {};
+  Set<String> _servedCourse = const {};
 
   Future<File> jsonFile() async {
     final cached = _file;
@@ -228,14 +234,22 @@ class JsonDataRepository
         return (day: doc.rollover['day'], week: doc.rollover['week']);
       });
 
-  Future<Either<Failure, Unit>> markRollover({String? day, String? week}) =>
-      _guard(() async {
-        final doc = await _load();
-        if (day != null) doc.rollover['day'] = day;
-        if (week != null) doc.rollover['week'] = week;
-        await _write(doc);
-        return unit;
-      });
+  /// Отметка о показанном месячном разборе (ключ 'month', напр. '2026-09').
+  Future<Either<Failure, String?>> monthRollover() =>
+      _guard(() async => (await _load()).rollover['month']);
+
+  Future<Either<Failure, Unit>> markRollover({
+    String? day,
+    String? week,
+    String? month,
+  }) => _guard(() async {
+    final doc = await _load();
+    if (day != null) doc.rollover['day'] = day;
+    if (week != null) doc.rollover['week'] = week;
+    if (month != null) doc.rollover['month'] = month;
+    await _write(doc);
+    return unit;
+  });
 
   /// Снимок таймера пишется ТОЛЬКО на переходах (старт/пауза/стоп/смена фазы):
   /// периодические сохранения раз в 15 секунд идут в локальный
@@ -490,13 +504,14 @@ class JsonDataRepository
     if (existing != null &&
         existing.goal == sprint.goal &&
         existing.milestone == sprint.milestone &&
+        existing.milestoneId == sprint.milestoneId &&
         _sameList(existing.doneWeek, sprint.doneWeek)) {
-      await _mirrorSprint(sprint, fact, weekTasks);
+      await _mirrorSprint(doc, sprint, fact, weekTasks);
       return unit;
     }
     doc.sprints[sprint.id] = sprint;
     await _write(doc);
-    await _mirrorSprint(sprint, fact, weekTasks);
+    await _mirrorSprint(doc, sprint, fact, weekTasks);
     return unit;
   });
 
@@ -538,6 +553,89 @@ class JsonDataRepository
     return summaries;
   });
 
+  // -- курс (направления и вехи) ---------------------------------------------
+
+  @override
+  Future<Either<Failure, Course>> loadCourse() => _guard(() async {
+    final doc = await _load();
+    _servedCourse = {
+      for (final d in doc.directions) d.id,
+      for (final m in doc.milestones) m.id,
+    };
+    return (
+      directions: [...doc.directions],
+      milestones: [...doc.milestones],
+    );
+  });
+
+  @override
+  Future<Either<Failure, Unit>> saveCourse(Course course) => _guard(() async {
+    final doc = await _load();
+    final before = doc.ids();
+    final directions = _withDirIds(course.directions);
+    final milestones = _withMilestoneIds(course.milestones);
+    final known = {
+      for (final d in directions) d.id,
+      for (final m in milestones) m.id,
+    };
+    // Направление или веха, которых нет ни в снимке вызывающего, ни в том,
+    // что мы ему отдавали, — это прилёт синка. Его снимок не свидетельство
+    // удаления.
+    bool arrivedDir(Direction d) =>
+        d.id.isNotEmpty &&
+        !known.contains(d.id) &&
+        !_servedCourse.contains(d.id);
+    bool arrivedMile(Milestone m) =>
+        m.id.isNotEmpty &&
+        !known.contains(m.id) &&
+        !_servedCourse.contains(m.id);
+
+    final keepDirs = [
+      for (final d in doc.directions)
+        if (arrivedDir(d)) d,
+    ];
+    final keepMiles = [
+      for (final m in doc.milestones)
+        if (arrivedMile(m)) m,
+    ];
+
+    doc.directions
+      ..clear()
+      ..addAll(directions)
+      ..addAll(keepDirs);
+    doc.milestones
+      ..clear()
+      ..addAll(milestones)
+      ..addAll(keepMiles);
+
+    _servedCourse = known;
+    await _write(doc, before: before);
+    await _mirrorCourse(doc);
+    return unit;
+  });
+
+  List<Direction> _withDirIds(List<Direction> list) {
+    final seen = <String>{};
+    final result = <Direction>[];
+    for (final d in list) {
+      final id = d.id.isEmpty ? newId() : d.id;
+      if (!seen.add(id)) continue;
+      result.add(d.id.isEmpty ? d.copyWith(id: id) : d);
+    }
+    return result;
+  }
+
+  List<Milestone> _withMilestoneIds(List<Milestone> list) {
+    final seen = <String>{};
+    final result = <Milestone>[];
+    for (final m in list) {
+      final id = m.id.isEmpty ? newId() : m.id;
+      if (!seen.add(id)) continue;
+      result.add(m.id.isEmpty ? m.copyWith(id: id) : m);
+    }
+    return result;
+  }
+
   // -- зеркала в валт ---------------------------------------------------------
 
   /// Валт недоступен — молча пропускаем: данные от него не зависят.
@@ -562,13 +660,42 @@ class JsonDataRepository
       _mirror(_store.journalFile(log.date), _mirrorNote + serializeDayLog(log));
 
   Future<void> _mirrorSprint(
+    _Doc doc,
     Sprint sprint,
     List<DayLog> fact,
     List<PomoTask> weekTasks,
   ) => _mirror(
     _store.sprintFile(sprint.id),
-    _mirrorNote + serializeSprint(sprint, fact, weekTasks: weekTasks),
+    _mirrorNote +
+        serializeSprint(
+          sprint,
+          fact,
+          weekTasks: weekTasks,
+          milestoneText: _milestoneTitle(doc, sprint),
+        ),
   );
+
+  /// Текст вехи недели для зеркала. Веха, взятая из лестницы направления,
+  /// хранится ссылкой, и `sprint.milestone` у такой недели пуст — без
+  /// разворачивания ссылки `Спринты/*.md` терял веху целиком.
+  String _milestoneTitle(_Doc doc, Sprint sprint) {
+    if (sprint.milestoneId.isEmpty) return sprint.milestone;
+    for (final m in doc.milestones) {
+      if (m.id == sprint.milestoneId) return m.title;
+    }
+    return sprint.milestone;
+  }
+
+  /// Пустой курс не зеркалим совсем: пока направлений нет, файл «Курс.md» в
+  /// валте — просто шум, а лишняя файловая операция на каждый прилёт синка
+  /// ещё и гоняется с чтением валта.
+  Future<void> _mirrorCourse(_Doc doc) async {
+    if (doc.directions.isEmpty && doc.milestones.isEmpty) return;
+    await _mirror(
+      _store.courseFile(),
+      _mirrorNote + serializeCourse(doc.directions, doc.milestones),
+    );
+  }
 
   /// После прилёта удалённой версии — переписать зеркала целиком.
   Future<void> _mirrorAll(_Doc doc) async {
@@ -576,6 +703,7 @@ class JsonDataRepository
     for (final log in doc.days.values) {
       await _mirrorDay(log);
     }
+    await _mirrorCourse(doc);
   }
 
   Future<Either<Failure, T>> _guard<T>(Future<T> Function() body) async {
@@ -602,6 +730,8 @@ class _Doc {
     required this.graves,
     required this.rollover,
     required this.extra,
+    required this.directions,
+    required this.milestones,
   });
 
   factory _Doc.empty() => _Doc(
@@ -612,6 +742,8 @@ class _Doc {
     graves: {},
     rollover: {},
     extra: {},
+    directions: [],
+    milestones: [],
   );
 
   /// Ключи, которые _Doc знает. Всё остальное проносится через [extra]:
@@ -626,6 +758,8 @@ class _Doc {
     'graves',
     'rollover',
     'timer',
+    'dirs',
+    'miles',
   };
 
   factory _Doc.decode(String raw) {
@@ -656,10 +790,24 @@ class _Doc {
           start: monday,
           goal: (s['goal'] as num?)?.toInt() ?? 0,
           milestone: s['milestone'] as String? ?? '',
+          milestoneId:
+              s['milestoneId'] as String? ?? (s['mid'] as String? ?? ''),
           doneWeek: [
             if (s['done'] is List) ...(s['done'] as List).whereType<String>(),
           ],
         );
+      }
+    }
+    final dirs = json['dirs'];
+    if (dirs is List) {
+      for (final e in dirs.whereType<Map<String, dynamic>>()) {
+        doc.directions.add(_directionFrom(e));
+      }
+    }
+    final miles = json['miles'];
+    if (miles is List) {
+      for (final e in miles.whereType<Map<String, dynamic>>()) {
+        doc.milestones.add(_milestoneFrom(e));
       }
     }
     final graves = json['graves'];
@@ -685,6 +833,8 @@ class _Doc {
   final Map<String, Sprint> sprints;
   final Map<String, String> graves;
   final Map<String, String> rollover;
+  final List<Direction> directions;
+  final List<Milestone> milestones;
 
   /// Секции будущих версий, о которых этот код ещё не знает.
   final Map<String, dynamic> extra;
@@ -700,6 +850,8 @@ class _Doc {
       if (t.id != null) t.id!,
     for (final d in days.values)
       for (final s in d.sessions) s.id,
+    for (final d in directions) d.id,
+    for (final m in milestones) m.id,
   };
 
   String encode() => jsonEncode({
@@ -720,12 +872,18 @@ class _Doc {
         e.key: {
           'goal': e.value.goal,
           if (e.value.milestone.isNotEmpty) 'milestone': e.value.milestone,
+          if (e.value.milestoneId.isNotEmpty)
+            'milestoneId': e.value.milestoneId,
           if (e.value.doneWeek.isNotEmpty) 'done': e.value.doneWeek,
         },
     },
     'graves': graves,
     if (rollover.isNotEmpty) 'rollover': rollover,
     if (timer != null) 'timer': timer,
+    if (directions.isNotEmpty)
+      'dirs': [for (final d in directions) _directionJson(d)],
+    if (milestones.isNotEmpty)
+      'miles': [for (final m in milestones) _milestoneJson(m)],
   });
 
   static List<PomoTask> _taskList(Object? raw) => [
@@ -806,5 +964,56 @@ class _Doc {
     if (s.interruptions != 0) 'in': s.interruptions,
     if (s.manual) 'man': true,
     if (s.frog) 'frog': true,
+  };
+
+  static Direction _directionFrom(Map<String, dynamic> j) {
+    final st = switch (j['st'] as String?) {
+      'paused' => DirectionStatus.paused,
+      'done' => DirectionStatus.done,
+      _ => DirectionStatus.active,
+    };
+    final hor = j['hor'];
+    return Direction(
+      id: j['id'] as String? ?? '',
+      name: j['name'] as String? ?? '',
+      note: j['note'] as String? ?? '',
+      horizon: hor is String ? DateTime.tryParse(hor) : null,
+      status: st,
+      order: (j['ord'] as num?)?.toInt() ?? 0,
+      categories: [
+        if (j['cats'] is List) ...(j['cats'] as List).whereType<String>(),
+      ],
+    );
+  }
+
+  static Map<String, dynamic> _directionJson(Direction d) => {
+    'id': d.id,
+    'name': d.name,
+    if (d.note.isNotEmpty) 'note': d.note,
+    if (d.horizon != null) 'hor': dateKey(d.horizon!),
+    'st': d.status.name,
+    'ord': d.order,
+    if (d.categories.isNotEmpty) 'cats': d.categories,
+  };
+
+  static Milestone _milestoneFrom(Map<String, dynamic> j) {
+    final wa = j['wa'];
+    return Milestone(
+      id: j['id'] as String? ?? '',
+      directionId: j['dir'] as String? ?? '',
+      title: j['t'] as String? ?? '',
+      order: (j['ord'] as num?)?.toInt() ?? 0,
+      doneSprint: j['ws'] as String? ?? '',
+      doneAt: wa is String ? DateTime.tryParse(wa) : null,
+    );
+  }
+
+  static Map<String, dynamic> _milestoneJson(Milestone m) => {
+    'id': m.id,
+    'dir': m.directionId,
+    't': m.title,
+    'ord': m.order,
+    if (m.doneSprint.isNotEmpty) 'ws': m.doneSprint,
+    if (m.doneAt != null) 'wa': dateKey(m.doneAt!),
   };
 }

@@ -9,6 +9,7 @@ import 'package:pomodoro_tracker/domain/entities/pomo_session.dart';
 import 'package:pomodoro_tracker/domain/entities/pomo_task.dart';
 import 'package:pomodoro_tracker/domain/entities/sprint.dart';
 import 'package:pomodoro_tracker/domain/repositories.dart';
+import 'package:pomodoro_tracker/presentation/cubits/directions_cubit.dart';
 import 'package:pomodoro_tracker/presentation/cubits/journal_cubit.dart';
 import 'package:pomodoro_tracker/presentation/cubits/settings_cubit.dart';
 import 'package:pomodoro_tracker/presentation/cubits/sprint_cubit.dart';
@@ -145,6 +146,16 @@ class FakeSprints implements SprintRepository {
       ]);
 }
 
+class FakeCourse implements DirectionRepository {
+  @override
+  Future<Either<Failure, Course>> loadCourse() async =>
+      Either.right((directions: const [], milestones: const []));
+
+  @override
+  Future<Either<Failure, Unit>> saveCourse(Course course) async =>
+      Either.right(unit);
+}
+
 class FakeSettings implements SettingsRepository {
   @override
   Future<Either<Failure, AppSettings>> load() async =>
@@ -215,6 +226,9 @@ Future<ScreenHarness> pumpScreen(
     onPomodoroComplete: (_) async {},
   );
 
+  final directions = DirectionsCubit(FakeCourse(), journalRepo);
+  await directions.refresh();
+
   await tester.pumpWidget(
     MaterialApp(
       home: MultiBlocProvider(
@@ -225,6 +239,7 @@ Future<ScreenHarness> pumpScreen(
           BlocProvider.value(value: sprint),
           BlocProvider.value(value: stats),
           BlocProvider.value(value: timer),
+          BlocProvider.value(value: directions),
         ],
         child: Scaffold(body: screen),
       ),
@@ -239,6 +254,7 @@ Future<ScreenHarness> pumpScreen(
     await sprint.close();
     await stats.close();
     await timer.close();
+    await directions.close();
     await settings.close();
   });
 }

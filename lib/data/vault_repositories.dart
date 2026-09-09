@@ -16,10 +16,13 @@ class VaultStore {
   String root;
 
   static const tasksFileName = 'Задачи.md';
+  static const courseFileName = 'Курс.md';
   static const journalDirName = 'Журнал';
   static const sprintsDirName = 'Спринты';
 
   File tasksFile() => File('$root${Platform.pathSeparator}$tasksFileName');
+
+  File courseFile() => File('$root${Platform.pathSeparator}$courseFileName');
 
   File journalFile(DateTime d) => File(
     '$root${Platform.pathSeparator}$journalDirName'

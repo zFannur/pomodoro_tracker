@@ -56,6 +56,8 @@ String mergeData(String? local, String remote, {required bool localWins}) {
   result['days'] = _mergeDays(winner['days'], loser['days']);
   result['sprints'] = _mergeSprints(winner['sprints'], loser['sprints']);
   result['rollover'] = _mergeRollover(winner['rollover'], loser['rollover']);
+  result['dirs'] = _mergeById(winner['dirs'], loser['dirs']);
+  result['miles'] = _mergeById(winner['miles'], loser['miles']);
 
   // Таймер — не список: у него ровно одно актуальное состояние, побеждает
   // более свежий снимок независимо от localWins.
@@ -229,6 +231,7 @@ Map<String, dynamic> _mergeRollover(Object? win, Object? lose) {
     ...w,
     if (later('day') != null) 'day': later('day'),
     if (later('week') != null) 'week': later('week'),
+    if (later('month') != null) 'month': later('month'),
   };
 }
 
@@ -246,4 +249,6 @@ void _purge(Map<String, dynamic> doc, Set<String> graves) {
     for (final e in days.entries)
       e.key: {..._map(e.value), 's': alive(_map(e.value)['s'])},
   };
+  doc['dirs'] = alive(doc['dirs']);
+  doc['miles'] = alive(doc['miles']);
 }

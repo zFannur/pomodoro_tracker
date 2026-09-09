@@ -8,10 +8,14 @@ import 'package:window_manager/window_manager.dart';
 import '../../app/strings.dart';
 import '../../app/theme.dart';
 import '../../domain/entities/app_settings.dart';
+import '../../domain/entities/direction.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
+import '../../domain/entities/sprint.dart';
+import '../cubits/directions_cubit.dart';
 import '../cubits/journal_cubit.dart';
 import '../cubits/settings_cubit.dart';
+import '../cubits/sprint_cubit.dart';
 import '../cubits/tasks_cubit.dart';
 import '../cubits/timer_cubit.dart';
 import '../widgets/common.dart';
@@ -394,6 +398,41 @@ class _NowCard extends StatelessWidget {
 
   final PomoTask? task;
 
+  /// Нить «Направление → веха»: показывает, ради какой большой цели идёт помидор.
+  String? _buildThreadLine(BuildContext context, PomoTask task) {
+    DirectionsState? directionsState;
+    try {
+      directionsState = context.watch<DirectionsCubit>().state;
+    } catch (_) {
+      directionsState = null;
+    }
+    if (directionsState == null) return null;
+
+    final direction = directionsState.directionForCategory(task.category);
+    if (direction == null) return null;
+
+    Sprint? sprint;
+    try {
+      sprint = context.watch<SprintCubit>().state.sprint;
+    } catch (_) {
+      sprint = null;
+    }
+
+    Milestone? milestone;
+    if (sprint != null && sprint.milestoneId.isNotEmpty) {
+      final sprintMilestone = directionsState.milestoneById(sprint.milestoneId);
+      if (sprintMilestone != null && sprintMilestone.directionId == direction.id) {
+        milestone = sprintMilestone;
+      }
+    }
+    milestone ??= nextOpen(directionsState.milestones, direction.id);
+
+    if (milestone != null) {
+      return '${direction.name} → ${milestone.title}';
+    }
+    return direction.name;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -438,7 +477,7 @@ class _NowCard extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             )
-          else
+          else ...[
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -455,6 +494,19 @@ class _NowCard extends StatelessWidget {
                 CategoryChip(current.category),
               ],
             ),
+            // Нить: <Направление> → <веха> для осознанности текущего помидора.
+            if (_buildThreadLine(context, current) case final thread?) ...[
+              const SizedBox(height: 4),
+              Text(
+                thread,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );

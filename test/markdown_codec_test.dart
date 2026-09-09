@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_tracker/data/markdown_codec.dart';
+import 'package:pomodoro_tracker/domain/entities/direction.dart';
 import 'package:pomodoro_tracker/domain/entities/pomo_session.dart';
 import 'package:pomodoro_tracker/domain/entities/pomo_task.dart';
 import 'package:pomodoro_tracker/domain/entities/sprint.dart';
@@ -293,5 +294,155 @@ void main() {
       expect(sprintId(DateTime(2027, 1, 1)), '2026-W53');
       expect(sprintId(DateTime(2027, 1, 4)), '2027-W01');
     });
+  });
+
+  group('Курс.md', () {
+    test('закрытая и открытая веха сериализуются в правильные чекбоксы', () {
+      final directions = [
+        const Direction(
+          id: 'pomo',
+          name: 'Помидоро Трекер',
+          note: 'Направления/Помидоро Трекер',
+          order: 0,
+          categories: ['проекты', 'работа'],
+        ),
+      ];
+      final milestones = [
+        Milestone(
+          id: 'm1',
+          directionId: 'pomo',
+          title: 'Синк без потерь данных',
+          order: 0,
+          doneSprint: '2026-W29',
+          doneAt: DateTime(2026, 7, 16),
+        ),
+        const Milestone(
+          id: 'm2',
+          directionId: 'pomo',
+          title: 'Курс: направления и лестницы вех',
+          order: 1,
+        ),
+      ];
+      final md = serializeCourse(
+        directions,
+        milestones,
+        now: DateTime(2026, 7, 20),
+      );
+      expect(md, contains('### 1. Помидоро Трекер\n'));
+      expect(md, contains('- заметка: [[Направления/Помидоро Трекер]]\n'));
+      expect(md, contains('- категории: проекты, работа\n'));
+      expect(md, contains('- веха 1 из 2'));
+      expect(md, contains('- [x] Синк без потерь данных `2026-W29`\n'));
+      expect(md, contains('- [ ] Курс: направления и лестницы вех\n'));
+    });
+
+    test('направление без горизонта/заметки/категорий не даёт пустых строк', () {
+      const directions = [
+        Direction(
+          id: 'clean',
+          name: 'Чистое направление',
+          order: 0,
+        ),
+      ];
+      final md = serializeCourse(directions, const []);
+      expect(md, contains('### 1. Чистое направление\n- веха 0 из 0\n'));
+      expect(md, isNot(contains('- горизонт:')));
+      expect(md, isNot(contains('- заметка:')));
+      expect(md, isNot(contains('- категории:')));
+      expect(md, isNot(contains('\n\n\n')));
+    });
+
+    test('порядок направлений и вех — по order', () {
+      final directions = [
+        const Direction(id: 'd3', name: 'Третье', order: 30),
+        const Direction(id: 'd1', name: 'Первое', order: 10),
+        const Direction(id: 'd2', name: 'Второе', order: 20),
+        const Direction(
+          id: 'p2',
+          name: 'Пауза 2',
+          order: 2,
+          status: DirectionStatus.paused,
+        ),
+        const Direction(
+          id: 'p1',
+          name: 'Пауза 1',
+          order: 1,
+          status: DirectionStatus.paused,
+        ),
+        const Direction(
+          id: 'z2',
+          name: 'Закрыто 2',
+          order: 2,
+          status: DirectionStatus.done,
+        ),
+        const Direction(
+          id: 'z1',
+          name: 'Закрыто 1',
+          order: 1,
+          status: DirectionStatus.done,
+        ),
+      ];
+      final milestones = [
+        const Milestone(id: 'm3', directionId: 'd1', title: 'Веха 3', order: 3),
+        const Milestone(id: 'm1', directionId: 'd1', title: 'Веха 1', order: 1),
+        const Milestone(id: 'm2', directionId: 'd1', title: 'Веха 2', order: 2),
+      ];
+      final md = serializeCourse(directions, milestones);
+
+      // Активные направления упорядочены по order
+      final firstIdx = md.indexOf('### 1. Первое');
+      final secondIdx = md.indexOf('### 2. Второе');
+      final thirdIdx = md.indexOf('### 3. Третье');
+      expect(firstIdx, isNonNegative);
+      expect(secondIdx, greaterThan(firstIdx));
+      expect(thirdIdx, greaterThan(secondIdx));
+
+      // Вехи направления d1 упорядочены по order
+      final m1Idx = md.indexOf('- [ ] Веха 1');
+      final m2Idx = md.indexOf('- [ ] Веха 2');
+      final m3Idx = md.indexOf('- [ ] Веха 3');
+      expect(m1Idx, isNonNegative);
+      expect(m2Idx, greaterThan(m1Idx));
+      expect(m3Idx, greaterThan(m2Idx));
+
+      // Направления на паузе упорядочены по order
+      final p1Idx = md.indexOf('### Пауза 1 — веха 0 из 0');
+      final p2Idx = md.indexOf('### Пауза 2 — веха 0 из 0');
+      expect(p1Idx, isNonNegative);
+      expect(p2Idx, greaterThan(p1Idx));
+
+      // Закрытые направления упорядочены по order
+      final z1Idx = md.indexOf('### Закрыто 1 — 0 из 0');
+      final z2Idx = md.indexOf('### Закрыто 2 — 0 из 0');
+      expect(z1Idx, isNonNegative);
+      expect(z2Idx, greaterThan(z1Idx));
+    });
+  });
+
+  test('веха недели из лестницы попадает в зеркало спринта текстом', () {
+    // У недели, взявшей ступень лестницы, sprint.milestone пуст: там только
+    // ссылка. Без разворачивания Спринты/*.md терял веху целиком.
+    final sprint = Sprint(
+      id: '2026-W29',
+      start: DateTime(2026, 7, 13),
+      goal: 40,
+      milestoneId: 'm1',
+    );
+    final content = serializeSprint(
+      sprint,
+      const [],
+      milestoneText: 'Бот отвечает на 3 команды в проде',
+    );
+    expect(content, contains('веха: Бот отвечает на 3 команды в проде'));
+    expect(content, contains('**Веха:** Бот отвечает на 3 команды в проде'));
+
+    // Свободный текст старых недель работает как раньше.
+    final old = Sprint(
+      id: '2026-W28',
+      start: DateTime(2026, 7, 6),
+      goal: 40,
+      milestone: 'Старая веха',
+    );
+    expect(serializeSprint(old, const []), contains('веха: Старая веха'));
   });
 }

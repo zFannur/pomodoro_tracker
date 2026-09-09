@@ -1,6 +1,7 @@
 /// Чистый кодек markdown-форматов хранилища. Без зависимостей от Flutter/IO.
 library;
 
+import '../domain/entities/direction.dart';
 import '../domain/entities/pomo_session.dart';
 import '../domain/entities/pomo_task.dart';
 import '../domain/entities/sprint.dart';
@@ -313,11 +314,16 @@ DayLog parseDayLog(String content, DateTime date, int fallbackGoal) {
 // Спринт: Спринты/YYYY-Wnn.md
 // ---------------------------------------------------------------------------
 
+/// [milestoneText] — текст вехи, когда она взята из лестницы направления:
+/// у такой недели `sprint.milestone` пуст (там лежит только ссылка), и без
+/// этого параметра зеркало недели теряло веху совсем.
 String serializeSprint(
   Sprint sprint,
   List<DayLog> fact, {
   List<PomoTask> weekTasks = const [],
+  String milestoneText = '',
 }) {
+  final milestone = milestoneText.isNotEmpty ? milestoneText : sprint.milestone;
   final total = fact.fold(0, (sum, d) => sum + d.count);
   final minutes = fact.fold(0, (sum, d) => sum + d.minutes);
   final percent = sprint.goal > 0 ? (total * 100 ~/ sprint.goal) : 0;
@@ -327,7 +333,7 @@ String serializeSprint(
     ..write('начало: ${dateKey(sprint.start)}\n')
     ..write('конец: ${dateKey(sprint.end)}\n')
     ..write('цель: ${sprint.goal}\n')
-    ..write('веха: ${sprint.milestone}\n')
+    ..write('веха: $milestone\n')
     ..write('факт: $total\n')
     ..write('минуты: $minutes\n')
     ..write('---\n\n')
@@ -336,8 +342,8 @@ String serializeSprint(
       '(${two(sprint.start.day)}.${two(sprint.start.month)} – '
       '${two(sprint.end.day)}.${two(sprint.end.month)})\n\n',
     );
-  if (sprint.milestone.isNotEmpty) {
-    buf.write('**Веха:** ${sprint.milestone}\n\n');
+  if (milestone.isNotEmpty) {
+    buf.write('**Веха:** $milestone\n\n');
   }
   buf.write(
     '**Цель:** ${sprint.goal} 🍅 · **Факт:** $total 🍅 · **$percent%** '
@@ -405,3 +411,102 @@ SprintSummary? parseSprintSummary(String content) {
     minutes: int.tryParse(fm['минуты'] ?? '') ?? 0,
   );
 }
+
+// ---------------------------------------------------------------------------
+// Курс: Курс.md (зеркало направлений и лестниц вех в валт)
+// ---------------------------------------------------------------------------
+
+/// Одностороннее зеркало курса в Obsidian: направления, прогресс лестниц, вехи.
+/// Обратно намеренно не читается — истиной остаётся data.json, а зеркало служит
+/// для человекочитаемого обзора, графа связей и поиска в Obsidian.
+String serializeCourse(
+  List<Direction> directions,
+  List<Milestone> milestones, {
+  DateTime? now,
+}) {
+  final currentTime = now ?? DateTime.now();
+  final buf = StringBuffer('# Курс\n');
+
+  // Разделяем направления по статусам и сортируем строго по order:
+  // порядок направлений определяет стратегический приоритет пользователя.
+  final active = [
+    for (final d in directions)
+      if (d.status == DirectionStatus.active) d,
+  ]..sort((a, b) => a.order.compareTo(b.order));
+
+  final paused = [
+    for (final d in directions)
+      if (d.status == DirectionStatus.paused) d,
+  ]..sort((a, b) => a.order.compareTo(b.order));
+
+  final done = [
+    for (final d in directions)
+      if (d.status == DirectionStatus.done) d,
+  ]..sort((a, b) => a.order.compareTo(b.order));
+
+  buf.write('\n## Направления\n');
+  for (var i = 0; i < active.length; i++) {
+    final dir = active[i];
+    buf.write('\n### ${i + 1}. ${dir.name}\n');
+
+    // Пустые поля (горизонт, заметка, категории) опускаются без пустых строк.
+    if (dir.horizon != null) {
+      buf.write(
+        '- горизонт: ${dir.horizon!.year}-${two(dir.horizon!.month)}\n',
+      );
+    }
+
+    final note = dir.note.trim();
+    if (note.isNotEmpty) {
+      final formattedNote =
+          note.startsWith('[[') && note.endsWith(']]') ? note : '[[$note]]';
+      buf.write('- заметка: $formattedNote\n');
+    }
+
+    if (dir.categories.isNotEmpty) {
+      buf.write('- категории: ${dir.categories.join(', ')}\n');
+    }
+
+    // Лестница и темп: ladder() сортирует вехи по order.
+    final lad = ladder(milestones, dir.id);
+    final doneCount = lad.where((m) => m.done).length;
+    final rate = closureRate(milestones, dir.id, currentTime);
+    final rateSuffix =
+        rate > 0 ? ' · темп ${rate.toStringAsFixed(1)} вех/мес' : '';
+    buf.write('- веха $doneCount из ${lad.length}$rateSuffix\n');
+
+    if (lad.isNotEmpty) {
+      buf.write('\n');
+      for (final m in lad) {
+        if (m.done) {
+          final sprintSuffix =
+              m.doneSprint.isNotEmpty ? ' `${m.doneSprint}`' : '';
+          buf.write('- [x] ${m.title}$sprintSuffix\n');
+        } else {
+          buf.write('- [ ] ${m.title}\n');
+        }
+      }
+    }
+  }
+
+  if (paused.isNotEmpty) {
+    buf.write('\n## На паузе\n');
+    for (final dir in paused) {
+      final lad = ladder(milestones, dir.id);
+      final doneCount = lad.where((m) => m.done).length;
+      buf.write('\n### ${dir.name} — веха $doneCount из ${lad.length}\n');
+    }
+  }
+
+  if (done.isNotEmpty) {
+    buf.write('\n## Закрытые\n');
+    for (final dir in done) {
+      final lad = ladder(milestones, dir.id);
+      final doneCount = lad.where((m) => m.done).length;
+      buf.write('\n### ${dir.name} — $doneCount из ${lad.length}\n');
+    }
+  }
+
+  return buf.toString();
+}
+

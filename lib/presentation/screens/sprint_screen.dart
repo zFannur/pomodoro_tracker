@@ -4,8 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
 import '../../data/markdown_codec.dart';
+import '../../domain/entities/direction.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
+import '../../domain/entities/sprint.dart';
+import '../cubits/directions_cubit.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/sprint_cubit.dart';
 import '../cubits/tasks_cubit.dart';
@@ -47,6 +50,9 @@ class _SprintBody extends StatefulWidget {
 class _SprintBodyState extends State<_SprintBody> {
   /// Раскрытый день недели. Держим дату: факт пересобирается при обновлении.
   DateTime? _openDay;
+
+  /// Имя направления, у которого только что закрыли последнюю ступень лестницы.
+  String? _ladderCompletedDirName;
 
   void _toggleDay(DayLog day) => setState(
     () => _openDay = _openDay == day.date ? null : day.date,
@@ -102,24 +108,8 @@ class _SprintBodyState extends State<_SprintBody> {
                 style: theme.textTheme.titleLarge,
               ),
               const SizedBox(height: 12),
-              // Веха недели — стержень: задачи недели двигают её.
-              SectionCard(
-                title: S.milestone,
-                trailing: IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  tooltip: S.milestone,
-                  onPressed: () => _editMilestone(context, sprint.milestone),
-                ),
-                child: Text(
-                  sprint.milestone.isEmpty ? S.milestoneHint : sprint.milestone,
-                  style: sprint.milestone.isEmpty
-                      ? theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontStyle: FontStyle.italic,
-                        )
-                      : theme.textTheme.titleMedium,
-                ),
-              ),
+              // Веха недели — тянется из лестницы направления либо свободный текст.
+              _buildMilestoneSection(context, sprint),
               const SizedBox(height: 12),
               SectionCard(
                 title: S.weekTasksTitle,
@@ -302,7 +292,275 @@ class _SprintBodyState extends State<_SprintBody> {
     );
   }
 
-  static void _editMilestone(BuildContext context, String current) {
+  /// Секция вехи недели: берется из лестницы направления (Sprint.milestoneId)
+  /// либо свободный текст (Sprint.milestone) для совместимости со старыми неделями.
+  Widget _buildMilestoneSection(BuildContext context, Sprint sprint) {
+    final theme = Theme.of(context);
+    DirectionsState? directionsState;
+    try {
+      directionsState = context.watch<DirectionsCubit>().state;
+    } catch (_) {
+      directionsState = null;
+    }
+
+    Milestone? milestone;
+    Direction? direction;
+    var ladderIndex = 0;
+    var ladderTotal = 0;
+
+    if (directionsState != null && sprint.milestoneId.isNotEmpty) {
+      milestone = directionsState.milestoneById(sprint.milestoneId);
+      if (milestone != null) {
+        direction = directionsState.directionOf(milestone);
+        if (direction != null) {
+          final lad = ladder(directionsState.milestones, direction.id);
+          ladderIndex = lad.indexOf(milestone) + 1;
+          ladderTotal = lad.length;
+        }
+      }
+    }
+
+    Widget content;
+    if (milestone != null) {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (direction != null)
+            Text(
+              '${direction.name} · ${S.ladderProgress(ladderIndex, ladderTotal)}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          const SizedBox(height: 2),
+          Text(
+            milestone.title,
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            icon: const Icon(Icons.check, size: 18),
+            label: Text(S.courseCloseMilestone),
+            onPressed: () => _closeMilestone(
+              context,
+              sprint,
+              milestone!,
+              direction,
+              directionsState!,
+            ),
+          ),
+        ],
+      );
+    } else if (_ladderCompletedDirName != null) {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.check_circle, size: 20, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                '$_ladderCompletedDirName: ${S.courseLadderPassed}',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          ..._buildTakeNextButton(context, directionsState),
+        ],
+      );
+    } else if (sprint.milestone.isNotEmpty) {
+      content = Text(
+        sprint.milestone,
+        style: theme.textTheme.titleMedium,
+      );
+    } else {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            S.milestoneHint,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          ..._buildTakeNextButton(context, directionsState),
+        ],
+      );
+    }
+
+    return SectionCard(
+      title: S.milestone,
+      trailing: IconButton(
+        icon: const Icon(Icons.edit_outlined, size: 18),
+        tooltip: S.pickMilestone,
+        onPressed: () => _showPickMilestoneDialog(
+          context,
+          sprint,
+          directionsState,
+        ),
+      ),
+      child: content,
+    );
+  }
+
+  List<Widget> _buildTakeNextButton(
+    BuildContext context,
+    DirectionsState? directionsState,
+  ) {
+    if (directionsState == null) return const [];
+    Milestone? nextFirstOpen;
+    Direction? nextFirstDir;
+    for (final d in directionsState.active) {
+      final next = nextOpen(directionsState.milestones, d.id);
+      if (next != null) {
+        nextFirstOpen = next;
+        nextFirstDir = d;
+        break;
+      }
+    }
+    if (nextFirstOpen == null || nextFirstDir == null) return const [];
+    return [
+      const SizedBox(height: 10),
+      FilledButton.tonalIcon(
+        icon: const Icon(Icons.arrow_forward, size: 18),
+        label: Text(
+          '${S.takeNextMilestone}: ${nextFirstDir.name} → ${nextFirstOpen.title}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        onPressed: () {
+          setState(() {
+            _ladderCompletedDirName = null;
+          });
+          context.read<SprintCubit>().setMilestoneRef(nextFirstOpen!.id);
+        },
+      ),
+    ];
+  }
+
+  Future<void> _closeMilestone(
+    BuildContext context,
+    Sprint sprint,
+    Milestone milestone,
+    Direction? direction,
+    DirectionsState directionsState,
+  ) async {
+    final now = DateTime.now();
+    await context.read<DirectionsCubit>().closeMilestone(
+      milestone.id,
+      sprint.id,
+      now,
+    );
+    final dirId = milestone.directionId;
+    final updated = [
+      for (final m in directionsState.milestones)
+        if (m.id == milestone.id)
+          m.copyWith(doneSprint: sprint.id, doneAt: now)
+        else
+          m,
+    ];
+    final next = nextOpen(updated, dirId);
+    if (next != null) {
+      if (context.mounted) {
+        await context.read<SprintCubit>().setMilestoneRef(next.id);
+      }
+    } else {
+      if (context.mounted) {
+        await context.read<SprintCubit>().clearMilestoneRef();
+        setState(() {
+          _ladderCompletedDirName = direction?.name;
+        });
+      }
+    }
+  }
+
+  void _showPickMilestoneDialog(
+    BuildContext context,
+    Sprint sprint,
+    DirectionsState? directionsState,
+  ) {
+    final theme = Theme.of(context);
+    final active = directionsState?.active ?? const [];
+    final hasActiveSteps = active.any(
+      (d) => ladder(directionsState!.milestones, d.id).any((m) => !m.done),
+    );
+
+    if (directionsState == null || !hasActiveSteps) {
+      _editMilestone(context, sprint.milestone);
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(S.pickMilestone),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480, maxHeight: 420),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final dir in active) ...[
+                  if (ladder(directionsState.milestones, dir.id)
+                      .where((m) => !m.done)
+                      .toList()
+                      case final openSteps when openSteps.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 4),
+                      child: Text(
+                        dir.name,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    for (final m in openSteps)
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.flag_outlined, size: 20),
+                        title: Text(m.title, style: theme.textTheme.bodyMedium),
+                        onTap: () {
+                          setState(() {
+                            _ladderCompletedDirName = null;
+                          });
+                          context.read<SprintCubit>().setMilestoneRef(m.id);
+                          Navigator.of(dialogContext).pop();
+                        },
+                      ),
+                  ],
+                ],
+                const Divider(height: 20),
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.edit_note, size: 22),
+                  title: Text(S.customMilestone, style: theme.textTheme.bodyMedium),
+                  onTap: () {
+                    Navigator.of(dialogContext).pop();
+                    _editMilestone(context, sprint.milestone);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(S.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editMilestone(BuildContext context, String current) {
     final controller = TextEditingController(text: current);
     showDialog<String>(
           context: context,
@@ -334,7 +592,10 @@ class _SprintBodyState extends State<_SprintBody> {
         )
         .then((value) {
           if (value != null && context.mounted) {
-            context.read<SprintCubit>().setMilestone(value);
+            setState(() {
+              _ladderCompletedDirName = null;
+            });
+            context.read<SprintCubit>().setMilestone(value, clearRef: true);
           }
         })
         .whenComplete(controller.dispose);

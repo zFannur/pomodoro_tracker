@@ -18,7 +18,7 @@ Obsidian vault as plain `.md` files for reading, search and git.
 [![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Android-0078D6?logo=windows&logoColor=white)](#quick-start)
 [![Storage](https://img.shields.io/badge/Storage-Markdown-3FA45B?logo=markdown&logoColor=white)](#data-storage)
-[![Tests](https://img.shields.io/badge/tests-82%20passing-3FA45B.svg)](#tests)
+[![Tests](https://img.shields.io/badge/tests-200%20passing-3FA45B.svg)](#tests)
 
 <img src="docs/screenshot-timer.png" width="820" alt="Timer screen">
 
@@ -89,6 +89,8 @@ Cross-device sync is optional: without it the app runs fully offline. See
 | **Idle time (delay)** | Time while the timer is stopped or paused. Accumulates and lands on the next pomodoro record. |
 | **Interruption** | Pausing a running pomodoro. Penalizes focus. |
 | **Sprint** | A calendar week (Mon–Sun) with a milestone and a pomodoro goal. |
+| **Direction** | A 3–12 month goal. Holds a list of categories, so all past journal history is attributed retroactively. |
+| **Milestone** | A rung on a direction's ladder: a verifiable result for 1–3 weeks. Milestones have no dates — only relative order. |
 
 ---
 
@@ -141,6 +143,23 @@ Charts: by category, last 14 days, an activity heatmap (from 90 days).
 > There's **deliberately** no "day streak" tile — a broken streak feeds
 > self-criticism.
 
+### Course
+
+Strategic level above sprints and days (3–12 month horizon):
+
+- **Direction cards** — active directions (focus on 2–4 main ones), milestone
+  ladders with relative order and progress, next milestone, actual velocity
+  calculation (milestones/mo) and estimated completion date;
+- **Collapsible "Paused" and "Completed" blocks** — guilt-free pause and an
+  archive of finished directions;
+- **Weekly closures feed** — cross-direction chronicle of wins (`2026-W29`,
+  `2026-W31`…);
+- **30-day attention budget** — pomodoro distribution across directions
+  (clearly shows where focus actually goes and what's starved);
+- **Monthly review** — low-friction review at the start of each month:
+  milestones closed, stalled directions (>3 weeks without progress) prompting
+  to pause or make #1.
+
 ---
 
 ## Focus system
@@ -150,7 +169,7 @@ On top of the classic timer, a personal focus system:
 | Element | How it works |
 |---|---|
 | 🐸 **Frog of the day** | One per day, always at the top of the list. Set from the Planner. **Resets every morning** (05:00 boundary). |
-| ⭐ **Sprint task** | A weekly commitment that moves the milestone. Set from the Planner. **Cleared automatically at the start of a new week.** A closed ⭐ task moves to "Done this week". |
+| ⭐ **Sprint task** | A weekly commitment that moves the milestone. The weekly milestone is now a link to a ladder rung, and closing it moves the direction forward permanently. Set from the Planner. **Cleared automatically at the start of a new week.** A closed ⭐ task moves to "Done this week". |
 | **NOW (WIP = 1)** | One task in progress — the top of the list. |
 | **Flowtime** | The pomodoro finishes — the timer quietly keeps counting up (`+ MM:SS`) until you press "Done". Doesn't break your flow. Toggled in Settings. |
 | **"Where did you leave off?"** | Stopping a running pomodoro asks a one-line question. The answer goes into the day journal's `## Notes`. Skippable. |
@@ -162,9 +181,12 @@ On top of the classic timer, a personal focus system:
 about **due dates**. The sprint is only ⭐. A task can be in Inbox and in the
 sprint at the same time.
 
-**Category = project.** There's deliberately no separate subtask hierarchy:
-big goals live in Obsidian (your own planning notes), this app is about
-execution. Group a project's tasks under one category and watch its counter.
+**Category = project.** Categories are now grouped into **directions**
+(strategic 3–12 month level), while Obsidian remains the place for "why"
+and branching. There is deliberately no dependency graph in the app: task nodes
+evaporate as they get done, edges would have to be redrawn every week, and the
+answer to "what to do right now" is already given by 🐸 + the top of the list.
+Group a project's tasks under one category and watch its counter.
 
 ---
 
@@ -220,6 +242,7 @@ Markdown in the storage folder (`…\Obsidian\Помодоро` by default) is a
 ```
 Помодоро/
 ├── Задачи.md                    # MIRROR of the task list
+├── Курс.md                      # MIRROR of directions and milestones
 ├── Входящие.md                  # inbox: capture tasks from Obsidian
 ├── Журнал/
 │   └── 2026-07/
@@ -228,7 +251,7 @@ Markdown in the storage folder (`…\Obsidian\Помодоро` by default) is a
     └── 2026-W29.md              # MIRROR: milestone, goal, daily facts
 ```
 
-The folder and file names are fixed (`Задачи.md`, `Журнал/`, `Спринты/`) —
+The folder and file names are fixed (`Задачи.md`, `Курс.md`, `Журнал/`, `Спринты/`) —
 they don't change with the interface language, so your vault stays
 consistent no matter which language you use day to day. The **UI language
 switch only translates the app's own text**; the markdown format itself
@@ -237,7 +260,7 @@ exactly as you typed them.
 
 ### Mirrors are read-only
 
-`Задачи.md`, `Журнал/*.md` and `Спринты/*.md` are regenerated on every change:
+`Задачи.md`, `Курс.md`, `Журнал/*.md` and `Спринты/*.md` are regenerated on every change:
 visible in Obsidian, searchable, versioned by git, and they double as a
 human-readable emergency backup. **Edits to them are not read back and get
 overwritten** (a note at the top says so). Edit the weekly milestone in the
@@ -308,6 +331,34 @@ Frontmatter (goal, milestone, week bounds, weekly facts), a `## Задачи
 Daily facts are not stored in `data.json` — they're derived from the journal.
 That's why pomodoros don't push the sprint to Drive: the file only travels
 when the goal, the milestone or the "done" list actually changes.
+
+### Курс.md ("Course.md")
+
+```markdown
+<!-- Зеркало Помодоро Трекера: правки здесь не читаются. -->
+# Курс
+
+## Направления
+
+### 1. Помидоро Трекер
+- горизонт: 2026-12
+- заметка: [[Направления/Помидоро Трекер]]
+- категории: проекты, работа
+- веха 3 из 7 · темп 1.4 вех/мес
+
+- [x] Синк без потерь данных `2026-W29`
+- [x] Задачник со сворачиваемыми группами `2026-W31`
+- [ ] Курс: направления и лестницы вех
+- [ ] ...
+
+## На паузе
+
+### Английский — веха 2 из 5
+
+## Закрытые
+
+### Переезд — 4 из 4
+```
 
 ### App settings
 
@@ -417,7 +468,7 @@ instead of release), or the clients are spread across separate projects.
 - **interface language** — Russian / English, switches instantly, no restart
   needed;
 - date format (6 options) and time format (24h / 12h);
-- storage folder and **mirroring tasks into the vault** (`Задачи.md`);
+- storage folder and **mirroring tasks and course into the vault** (`Задачи.md`, `Курс.md`);
 - categories and **scheme-per-category binding** (a task in that category
   gets that scheme's pomodoro length when estimated). A new category can be
   typed right in the task edit dialog — it registers instantly and shows up
@@ -506,7 +557,7 @@ lib/
 ```bash
 flutter pub get
 flutter analyze          # should be clean
-flutter test             # 82 tests
+flutter test             # 200 tests
 flutter run -d windows   # debug
 flutter build windows --release
 flutter build apk --release
@@ -537,7 +588,12 @@ may need to clear the Windows icon cache (`IconCache.db` + restart Explorer).
 ### Tests
 
 - `test/markdown_codec_test.dart` — round-trip of tasks, journal (🐸, `|`,
-  overnight pomodoros), sprint; the focus formula; logical date; ISO weeks.
+  overnight pomodoros), sprint, `Курс.md` mirror (checkboxes, empty fields, `order`);
+  the focus formula; logical date; ISO weeks.
+- `test/course_test.dart`, `test/course_merge_test.dart`,
+  `test/course_screen_test.dart`, `test/directions_cubit_test.dart` —
+  course domain functions (ladders, velocity, completion ETA, attention budget),
+  direction and milestone merging, state management, and the Course screen.
 - `test/timer_cubit_test.dart` — pomodoro/break cycle, series, pause and
   interruptions, stop, skip, prolong, smart input.
 - `test/stats_frog_test.dart` — counting days with a frog.
@@ -545,7 +601,7 @@ may need to clear the Windows icon cache (`IconCache.db` + restart Explorer).
   units.
 - `test/json_data_repository_test.dart` — migration of tasks and journal,
   round-trip, deterministic ids on migration, tombstones, synthesized empty
-  days, mirrors, the inbox file, `applyRemote`.
+  days, mirrors (including `Курс.md`), the inbox file, `applyRemote`.
 - `test/data_merge_test.dart` — merging: union by id, delete-wins in both
   directions, survival of unknown sections, idempotence.
 - `test/tasks_cubit_planner_test.dart` — bucket reordering, editing, the
@@ -562,7 +618,7 @@ may need to clear the Windows icon cache (`IconCache.db` + restart Explorer).
 
 ## Known limitations
 
-- **Markdown files are mirrors only**: edits to `Задачи.md`, `Журнал/*.md` and
+- **Markdown files are mirrors only**: edits to `Задачи.md`, `Курс.md`, `Журнал/*.md` and
   `Спринты/*.md` are never read back and get overwritten on the next write.
   Add tasks from Obsidian via `Входящие.md`; do everything else in the app.
 - **Flowtime overtime doesn't survive a restart** — closing the app during
