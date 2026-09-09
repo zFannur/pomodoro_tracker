@@ -18,7 +18,7 @@ Obsidian vault as plain `.md` files for reading, search and git.
 [![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Android-0078D6?logo=windows&logoColor=white)](#quick-start)
 [![Storage](https://img.shields.io/badge/Storage-Markdown-3FA45B?logo=markdown&logoColor=white)](#data-storage)
-[![Tests](https://img.shields.io/badge/tests-200%20passing-3FA45B.svg)](#tests)
+[![Tests](https://img.shields.io/badge/tests-209%20passing-3FA45B.svg)](#tests)
 
 <img src="docs/screenshot-timer.png" width="820" alt="Timer screen">
 
@@ -36,10 +36,16 @@ markdown in your own vault — visible in Obsidian's graph, searchable, and easy
 to keep in git. Sync goes through your personal Drive, not through a
 middleman service.
 
+> 📘 **Not sure where to start?** — [How to use it](docs/КАК-ПОЛЬЗОВАТЬСЯ.md)
+> (in Russian): the working order step by step, daily/weekly/monthly rituals,
+> common mistakes. This README is the feature reference; that file is the
+> operating manual.
+
 ---
 
 ## Contents
 
+- [How to use it](docs/КАК-ПОЛЬЗОВАТЬСЯ.md) ← the working order, step by step
 - [Quick start](#quick-start)
 - [Core concepts](#core-concepts)
 - [Screens](#screens)
@@ -157,7 +163,7 @@ Strategic level above sprints and days (3–12 month horizon):
 - **30-day attention budget** — pomodoro distribution across directions
   (clearly shows where focus actually goes and what's starved);
 - **Monthly review** — low-friction review at the start of each month:
-  milestones closed, stalled directions (>3 weeks without progress) prompting
+  milestones closed, stalled directions (no closures for 6 weeks or more) prompting
   to pause or make #1.
 
 ---
@@ -169,7 +175,7 @@ On top of the classic timer, a personal focus system:
 | Element | How it works |
 |---|---|
 | 🐸 **Frog of the day** | One per day, always at the top of the list. Set from the Planner. **Resets every morning** (05:00 boundary). |
-| ⭐ **Sprint task** | A weekly commitment that moves the milestone. The weekly milestone is now a link to a ladder rung, and closing it moves the direction forward permanently. Set from the Planner. **Cleared automatically at the start of a new week.** A closed ⭐ task moves to "Done this week". |
+| ⭐ **Sprint task** | A weekly commitment that moves the milestone. The weekly milestone is a link to a ladder rung, and closing it moves the direction forward permanently. Set from the Planner. **Cleared automatically at the start of a new week.** Starring a task **records the specific rung** as a snapshot, not a live link: when a rung is closed and the next one steps into the sprint, commitments already taken are not re-attributed after the fact. A closed ⭐ task goes both to "Done this week" and to the rung's **proofs** — under a milestone you can see what actually closed it. |
 | **NOW (WIP = 1)** | One task in progress — the top of the list. |
 | **Flowtime** | The pomodoro finishes — the timer quietly keeps counting up (`+ MM:SS`) until you press "Done". Doesn't break your flow. Toggled in Settings. |
 | **"Where did you leave off?"** | Stopping a running pomodoro asks a one-line question. The answer goes into the day journal's `## Notes`. Skippable. |
@@ -347,6 +353,8 @@ when the goal, the milestone or the "done" list actually changes.
 - веха 3 из 7 · темп 1.4 вех/мес
 
 - [x] Синк без потерь данных `2026-W29`
+  - ✅ 16.07 Слияние по id вместо выбора победителя #проекты
+  - ✅ 18.07 Надгробия удалённых записей #проекты
 - [x] Задачник со сворачиваемыми группами `2026-W31`
 - [ ] Курс: направления и лестницы вех
 - [ ] ...
@@ -557,7 +565,7 @@ lib/
 ```bash
 flutter pub get
 flutter analyze          # should be clean
-flutter test             # 200 tests
+flutter test             # 209 tests
 flutter run -d windows   # debug
 flutter build windows --release
 flutter build apk --release

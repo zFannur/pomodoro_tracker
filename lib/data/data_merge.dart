@@ -57,7 +57,7 @@ String mergeData(String? local, String remote, {required bool localWins}) {
   result['sprints'] = _mergeSprints(winner['sprints'], loser['sprints']);
   result['rollover'] = _mergeRollover(winner['rollover'], loser['rollover']);
   result['dirs'] = _mergeById(winner['dirs'], loser['dirs']);
-  result['miles'] = _mergeById(winner['miles'], loser['miles']);
+  result['miles'] = _mergeMilestones(winner['miles'], loser['miles']);
 
   // Таймер — не список: у него ровно одно актуальное состояние, побеждает
   // более свежий снимок независимо от localWins.
@@ -114,6 +114,50 @@ List<Map<String, dynamic>> _mergeById(Object? win, Object? lose) {
       // Запись без id мержить не по чему — считаем незнакомой и сохраняем.
       if (e['id'] is! String || seen.add(e['id'] as String)) e,
   ];
+}
+
+/// Объединение вех: как [_mergeById] по id, но у записей с одинаковым id
+/// доказательства (`pf`) объединяются через [_mergeValues] (порядок победителя
+/// первым, дубликаты по значению схлопываются — ровно как `done` у спринтов).
+List<Map<String, dynamic>> _mergeMilestones(Object? win, Object? lose) {
+  final winList = _list(win);
+  final loseList = _list(lose);
+  final loseById = <String, Map<String, dynamic>>{
+    for (final e in loseList)
+      if (e['id'] is String) e['id'] as String: e,
+  };
+  final seen = <String>{};
+  final result = <Map<String, dynamic>>[];
+
+  for (final w in winList) {
+    final id = w['id'];
+    if (id is String) {
+      seen.add(id);
+      final l = loseById[id];
+      if (l != null) {
+        final proofs = _mergeValues(w['pf'], l['pf']);
+        final merged = <String, dynamic>{
+          ...w,
+          if (proofs.isNotEmpty) 'pf': proofs,
+        };
+        if (proofs.isEmpty) merged.remove('pf');
+        result.add(merged);
+      } else {
+        result.add(w);
+      }
+    } else {
+      result.add(w);
+    }
+  }
+
+  for (final l in loseList) {
+    final id = l['id'];
+    if (id is! String || seen.add(id)) {
+      result.add(l);
+    }
+  }
+
+  return result;
 }
 
 /// Объединение по значению, порядок победителя первым. Заметки дня и строки

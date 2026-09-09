@@ -83,6 +83,7 @@ class Milestone extends Equatable {
     this.order = 0,
     this.doneSprint = '',
     this.doneAt,
+    this.proofs = const [],
   });
 
   final String id;
@@ -96,6 +97,10 @@ class Milestone extends Equatable {
   /// Точный момент закрытия для расчёта темпа движения.
   final DateTime? doneAt;
 
+  /// Строки закрытых ⭐-задач, которыми ступень закрыта.
+  /// Формат: «✅ 16.09 Настроить оплату #проекты».
+  final List<String> proofs;
+
   bool get done => doneSprint.isNotEmpty;
 
   Milestone copyWith({
@@ -105,6 +110,7 @@ class Milestone extends Equatable {
     int? order,
     String? doneSprint,
     DateTime? doneAt,
+    List<String>? proofs,
     bool reopen = false,
   }) {
     return Milestone(
@@ -114,6 +120,7 @@ class Milestone extends Equatable {
       order: order ?? this.order,
       doneSprint: reopen ? '' : (doneSprint ?? this.doneSprint),
       doneAt: reopen ? null : (doneAt ?? this.doneAt),
+      proofs: proofs ?? this.proofs,
     );
   }
 
@@ -125,6 +132,7 @@ class Milestone extends Equatable {
     order,
     doneSprint,
     doneAt,
+    proofs,
   ];
 }
 

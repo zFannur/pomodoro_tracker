@@ -450,6 +450,23 @@ abstract final class S {
   static String get takeNextMilestone =>
       _t('Взять следующую ступень', 'Take next milestone');
 
+  static String milestoneProgressCounter(int tasksCount, int closedCount) {
+    final taskWord = switch (tasksCount % 10) {
+      1 when tasksCount % 100 != 11 => 'задача',
+      2 || 3 || 4 when tasksCount % 100 < 10 || tasksCount % 100 >= 20 =>
+        'задачи',
+      _ => 'задач',
+    };
+    final taskWordEn = tasksCount == 1 ? 'task' : 'tasks';
+    return _t(
+      '⭐ $tasksCount $taskWord · закрыто $closedCount',
+      '⭐ $tasksCount $taskWordEn · closed $closedCount',
+    );
+  }
+
+  static String get movesWeeklyMilestone =>
+      _t('двигает веху недели', 'moves the weekly milestone');
+
   static String deleteDirectionConfirm(String name) => _t(
     'Удалить направление $name вместе с его вехами?',
     'Delete direction $name along with its milestones?',

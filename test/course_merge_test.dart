@@ -6,6 +6,7 @@ import 'package:pomodoro_tracker/data/data_merge.dart';
 import 'package:pomodoro_tracker/data/json_data_repository.dart';
 import 'package:pomodoro_tracker/data/vault_repositories.dart';
 import 'package:pomodoro_tracker/domain/entities/direction.dart';
+import 'package:pomodoro_tracker/domain/entities/pomo_task.dart';
 
 Map<String, dynamic> decode(String s) =>
     jsonDecode(s) as Map<String, dynamic>;
@@ -35,6 +36,7 @@ Map<String, dynamic> milestone(
   int order = 0,
   String? doneSprint,
   String? doneAt,
+  List<String>? proofs,
 }) => {
   'id': id,
   'dir': directionId,
@@ -42,6 +44,7 @@ Map<String, dynamic> milestone(
   'ord': order,
   'ws': ?doneSprint,
   'wa': ?doneAt,
+  if (proofs != null && proofs.isNotEmpty) 'pf': proofs,
 };
 
 String doc({
@@ -206,6 +209,44 @@ void main() {
         );
       }
     });
+
+    test('proofs двух устройств объединяются, а не теряются; дубликат по значению схлопывается', () {
+      final local = doc(
+        miles: [
+          milestone(
+            'm1',
+            'd1',
+            title: 'Веха 1',
+            proofs: [
+              '✅ 16.09 Настроить оплату #проекты',
+              '✅ 17.09 Общий пункт #проекты',
+            ],
+          ),
+        ],
+      );
+      final remote = doc(
+        miles: [
+          milestone(
+            'm1',
+            'd1',
+            title: 'Веха 1',
+            proofs: [
+              '✅ 17.09 Общий пункт #проекты',
+              '✅ 18.09 Запустить рекламу #маркетинг',
+            ],
+          ),
+        ],
+      );
+
+      final merged = decode(mergeData(local, remote, localWins: true));
+      final miles = merged['miles'] as List;
+      final m1 = miles.first as Map<String, dynamic>;
+      expect(m1['pf'], [
+        '✅ 16.09 Настроить оплату #проекты',
+        '✅ 17.09 Общий пункт #проекты',
+        '✅ 18.09 Запустить рекламу #маркетинг',
+      ]);
+    });
   });
 
   group('milestoneId в спринте', () {
@@ -343,6 +384,35 @@ void main() {
       final doc = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
       final graves = doc['graves'] as Map<String, dynamic>;
       expect(graves.containsKey('d1'), isTrue, reason: 'удалённое направление должно попасть в graves');
+    });
+
+    test('round-trip вехи с proofs и задачи с milestoneId (ms/pf)', () async {
+      final r = repo();
+      final d = Direction(id: 'd1', name: 'Фокус');
+      final m = Milestone(
+        id: 'm1',
+        directionId: 'd1',
+        title: 'Первый релиз',
+        proofs: const ['✅ 16.09 Сделать фичу #код'],
+      );
+      await r.saveCourse((directions: [d], milestones: [m]));
+
+      final loadedCourse =
+          (await r.loadCourse()).getOrElse((f) => fail(f.message));
+      expect(loadedCourse.milestones.single.proofs, ['✅ 16.09 Сделать фичу #код']);
+
+      final task = PomoTask(
+        id: 't1',
+        description: 'Задача под веху',
+        category: 'код',
+        durationMinutes: 25,
+        week: true,
+        milestoneId: 'm1',
+      );
+      await r.saveTasks(TasksFile(todo: [task], planner: const []));
+
+      final loadedTasks = (await r.load()).getOrElse((f) => fail(f.message));
+      expect(loadedTasks.todo.single.milestoneId, 'm1');
     });
   });
 }

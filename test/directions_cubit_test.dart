@@ -330,4 +330,34 @@ void main() {
     expect(cubit.state.status, DirectionsStatus.failure);
     expect(cubit.state.error, 'ошибка сохранения курса');
   });
+
+  test('addProof добавляет доказательство, не дублирует строку, игнорирует пустой id и несуществующую веху', () async {
+    await cubit.addDirection('Разработка');
+    final dirId = cubit.state.directions.first.id;
+    await cubit.addMilestone(dirId, 'Ступень 1');
+    final m1 = cubit.state.milestones.first;
+
+    const proof1 = '✅ 16.09 Сделать фичу #код';
+    await cubit.addProof(m1.id, proof1);
+
+    expect(cubit.state.milestoneById(m1.id)?.proofs, [proof1]);
+
+    // Повторное добавление той же строки не дублирует
+    await cubit.addProof(m1.id, proof1);
+    expect(cubit.state.milestoneById(m1.id)?.proofs, [proof1]);
+
+    // Добавление второй уникальной строки
+    const proof2 = '✅ 17.09 Написать тесты #тесты';
+    await cubit.addProof(m1.id, proof2);
+    expect(cubit.state.milestoneById(m1.id)?.proofs, [proof1, proof2]);
+
+    // Пустой id — тихо ничего не делает
+    await cubit.addProof('', '✅ 18.09 Что-то #прочее');
+    expect(cubit.state.milestoneById(m1.id)?.proofs, [proof1, proof2]);
+
+    // Несуществующая веха — тихо ничего не делает
+    await cubit.addProof('non-existent', '✅ 19.09 Что-то #прочее');
+    expect(cubit.state.milestones.length, 1);
+    expect(cubit.state.milestones.first.proofs, [proof1, proof2]);
+  });
 }

@@ -347,6 +347,25 @@ class DirectionsCubit extends Cubit<DirectionsState> {
     await _save(milestones: updated);
   }
 
+  /// Дописать строку доказательства в веху, если её там ещё нет.
+  /// Пустой milestoneId, пустая строка доказательства или ненайденная веха —
+  /// тихо ничего не делает.
+  Future<void> addProof(String milestoneId, String line) async {
+    if (milestoneId.isEmpty || line.trim().isEmpty) return;
+    final index = state.milestones.indexWhere((m) => m.id == milestoneId);
+    if (index < 0) return;
+    final target = state.milestones[index];
+    if (target.proofs.contains(line)) return;
+    final updated = [
+      for (var i = 0; i < state.milestones.length; i++)
+        if (i == index)
+          target.copyWith(proofs: [...target.proofs, line])
+        else
+          state.milestones[i],
+    ];
+    await _save(milestones: updated);
+  }
+
   /// Скрыть баннер месячного разбора до следующего месяца и зафиксировать отметку в rollover.
   Future<void> dismissMonthReview(String month) async {
     emit(state.copyWith(reviewedMonth: month));

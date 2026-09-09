@@ -485,6 +485,9 @@ String serializeCourse(
         } else {
           buf.write('- [ ] ${m.title}\n');
         }
+        for (final proof in m.proofs) {
+          buf.write('  - $proof\n');
+        }
       }
     }
   }

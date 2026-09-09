@@ -384,6 +384,7 @@ class JsonDataRepository
       due: due is String ? DateTime.tryParse(due) : null,
       frog: j['frog'] == true,
       week: j['week'] == true,
+      milestoneId: j['ms'] as String? ?? '',
     );
   }
 
@@ -899,6 +900,7 @@ class _Doc {
               : null,
           frog: e['frog'] == true,
           week: e['week'] == true,
+          milestoneId: e['ms'] as String? ?? '',
         ),
   ];
 
@@ -910,6 +912,7 @@ class _Doc {
     if (t.due != null) 'due': dateKey(t.due!),
     if (t.frog) 'frog': true,
     if (t.week) 'week': true,
+    if (t.milestoneId.isNotEmpty) 'ms': t.milestoneId,
   };
 
   static DayLog _dayFrom(DateTime date, Map<String, dynamic> json) {
@@ -1005,6 +1008,9 @@ class _Doc {
       order: (j['ord'] as num?)?.toInt() ?? 0,
       doneSprint: j['ws'] as String? ?? '',
       doneAt: wa is String ? DateTime.tryParse(wa) : null,
+      proofs: [
+        if (j['pf'] is List) ...(j['pf'] as List).whereType<String>(),
+      ],
     );
   }
 
@@ -1015,5 +1021,6 @@ class _Doc {
     'ord': m.order,
     if (m.doneSprint.isNotEmpty) 'ws': m.doneSprint,
     if (m.doneAt != null) 'wa': dateKey(m.doneAt!),
+    if (m.proofs.isNotEmpty) 'pf': m.proofs,
   };
 }

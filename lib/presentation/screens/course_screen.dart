@@ -1379,6 +1379,7 @@ class _MilestoneItemTile extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Checkbox(
               value: milestone.done,
@@ -1386,14 +1387,34 @@ class _MilestoneItemTile extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             Expanded(
-              child: Text(
-                milestone.title,
-                style: milestone.done
-                    ? theme.textTheme.bodyMedium?.copyWith(
-                        decoration: TextDecoration.lineThrough,
-                        color: scheme.onSurfaceVariant,
-                      )
-                    : theme.textTheme.bodyMedium,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    milestone.title,
+                    style: milestone.done
+                        ? theme.textTheme.bodyMedium?.copyWith(
+                            decoration: TextDecoration.lineThrough,
+                            color: scheme.onSurfaceVariant,
+                          )
+                        : theme.textTheme.bodyMedium,
+                  ),
+                  if (milestone.proofs.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    for (final proof in milestone.proofs)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Text(
+                          proof,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                  ],
+                ],
               ),
             ),
             if (milestone.done && milestone.doneSprint.isNotEmpty) ...[

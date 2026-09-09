@@ -109,7 +109,7 @@ class _SprintBodyState extends State<_SprintBody> {
               ),
               const SizedBox(height: 12),
               // Веха недели — тянется из лестницы направления либо свободный текст.
-              _buildMilestoneSection(context, sprint),
+              _buildMilestoneSection(context, sprint, weekTodo),
               const SizedBox(height: 12),
               SectionCard(
                 title: S.weekTasksTitle,
@@ -135,6 +135,8 @@ class _SprintBodyState extends State<_SprintBody> {
                               task: task,
                               inPlanner: inPlanner,
                               pomodoro: pomodoro,
+                              movesMilestone: sprint.milestoneId.isNotEmpty &&
+                                  task.milestoneId == sprint.milestoneId,
                             ),
                         ],
                       ),
@@ -294,7 +296,11 @@ class _SprintBodyState extends State<_SprintBody> {
 
   /// Секция вехи недели: берется из лестницы направления (Sprint.milestoneId)
   /// либо свободный текст (Sprint.milestone) для совместимости со старыми неделями.
-  Widget _buildMilestoneSection(BuildContext context, Sprint sprint) {
+  Widget _buildMilestoneSection(
+    BuildContext context,
+    Sprint sprint,
+    List<(PomoTask, bool)> weekTodo,
+  ) {
     final theme = Theme.of(context);
     DirectionsState? directionsState;
     try {
@@ -322,6 +328,9 @@ class _SprintBodyState extends State<_SprintBody> {
 
     Widget content;
     if (milestone != null) {
+      final boundCount = weekTodo
+          .where((item) => item.$1.milestoneId == milestone!.id)
+          .length;
       content = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -336,6 +345,13 @@ class _SprintBodyState extends State<_SprintBody> {
           Text(
             milestone.title,
             style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            S.milestoneProgressCounter(boundCount, milestone.proofs.length),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
@@ -643,11 +659,13 @@ class _WeekTaskRow extends StatelessWidget {
     required this.task,
     required this.inPlanner,
     required this.pomodoro,
+    this.movesMilestone = false,
   });
 
   final PomoTask task;
   final bool inPlanner;
   final int pomodoro;
+  final bool movesMilestone;
 
   @override
   Widget build(BuildContext context) {
@@ -665,9 +683,26 @@ class _WeekTaskRow extends StatelessWidget {
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
       leading: CategoryChip(task.category),
-      title: Text(
-        '${task.frog ? '🐸 ' : ''}${task.description}',
-        style: theme.textTheme.bodyMedium,
+      title: Row(
+        children: [
+          if (movesMilestone) ...[
+            Tooltip(
+              message: S.movesWeeklyMilestone,
+              child: Icon(
+                Icons.circle,
+                size: 8,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Text(
+              '${task.frog ? '🐸 ' : ''}${task.description}',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
       ),
       subtitle: Text(
         inPlanner ? S.planner : S.periodToday,

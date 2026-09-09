@@ -110,23 +110,30 @@ Future<void> main() async {
   );
   final inbox = InboxImporter(store);
 
-  final tasksCubit = TasksCubit(
+  late final TasksCubit tasksCubit;
+  late final SprintCubit sprintCubit;
+  final statsCubit = StatsCubit(dataRepository, () => settings().dailyGoal);
+  final directionsCubit = DirectionsCubit(dataRepository, dataRepository);
+
+  tasksCubit = TasksCubit(
     dataRepository,
     dataRepository,
     settings,
     notify,
+    () => sprintCubit.state.sprint?.milestoneId ?? '',
   );
-  final statsCubit = StatsCubit(dataRepository, () => settings().dailyGoal);
-  final sprintCubit = SprintCubit(
+  sprintCubit = SprintCubit(
     dataRepository,
     dataRepository,
     () => settings().sprintGoal,
     () => settings().dailyGoal,
     tasksCubit.weekTasks,
   );
-  final directionsCubit = DirectionsCubit(dataRepository, dataRepository);
-  // Закрытая ⭐-задача недели уезжает в «Сделано за неделю» спринта.
-  tasksCubit.onWeeklyClosed = sprintCubit.addDoneWeek;
+  // Закрытая ⭐-задача недели уезжает в «Сделано за неделю» спринта и в proofs вехи.
+  tasksCubit.onWeeklyClosed = (line, milestoneId) async {
+    await sprintCubit.addDoneWeek(line);
+    await directionsCubit.addProof(milestoneId, line);
+  };
   // Смена дня — сброс 🐸 (лягушка выбирается утром заново);
   // смена недели — сброс ⭐ (3 задачи спринта выбираются из вехи заново).
   Future<bool> rolloverCheck() async {

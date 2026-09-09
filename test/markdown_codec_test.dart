@@ -417,6 +417,60 @@ void main() {
       expect(z1Idx, isNonNegative);
       expect(z2Idx, greaterThan(z1Idx));
     });
+
+    test('доказательства попадают в Курс.md с отступом, пустой список не даёт лишних строк', () {
+      final directions = [
+        const Direction(id: 'd1', name: 'Продукт', order: 1),
+      ];
+      final milestones = [
+        const Milestone(
+          id: 'm1',
+          directionId: 'd1',
+          title: 'Бот отвечает на 3 команды в проде',
+          order: 1,
+          doneSprint: '2026-W37',
+          proofs: [
+            '✅ 16.09 Написать обработчик /start #проекты',
+            '✅ 17.09 Выкатить на прод #проекты',
+          ],
+        ),
+        const Milestone(
+          id: 'm2',
+          directionId: 'd1',
+          title: 'Открытая веха без доказательств',
+          order: 2,
+        ),
+        const Milestone(
+          id: 'm3',
+          directionId: 'd1',
+          title: 'Открытая веха с доказательствами',
+          order: 3,
+          proofs: [
+            '✅ 18.09 Первое доказательство #проекты',
+          ],
+        ),
+      ];
+
+      final md = serializeCourse(directions, milestones);
+
+      expect(
+        md,
+        contains(
+          '- [x] Бот отвечает на 3 команды в проде `2026-W37`\n'
+          '  - ✅ 16.09 Написать обработчик /start #проекты\n'
+          '  - ✅ 17.09 Выкатить на прод #проекты\n',
+        ),
+      );
+      expect(
+        md,
+        contains(
+          '- [ ] Открытая веха без доказательств\n'
+          '- [ ] Открытая веха с доказательствами\n'
+          '  - ✅ 18.09 Первое доказательство #проекты\n',
+        ),
+      );
+      expect(md, isNot(contains('  - \n')));
+    });
   });
 
   test('веха недели из лестницы попадает в зеркало спринта текстом', () {

@@ -123,16 +123,23 @@ class TasksState extends Equatable {
 }
 
 class TasksCubit extends Cubit<TasksState> {
-  TasksCubit(this._tasks, this._journal, this._settings, this._notify)
-    : super(const TasksState(status: TasksStatus.loading));
+  TasksCubit(
+    this._tasks,
+    this._journal,
+    this._settings,
+    this._notify, [
+    String Function()? currentMilestoneId,
+  ]) : _currentMilestoneId = currentMilestoneId ?? (() => ''),
+       super(const TasksState(status: TasksStatus.loading));
 
   final TaskRepository _tasks;
   final JournalRepository _journal;
   final AppSettings Function() _settings;
   final NotifyService _notify;
+  final String Function() _currentMilestoneId;
 
-  /// Вызывается, когда ⭐-задача недели полностью закрыта (для спринта).
-  Future<void> Function(String line)? onWeeklyClosed;
+  /// Вызывается, когда ⭐-задача недели полностью закрыта (для спринта и вехи курса).
+  Future<void> Function(String line, String milestoneId)? onWeeklyClosed;
 
   /// Ручная отметка «сделано» дописала запись в журнал. Таймер идёт своим
   /// путём (onPomodoroComplete), а здесь без этого журнал и статистика
@@ -153,6 +160,7 @@ class TasksCubit extends Cubit<TasksState> {
       '✅ ${now.day.toString().padLeft(2, '0')}.'
       '${now.month.toString().padLeft(2, '0')} ${task.description} '
       '#${task.category}',
+      task.milestoneId,
     );
   }
 
@@ -289,26 +297,39 @@ class TasksCubit extends Cubit<TasksState> {
     await _persist(todo: [for (final t in state.todo) t.copyWith(frog: false)]);
   }
 
-  /// Новая неделя: звёзды спринта снимаются, выбираются заново из вехи.
+  /// Новая неделя: звёзды спринта и привязка к вехе снимаются, выбираются заново из вехи.
   Future<void> clearWeekFlags() async {
     final hasTodo = state.todo.any((t) => t.week);
     final hasPlanner = state.planner.any((t) => t.week);
     if (!hasTodo && !hasPlanner) return;
     await _persist(
       todo: hasTodo
-          ? [for (final t in state.todo) t.copyWith(week: false)]
+          ? [
+              for (final t in state.todo)
+                t.copyWith(week: false, clearMilestoneId: true),
+            ]
           : null,
       planner: hasPlanner
-          ? [for (final t in state.planner) t.copyWith(week: false)]
+          ? [
+              for (final t in state.planner)
+                t.copyWith(week: false, clearMilestoneId: true),
+            ]
           : null,
     );
   }
 
-  /// ⭐ Задача спринта.
+  /// ⭐ Задача спринта: при постановке запоминает веху текущей недели,
+  /// при снятии — очищает привязку.
   Future<void> toggleWeek(int index, {bool inPlanner = false}) async {
     final list = inPlanner ? [...state.planner] : [...state.todo];
     if (index < 0 || index >= list.length) return;
-    list[index] = list[index].copyWith(week: !list[index].week);
+    final currentTask = list[index];
+    final nextWeek = !currentTask.week;
+    list[index] = currentTask.copyWith(
+      week: nextWeek,
+      milestoneId: nextWeek ? _currentMilestoneId() : null,
+      clearMilestoneId: !nextWeek,
+    );
     await _persist(
       todo: inPlanner ? null : list,
       planner: inPlanner ? list : null,
