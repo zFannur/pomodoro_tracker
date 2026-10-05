@@ -15,6 +15,7 @@ abstract final class S {
   static String get navTasks => _t('Задачи', 'Tasks');
   static String get navSprint => _t('Спринт', 'Sprint');
   static String get navStats => _t('Статистика', 'Stats');
+  static String get navActivity => _t('Активность', 'Activity');
 
   // Таймер
   static String get pomodoroWord => _t('ПОМИДОР', 'POMODORO');
@@ -471,6 +472,25 @@ abstract final class S {
     'Удалить направление $name вместе с его вехами?',
     'Delete direction $name along with its milestones?',
   );
+
+  // Активность
+  static String get hourShort => _t('ч', 'h');
+  static String get activityWindowsOnly => _t(
+    'Трекер активности пока работает только на Windows',
+    'Activity tracker only works on Windows for now',
+  );
+  static String get activityEmpty =>
+      _t('Нет данных за этот день', 'No data for this day');
+  static String get activityOther => _t('прочее', 'other');
+  static String get activityHint => _t(
+    'Клик по строке — отметить как отвлекающее (и снять отметку)',
+    'Click a row to mark it as distracting (or unmark it)',
+  );
+  static String activityTotal(String time) => _t('Всего $time', 'Total $time');
+  static String activityDistractions(int percent) =>
+      _t('отвлечения $percent%', 'distractions $percent%');
+  static String activityPomoFocus(int percent) =>
+      _t('в помидорах фокус $percent%', 'focus in pomodoros $percent%');
 
   // Общее
   static String get retry => _t('Повторить', 'Retry');

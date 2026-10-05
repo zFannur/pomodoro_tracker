@@ -9,6 +9,7 @@ import '../app/strings.dart';
 import 'cubits/settings_cubit.dart';
 import 'cubits/tasks_cubit.dart';
 import 'cubits/timer_cubit.dart';
+import 'screens/activity_screen.dart';
 import 'screens/course_screen.dart';
 import 'screens/settings_dialog.dart';
 import 'screens/sprint_screen.dart';
@@ -126,6 +127,18 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  /// Иконка «Активность»: Material в цвет темы (своего ассета нет).
+  Widget _activityIcon({required bool selected}) {
+    return Opacity(
+      opacity: selected ? 1 : 0.45,
+      child: Icon(
+        Icons.timelapse,
+        size: 30,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    );
+  }
+
   /// Заголовок окна: при работающем таймере — «MM:SS контекст».
   void _updateTitle(TimerState timer) {
     if (!Platform.isWindows) return;
@@ -173,6 +186,7 @@ class _HomeShellState extends State<HomeShell> {
         SprintScreen(),
         CourseScreen(),
         StatsScreen(),
+        ActivityScreen(),
       ],
     );
     // Телефон/узкое окно — навигация снизу, шестерёнка в баре сверху.
@@ -224,6 +238,11 @@ class _HomeShellState extends State<HomeShell> {
             icon: _navIcon('assets/nav/stats.png', selected: false),
             selectedIcon: _navIcon('assets/nav/stats.png', selected: true),
             label: S.navStats,
+          ),
+          NavigationDestination(
+            icon: _activityIcon(selected: false),
+            selectedIcon: _activityIcon(selected: true),
+            label: S.navActivity,
           ),
         ],
       ),
@@ -280,6 +299,11 @@ class _HomeShellState extends State<HomeShell> {
                 icon: _navIcon('assets/nav/stats.png', selected: false),
                 selectedIcon: _navIcon('assets/nav/stats.png', selected: true),
                 label: Text(S.navStats),
+              ),
+              NavigationRailDestination(
+                icon: _activityIcon(selected: false),
+                selectedIcon: _activityIcon(selected: true),
+                label: Text(S.navActivity),
               ),
             ],
           ),

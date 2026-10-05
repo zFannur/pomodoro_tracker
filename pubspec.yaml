@@ -48,6 +48,8 @@ dependencies:
   # Защита от второго экземпляра (named mutex): два процесса пишут
   # tasks.json целиком и молча воскрешают удалённые задачи.
   win32: ^5.15.0
+  # calloc/Utf16 для трекера активности (WinAPI через FFI).
+  ffi: ^2.1.0
   # Google Drive синк (appDataFolder): Windows — loopback-консент,
   # Android — google_sign_in; extension склеивает его с googleapis_auth.
   googleapis: ^16.0.0

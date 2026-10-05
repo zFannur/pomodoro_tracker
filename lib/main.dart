@@ -10,12 +10,14 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app/strings.dart';
 import 'app/theme.dart';
+import 'data/activity_store.dart';
 import 'data/json_data_repository.dart';
 import 'data/markdown_codec.dart' show dateKey, sprintId;
 import 'data/timer_state_store.dart';
 import 'data/vault_repositories.dart';
 import 'domain/entities/app_settings.dart';
 import 'domain/entities/pomo_session.dart' show logicalDate;
+import 'presentation/cubits/activity_cubit.dart';
 import 'presentation/cubits/directions_cubit.dart';
 import 'presentation/cubits/journal_cubit.dart';
 import 'presentation/cubits/settings_cubit.dart';
@@ -25,6 +27,7 @@ import 'presentation/cubits/sync_cubit.dart';
 import 'presentation/cubits/tasks_cubit.dart';
 import 'presentation/cubits/timer_cubit.dart';
 import 'presentation/home_shell.dart';
+import 'services/activity_tracker.dart';
 import 'services/drive_sync_service.dart';
 import 'services/notify_service.dart';
 import 'services/sound_service.dart';
@@ -279,6 +282,16 @@ Future<void> main() async {
 
   unawaited(bootstrap());
 
+  // Трекер активности (только Windows, иначе no-op): локальные данные в
+  // activity.json, в синк не едут. Секунды копятся и «в помидоре».
+  final activityTracker = ActivityTracker(
+    store: ActivityStore(),
+    inPomodoro: () =>
+        timerCubit.state.running && timerCubit.state.mode == TimerMode.pomodoro,
+  );
+  final activityCubit = ActivityCubit(activityTracker);
+  unawaited(activityTracker.start());
+
   runApp(
     MultiBlocProvider(
       providers: [
@@ -290,6 +303,7 @@ Future<void> main() async {
         BlocProvider.value(value: directionsCubit),
         BlocProvider.value(value: timerCubit),
         BlocProvider.value(value: syncCubit),
+        BlocProvider.value(value: activityCubit),
       ],
       child: PomodoroApp(onWindowFocus: onForeground),
     ),
