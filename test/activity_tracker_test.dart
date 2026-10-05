@@ -1,5 +1,7 @@
+import 'package:clock/clock.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_tracker/data/activity_store.dart';
+import 'package:pomodoro_tracker/data/markdown_codec.dart' show dateKey;
 import 'package:pomodoro_tracker/domain/entities/pomo_session.dart';
 import 'package:pomodoro_tracker/presentation/cubits/activity_cubit.dart';
 import 'package:pomodoro_tracker/services/activity_tracker.dart';
@@ -331,4 +333,260 @@ void main() {
       cubit.close();
     });
   });
+
+  group('deleteActivity', () {
+    test('за один день не трогает другие дни', () {
+      final data = ActivityData();
+      addTick(
+        data.days.putIfAbsent('2026-10-05', () => {}),
+        app: 'code.exe',
+        seconds: 10,
+        inFocus: false,
+      );
+      addTick(
+        data.days.putIfAbsent('2026-10-06', () => {}),
+        app: 'code.exe',
+        seconds: 20,
+        inFocus: false,
+      );
+      deleteActivity(data, {(app: 'code.exe', title: '')}, day: '2026-10-05');
+
+      expect(data.days['2026-10-05'], isNull);
+      expect(data.days['2026-10-06'], isNotNull);
+      expect(data.days['2026-10-06']!['code.exe|']!.seconds, 20);
+    });
+
+    test('за все дни удаляет везде, включая отрезки', () {
+      final data = ActivityData();
+      final t1 = DateTime(2026, 10, 5, 10);
+      final t2 = DateTime(2026, 10, 6, 10);
+      addTick(
+        data.days.putIfAbsent('2026-10-05', () => {}),
+        app: 'chrome.exe',
+        title: 'YouTube',
+        seconds: 10,
+        inFocus: true,
+      );
+      addSegmentTick(
+        data.focusSegments.putIfAbsent('2026-10-05', () => []),
+        now: t1,
+        app: 'chrome.exe',
+        title: 'YouTube',
+        seconds: 10,
+      );
+      addTick(
+        data.days.putIfAbsent('2026-10-06', () => {}),
+        app: 'chrome.exe',
+        title: 'YouTube',
+        seconds: 20,
+        inFocus: true,
+      );
+      addSegmentTick(
+        data.focusSegments.putIfAbsent('2026-10-06', () => []),
+        now: t2,
+        app: 'chrome.exe',
+        title: 'YouTube',
+        seconds: 20,
+      );
+
+      deleteActivity(data, {(app: 'chrome.exe', title: 'YouTube')});
+
+      expect(data.days['2026-10-05'], isNull);
+      expect(data.days['2026-10-06'], isNull);
+      expect(data.focusSegments['2026-10-05'], isNull);
+      expect(data.focusSegments['2026-10-06'], isNull);
+    });
+
+    test('разные title одного браузера удаляются раздельно', () {
+      final data = ActivityData();
+      final day = '2026-10-05';
+      addTick(
+        data.days.putIfAbsent(day, () => {}),
+        app: 'chrome.exe',
+        title: 'Docs',
+        seconds: 30,
+        inFocus: true,
+      );
+      addTick(
+        data.days.putIfAbsent(day, () => {}),
+        app: 'chrome.exe',
+        title: 'YouTube',
+        seconds: 60,
+        inFocus: true,
+      );
+      final now = DateTime(2026, 10, 5, 10, 0);
+      addSegmentTick(
+        data.focusSegments.putIfAbsent(day, () => []),
+        now: now,
+        app: 'chrome.exe',
+        title: 'Docs',
+        seconds: 30,
+      );
+      addSegmentTick(
+        data.focusSegments.putIfAbsent(day, () => []),
+        now: now.add(const Duration(seconds: 30)),
+        app: 'chrome.exe',
+        title: 'YouTube',
+        seconds: 30,
+      );
+
+      deleteActivity(data, {(app: 'chrome.exe', title: 'YouTube')}, day: day);
+
+      expect(data.days[day]!.containsKey('chrome.exe|YouTube'), isFalse);
+      expect(data.days[day]!.containsKey('chrome.exe|Docs'), isTrue);
+      expect(data.focusSegments[day]!.any((s) => s.title == 'YouTube'), isFalse);
+      expect(data.focusSegments[day]!.any((s) => s.title == 'Docs'), isTrue);
+    });
+
+    test('опустевший день исчезает', () {
+      final data = ActivityData();
+      final day = '2026-10-05';
+      addTick(
+        data.days.putIfAbsent(day, () => {}),
+        app: 'code.exe',
+        seconds: 5,
+        inFocus: true,
+      );
+      addSegmentTick(
+        data.focusSegments.putIfAbsent(day, () => []),
+        now: DateTime(2026, 10, 5, 10),
+        app: 'code.exe',
+        title: '',
+        seconds: 5,
+      );
+
+      deleteActivity(data, {(app: 'code.exe', title: '')}, day: day);
+
+      expect(data.days.containsKey(day), isFalse);
+      expect(data.focusSegments.containsKey(day), isFalse);
+    });
+
+    test('distracting не меняется', () {
+      final data = ActivityData();
+      final day = '2026-10-05';
+      addTick(
+        data.days.putIfAbsent(day, () => {}),
+        app: 'chrome.exe',
+        title: 'YouTube',
+        seconds: 10,
+        inFocus: false,
+      );
+      data.distracting.add('YouTube');
+      data.distracting.add('code.exe');
+
+      deleteActivity(data, {(app: 'chrome.exe', title: 'YouTube')});
+
+      expect(data.distracting, containsAll(['YouTube', 'code.exe']));
+      expect(data.distracting, hasLength(2));
+    });
+  });
+
+  group('ActivityCubit selection and deletion', () {
+    test('выбор, сброс выбора при смене дня', () {
+      final tracker = ActivityTracker(
+        store: ActivityStore(),
+        inPomodoro: () => true,
+      );
+      final today = logicalDate(clock.now());
+      final todayKey = dateKey(today);
+      final prevDay = DateTime(today.year, today.month, today.day - 1);
+      final prevKey = dateKey(prevDay);
+
+      addTick(
+        tracker.data.days.putIfAbsent(todayKey, () => {}),
+        app: 'code.exe',
+        seconds: 100,
+        inFocus: true,
+      );
+      addTick(
+        tracker.data.days.putIfAbsent(todayKey, () => {}),
+        app: 'chrome.exe',
+        title: 'Docs',
+        seconds: 200,
+        inFocus: false,
+      );
+      addTick(
+        tracker.data.days.putIfAbsent(prevKey, () => {}),
+        app: 'slack.exe',
+        seconds: 50,
+        inFocus: false,
+      );
+
+      final cubit = ActivityCubit(tracker)..refresh();
+      expect(cubit.state.rows, hasLength(2));
+      expect(cubit.state.selected, isEmpty);
+
+      final row0 = cubit.state.rows.first;
+      cubit.toggleSelected(row0);
+      expect(cubit.state.selected, {'${row0.app}|${row0.title}'});
+      expect(cubit.state.isSelected(row0), isTrue);
+
+      // Смена дня сбрасывает выбор
+      cubit.prevDay();
+      expect(cubit.state.selected, isEmpty);
+      expect(cubit.state.rows, hasLength(1));
+
+      // Выбор на предыдущем дне
+      final prevRow = cubit.state.rows.first;
+      cubit.toggleSelected(prevRow);
+      expect(cubit.state.selected, {'${prevRow.app}|${prevRow.title}'});
+
+      // Переход на следующий день сбрасывает выбор
+      cubit.nextDay();
+      expect(cubit.state.selected, isEmpty);
+
+      // Проверка clearSelection
+      final row1 = cubit.state.rows.first;
+      cubit.toggleSelected(row1);
+      expect(cubit.state.selected, isNotEmpty);
+      cubit.clearSelection();
+      expect(cubit.state.selected, isEmpty);
+
+      cubit.close();
+    });
+
+    test('deleteSelected удаляет выбранное, сбрасывает выбор и обновляет rows', () async {
+      final tracker = ActivityTracker(
+        store: _MemStore(),
+        inPomodoro: () => true,
+      );
+      final today = logicalDate(clock.now());
+      final todayKey = dateKey(today);
+      addTick(
+        tracker.data.days.putIfAbsent(todayKey, () => {}),
+        app: 'code.exe',
+        seconds: 100,
+        inFocus: true,
+      );
+      addTick(
+        tracker.data.days.putIfAbsent(todayKey, () => {}),
+        app: 'chrome.exe',
+        title: 'Docs',
+        seconds: 200,
+        inFocus: false,
+      );
+
+      final cubit = ActivityCubit(tracker)..refresh();
+      expect(cubit.state.rows, hasLength(2));
+
+      final docRow = cubit.state.rows.firstWhere((r) => r.app == 'chrome.exe');
+      cubit.toggleSelected(docRow);
+      expect(cubit.state.selected, {'chrome.exe|Docs'});
+
+      await cubit.deleteSelected(everywhere: false);
+
+      expect(cubit.state.selected, isEmpty);
+      expect(cubit.state.rows, hasLength(1));
+      expect(cubit.state.rows.first.app, 'code.exe');
+      expect(tracker.data.days[todayKey]!.containsKey('chrome.exe|Docs'), isFalse);
+
+      await cubit.close();
+    });
+  });
+}
+
+/// Хранилище без диска: в тестах path_provider недоступен.
+class _MemStore extends ActivityStore {
+  @override
+  Future<void> save(ActivityData data) async {}
 }

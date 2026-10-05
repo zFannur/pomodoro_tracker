@@ -164,6 +164,45 @@ void pruneDays<T>(
   days.removeWhere((key, _) => key.compareTo(cutoff) < 0);
 }
 
+/// Удаляет записи с [items] из `days` и отрезки с теми же app+title из
+/// `focusSegments`. Если [day] не указан (`null`), удаляет во всех днях,
+/// иначе только в указанном дне («yyyy-MM-dd»). Опустевшие дни удаляет
+/// из обеих карт.
+void deleteActivity(
+  ActivityData data,
+  Set<({String app, String title})> items, {
+  String? day,
+}) {
+  if (items.isEmpty) return;
+  final keys = {for (final item in items) '${item.app}|${item.title}'};
+
+  void cleanDay(String d) {
+    final dayEntries = data.days[d];
+    if (dayEntries != null) {
+      dayEntries.removeWhere((k, _) => keys.contains(k));
+      if (dayEntries.isEmpty) {
+        data.days.remove(d);
+      }
+    }
+    final segments = data.focusSegments[d];
+    if (segments != null) {
+      segments.removeWhere((seg) => keys.contains('${seg.app}|${seg.title}'));
+      if (segments.isEmpty) {
+        data.focusSegments.remove(d);
+      }
+    }
+  }
+
+  if (day != null) {
+    cleanDay(day);
+  } else {
+    final allDays = {...data.days.keys, ...data.focusSegments.keys};
+    for (final d in allDays) {
+      cleanDay(d);
+    }
+  }
+}
+
 /// Учёт активного окна Windows. На остальных платформах — no-op.
 class ActivityTracker {
   ActivityTracker({required this.store, required this.inPomodoro});
@@ -205,6 +244,16 @@ class ActivityTracker {
     if (!data.distracting.remove(key)) data.distracting.add(key);
     _dirty = true;
     await flush();
+  }
+
+  Future<void> delete(
+    Set<({String app, String title})> items, {
+    String? day,
+  }) async {
+    deleteActivity(data, items, day: day);
+    _dirty = true;
+    await flush();
+    _ticks.add(null);
   }
 
   Future<void> flush() async {

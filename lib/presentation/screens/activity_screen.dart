@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
-import '../../data/markdown_codec.dart' show dateHuman;
+import '../../data/markdown_codec.dart' show dateHuman, two;
 import '../../services/activity_tracker.dart' show browserNames;
 import '../cubits/activity_cubit.dart';
 
@@ -80,6 +80,55 @@ class ActivityScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                   ],
+                  if (state.isSelectionMode) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          S.activitySelected(state.selected.length),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        OutlinedButton(
+                          onPressed: () => _confirmAndDelete(
+                            context,
+                            date: state.date,
+                            count: state.selected.length,
+                            everywhere: false,
+                            onConfirm: () => cubit.deleteSelected(everywhere: false),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          child: Text(S.activityDeleteDay),
+                        ),
+                        OutlinedButton(
+                          onPressed: () => _confirmAndDelete(
+                            context,
+                            date: state.date,
+                            count: state.selected.length,
+                            everywhere: true,
+                            onConfirm: () => cubit.deleteSelected(everywhere: true),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          child: Text(S.activityDeleteAllDays),
+                        ),
+                        TextButton(
+                          onPressed: cubit.clearSelection,
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          child: Text(S.cancel),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Expanded(
                     child: state.rows.isEmpty
                         ? Center(
@@ -101,7 +150,43 @@ class ActivityScreen extends StatelessWidget {
                                   seconds: row.seconds,
                                   maxSeconds: maxSeconds,
                                   distracting: state.isDistracting(row),
-                                  onTap: () => cubit.toggleDistracting(row.key),
+                                  selectionMode: state.isSelectionMode,
+                                  selected: state.isSelected(row),
+                                  onTap: state.isSelectionMode
+                                      ? () => cubit.toggleSelected(row)
+                                      : () => cubit.toggleDistracting(row.key),
+                                  onLongPress: () => cubit.toggleSelected(row),
+                                  onToggleSelected: () =>
+                                      cubit.toggleSelected(row),
+                                  onMenuSelected: (action) {
+                                    if (action == 'select') {
+                                      if (!state.isSelected(row)) {
+                                        cubit.toggleSelected(row);
+                                      }
+                                    } else if (action == 'deleteDay') {
+                                      _confirmAndDelete(
+                                        context,
+                                        date: state.date,
+                                        count: 1,
+                                        everywhere: false,
+                                        onConfirm: () => cubit.deleteRow(
+                                          row,
+                                          everywhere: false,
+                                        ),
+                                      );
+                                    } else if (action == 'deleteAll') {
+                                      _confirmAndDelete(
+                                        context,
+                                        date: state.date,
+                                        count: 1,
+                                        everywhere: true,
+                                        onConfirm: () => cubit.deleteRow(
+                                          row,
+                                          everywhere: true,
+                                        ),
+                                      );
+                                    }
+                                  },
                                 ),
                               if (restSeconds > 0)
                                 _ActivityTile(
@@ -138,6 +223,45 @@ class ActivityScreen extends StatelessWidget {
       formatActivityName(row.app, row.title);
 }
 
+/// Подтверждение удаления записей через диалог.
+Future<void> _confirmAndDelete(
+  BuildContext context, {
+  required DateTime date,
+  required int count,
+  required bool everywhere,
+  required Future<void> Function() onConfirm,
+}) async {
+  final dateStr = '${two(date.day)}.${two(date.month)}';
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(
+        everywhere
+            ? S.activityDeleteConfirmAll(count)
+            : S.activityDeleteConfirmDay(count, dateStr),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: Text(S.cancel),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: Text(
+            S.delete,
+            style: TextStyle(
+              color: Theme.of(dialogContext).colorScheme.error,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true && context.mounted) {
+    await onConfirm();
+  }
+}
+
 /// Имя exe без `.exe`; у браузера — «Chrome: название вкладки».
 String formatActivityName(String app, String title) {
   final browser = browserNames[app.toLowerCase()];
@@ -166,7 +290,12 @@ class _ActivityTile extends StatelessWidget {
     required this.seconds,
     required this.maxSeconds,
     required this.distracting,
+    this.selectionMode = false,
+    this.selected = false,
     this.onTap,
+    this.onLongPress,
+    this.onToggleSelected,
+    this.onMenuSelected,
   });
 
   final IconData icon;
@@ -174,7 +303,12 @@ class _ActivityTile extends StatelessWidget {
   final int seconds;
   final int maxSeconds;
   final bool distracting;
+  final bool selectionMode;
+  final bool selected;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onToggleSelected;
+  final PopupMenuItemSelected<String>? onMenuSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -183,10 +317,22 @@ class _ActivityTile extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Row(
           children: [
+            if (selectionMode) ...[
+              Checkbox(
+                value: selected,
+                onChanged: onToggleSelected != null
+                    ? (_) => onToggleSelected!()
+                    : null,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              const SizedBox(width: 4),
+            ],
             Icon(icon, size: 20, color: color),
             const SizedBox(width: 8),
             Expanded(
@@ -220,6 +366,31 @@ class _ActivityTile extends StatelessWidget {
                 style: TextStyle(color: distracting ? scheme.error : null),
               ),
             ),
+            if (onMenuSelected != null) ...[
+              const SizedBox(width: 4),
+              PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.more_vert,
+                  size: 18,
+                  color: scheme.onSurfaceVariant,
+                ),
+                onSelected: onMenuSelected,
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'select',
+                    child: Text(S.activitySelect),
+                  ),
+                  PopupMenuItem(
+                    value: 'deleteDay',
+                    child: Text(S.activityDeleteDay),
+                  ),
+                  PopupMenuItem(
+                    value: 'deleteAll',
+                    child: Text(S.activityDeleteAllDays),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

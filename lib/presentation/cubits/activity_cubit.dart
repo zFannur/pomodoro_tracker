@@ -16,6 +16,7 @@ class ActivityState extends Equatable {
     required this.isToday,
     this.rows = const [],
     this.distracting = const {},
+    this.selected = const {},
   });
 
   /// Логическая дата (сутки с 05:00).
@@ -26,7 +27,15 @@ class ActivityState extends Equatable {
   final List<ActivityRow> rows;
   final Set<String> distracting;
 
+  /// Выбранные строки для удаления: ключ 'app|title'.
+  final Set<String> selected;
+
   bool isDistracting(ActivityRow row) => distracting.contains(row.key);
+
+  bool isSelected(ActivityRow row) =>
+      selected.contains('${row.app}|${row.title}');
+
+  bool get isSelectionMode => selected.isNotEmpty;
 
   int get totalSeconds => rows.fold(0, (sum, r) => sum + r.seconds);
 
@@ -50,8 +59,24 @@ class ActivityState extends Equatable {
     return (100 * good / all).round();
   }
 
+  ActivityState copyWith({
+    DateTime? date,
+    bool? isToday,
+    List<ActivityRow>? rows,
+    Set<String>? distracting,
+    Set<String>? selected,
+  }) {
+    return ActivityState(
+      date: date ?? this.date,
+      isToday: isToday ?? this.isToday,
+      rows: rows ?? this.rows,
+      distracting: distracting ?? this.distracting,
+      selected: selected ?? this.selected,
+    );
+  }
+
   @override
-  List<Object?> get props => [date, isToday, rows, distracting];
+  List<Object?> get props => [date, isToday, rows, distracting, selected];
 }
 
 /// Данные трекера за выбранный день. Обновляется по сигналу трекера
@@ -66,7 +91,7 @@ class ActivityCubit extends Cubit<ActivityState> {
   final ActivityTracker _tracker;
   StreamSubscription<void>? _sub;
 
-  ActivityState _build(DateTime date) {
+  ActivityState _build(DateTime date, {Set<String>? selected}) {
     final today = logicalDate(clock.now());
     final entries = _tracker.data.days[dateKey(date)]?.values ?? const [];
     final rows = <ActivityRow>[
@@ -79,11 +104,16 @@ class ActivityCubit extends Cubit<ActivityState> {
           focusSeconds: e.focusSeconds,
         ),
     ]..sort((a, b) => b.seconds.compareTo(a.seconds));
+    final existingKeys = {for (final r in rows) '${r.app}|${r.title}'};
+    final currentSelected = (selected ?? state.selected)
+        .where(existingKeys.contains)
+        .toSet();
     return ActivityState(
       date: date,
       isToday: !date.isBefore(today),
       rows: rows,
       distracting: Set.of(_tracker.data.distracting),
+      selected: currentSelected,
     );
   }
 
@@ -95,13 +125,57 @@ class ActivityCubit extends Cubit<ActivityState> {
 
   void prevDay() {
     final d = state.date;
-    emit(_build(DateTime(d.year, d.month, d.day - 1)));
+    emit(_build(DateTime(d.year, d.month, d.day - 1), selected: const {}));
   }
 
   void nextDay() {
     if (state.isToday) return;
     final d = state.date;
-    emit(_build(DateTime(d.year, d.month, d.day + 1)));
+    emit(_build(DateTime(d.year, d.month, d.day + 1), selected: const {}));
+  }
+
+  void toggleSelected(ActivityRow row) {
+    final key = '${row.app}|${row.title}';
+    final next = Set<String>.of(state.selected);
+    if (!next.remove(key)) {
+      next.add(key);
+    }
+    emit(state.copyWith(selected: next));
+  }
+
+  void clearSelection() {
+    if (state.selected.isEmpty) return;
+    emit(state.copyWith(selected: const {}));
+  }
+
+  Future<void> deleteSelected({required bool everywhere}) async {
+    if (state.selected.isEmpty) return;
+    final items = <({String app, String title})>{
+      for (final s in state.selected)
+        (
+          app: s.substring(0, s.indexOf('|')),
+          title: s.substring(s.indexOf('|') + 1),
+        ),
+    };
+    await _tracker.delete(
+      items,
+      day: everywhere ? null : dateKey(state.date),
+    );
+    clearSelection();
+    refresh();
+  }
+
+  Future<void> deleteRow(ActivityRow row, {required bool everywhere}) async {
+    await _tracker.delete(
+      {(app: row.app, title: row.title)},
+      day: everywhere ? null : dateKey(state.date),
+    );
+    final key = '${row.app}|${row.title}';
+    if (state.selected.contains(key)) {
+      final next = Set<String>.of(state.selected)..remove(key);
+      emit(state.copyWith(selected: next));
+    }
+    refresh();
   }
 
   Future<void> toggleDistracting(String key) async {

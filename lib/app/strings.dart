@@ -497,6 +497,26 @@ abstract final class S {
     'Нет данных: трекер не работал во время этого помидора',
     'No data: activity tracker was not running during this pomodoro',
   );
+  static String get activitySelect => _t('Выбрать', 'Select');
+  static String get activityDeleteDay =>
+      _t('Удалить за этот день', 'Delete for this day');
+  static String get activityDeleteAllDays =>
+      _t('Удалить за все дни', 'Delete for all days');
+  static String activitySelected(int count) =>
+      _t('Выбрано: $count', 'Selected: $count');
+  static String activityDeleteConfirmDay(int count, String date) => _t(
+    'Удалить $count ${_recordWord(count)} за $date?',
+    'Delete $count ${count == 1 ? 'record' : 'records'} for $date?',
+  );
+  static String activityDeleteConfirmAll(int count) => _t(
+    'Удалить $count ${_recordWord(count)} за все дни? Это нельзя отменить.',
+    'Delete $count ${count == 1 ? 'record' : 'records'} for all days? This cannot be undone.',
+  );
+  static String _recordWord(int n) => switch (n % 10) {
+    1 when n % 100 != 11 => 'запись',
+    2 || 3 || 4 when n % 100 < 10 || n % 100 >= 20 => 'записи',
+    _ => 'записей',
+  };
 
   // Общее
   static String get retry => _t('Повторить', 'Retry');
