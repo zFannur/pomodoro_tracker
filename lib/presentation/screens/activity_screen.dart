@@ -134,17 +134,21 @@ class ActivityScreen extends StatelessWidget {
   }
 
   /// Имя exe без `.exe`; у браузера — «Chrome: название вкладки».
-  static String _name(ActivityRow row) {
-    final browser = browserNames[row.app];
-    if (browser == null) {
-      return row.app.replaceFirst(RegExp(r'\.exe$', caseSensitive: false), '');
-    }
-    return row.title.isEmpty ? browser : '$browser: ${row.title}';
+  static String _name(ActivityRow row) =>
+      formatActivityName(row.app, row.title);
+}
+
+/// Имя exe без `.exe`; у браузера — «Chrome: название вкладки».
+String formatActivityName(String app, String title) {
+  final browser = browserNames[app.toLowerCase()];
+  if (browser == null) {
+    return app.replaceFirst(RegExp(r'\.exe$', caseSensitive: false), '');
   }
+  return title.isEmpty ? browser : '$browser: $title';
 }
 
 /// «1 ч 05 мин», «12 мин», «<1 мин».
-String _duration(int seconds) {
+String formatActivityDuration(int seconds) {
   final minutes = seconds ~/ 60;
   if (minutes == 0) return '<1 ${S.minShort}';
   final h = minutes ~/ 60;
@@ -152,6 +156,8 @@ String _duration(int seconds) {
   if (h == 0) return '$m ${S.minShort}';
   return '$h ${S.hourShort} ${m.toString().padLeft(2, '0')} ${S.minShort}';
 }
+
+String _duration(int seconds) => formatActivityDuration(seconds);
 
 class _ActivityTile extends StatelessWidget {
   const _ActivityTile({

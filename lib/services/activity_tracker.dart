@@ -55,6 +55,15 @@ String browserTabTitle(String exe, String windowTitle) {
   return tab.length > 120 ? tab.substring(0, 120) : tab;
 }
 
+/// Строка активности (приложение или вкладка браузера).
+typedef ActivityRow = ({
+  String key,
+  String app,
+  String title,
+  int seconds,
+  int focusSeconds,
+});
+
 /// Прибавляет тик к агрегату дня. [title] — уже очищенное название вкладки
 /// (см. [browserTabTitle]); [inFocus] — идёт помидор.
 void addTick(
@@ -70,6 +79,78 @@ void addTick(
   );
   entry.seconds += seconds;
   if (inFocus) entry.focusSeconds += seconds;
+}
+
+/// Добавляет тик активности к отрезкам помидора. Склеивает с предыдущим
+/// отрезком, если приложение то же и пауза не превышает 2 тиков.
+void addSegmentTick(
+  List<ActivitySegment> day, {
+  required DateTime now,
+  required String app,
+  required String title,
+  required int seconds,
+}) {
+  if (day.isNotEmpty) {
+    final last = day.last;
+    final gap = now.difference(last.to);
+    if (last.app == app &&
+        last.title == title &&
+        gap >= Duration.zero &&
+        gap <= Duration(seconds: seconds * 2)) {
+      last.to = now;
+      return;
+    }
+  }
+  day.add(
+    ActivitySegment(
+      from: now.subtract(Duration(seconds: seconds)),
+      to: now,
+      app: app,
+      title: title,
+    ),
+  );
+}
+
+/// Суммирует секунды пересечения каждого отрезка с [from, to] по ключу
+/// app+title и сортирует по убыванию.
+List<ActivityRow> segmentsSummary(
+  List<ActivitySegment> all,
+  DateTime from,
+  DateTime to,
+) {
+  final map = <String, ({String app, String title, int seconds})>{};
+  for (final seg in all) {
+    final start = seg.from.isAfter(from) ? seg.from : from;
+    final end = seg.to.isBefore(to) ? seg.to : to;
+    if (end.isAfter(start)) {
+      final secs = end.difference(start).inSeconds;
+      if (secs > 0) {
+        final k = '${seg.app}|${seg.title}';
+        final prev = map[k];
+        if (prev == null) {
+          map[k] = (app: seg.app, title: seg.title, seconds: secs);
+        } else {
+          map[k] = (
+            app: seg.app,
+            title: seg.title,
+            seconds: prev.seconds + secs,
+          );
+        }
+      }
+    }
+  }
+  final rows = <ActivityRow>[
+    for (final e in map.values)
+      (
+        key: e.title.isEmpty ? e.app : e.title,
+        app: e.app,
+        title: e.title,
+        seconds: e.seconds,
+        focusSeconds: e.seconds,
+      ),
+  ];
+  rows.sort((a, b) => b.seconds.compareTo(a.seconds));
+  return rows;
 }
 
 /// Удаляет дни старше [keep] суток (включая [today]). Ключи — «yyyy-MM-dd»,
@@ -105,6 +186,7 @@ class ActivityTracker {
     if (!Platform.isWindows) return;
     data = await store.load();
     pruneDays(data.days, logicalDate(clock.now()));
+    pruneDays(data.focusSegments, logicalDate(clock.now()));
     _lastFlush = clock.now();
     _timer = Timer.periodic(
       const Duration(seconds: activityTickSeconds),
@@ -130,6 +212,7 @@ class ActivityTracker {
     _dirty = false;
     _lastFlush = clock.now();
     pruneDays(data.days, logicalDate(_lastFlush));
+    pruneDays(data.focusSegments, logicalDate(_lastFlush));
     await store.save(data);
   }
 
@@ -145,13 +228,25 @@ class ActivityTracker {
     if (_idleSeconds() > _idleLimitSeconds) return;
     final window = _foreground();
     if (window == null) return;
+    final inFocus = inPomodoro();
+    final title = browserTabTitle(window.exe, window.title);
+    final dayKey = dateKey(logicalDate(now));
     addTick(
-      data.days.putIfAbsent(dateKey(logicalDate(now)), () => {}),
+      data.days.putIfAbsent(dayKey, () => {}),
       app: window.exe,
-      title: browserTabTitle(window.exe, window.title),
+      title: title,
       seconds: activityTickSeconds,
-      inFocus: inPomodoro(),
+      inFocus: inFocus,
     );
+    if (inFocus) {
+      addSegmentTick(
+        data.focusSegments.putIfAbsent(dayKey, () => []),
+        now: now,
+        app: window.exe,
+        title: title,
+        seconds: activityTickSeconds,
+      );
+    }
     _dirty = true;
     _ticks.add(null);
   }

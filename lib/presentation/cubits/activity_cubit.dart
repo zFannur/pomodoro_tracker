@@ -5,17 +5,10 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/markdown_codec.dart' show dateKey;
-import '../../domain/entities/pomo_session.dart' show logicalDate;
+import '../../domain/entities/pomo_session.dart' show PomoSession, logicalDate;
 import '../../services/activity_tracker.dart';
 
-/// Строка списка: приложение (или вкладка браузера) за день.
-typedef ActivityRow = ({
-  String key,
-  String app,
-  String title,
-  int seconds,
-  int focusSeconds,
-});
+export '../../services/activity_tracker.dart' show ActivityRow;
 
 class ActivityState extends Equatable {
   const ActivityState({
@@ -114,6 +107,15 @@ class ActivityCubit extends Cubit<ActivityState> {
   Future<void> toggleDistracting(String key) async {
     await _tracker.toggleDistracting(key);
     refresh();
+  }
+
+  /// Отрезки активности, попадающие в окно помидора [s].
+  List<ActivityRow> segmentsFor(PomoSession s) {
+    final dayKey = dateKey(logicalDate(s.start));
+    final segments = _tracker.data.focusSegments[dayKey] ?? const [];
+    final from = s.start.subtract(const Duration(minutes: 1));
+    final to = s.start.add(Duration(minutes: s.minutes + 1));
+    return segmentsSummary(segments, from, to);
   }
 
   @override

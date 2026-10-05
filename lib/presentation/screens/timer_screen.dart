@@ -12,6 +12,7 @@ import '../../domain/entities/direction.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../../domain/entities/sprint.dart';
+import '../cubits/activity_cubit.dart';
 import '../cubits/directions_cubit.dart';
 import '../cubits/journal_cubit.dart';
 import '../cubits/settings_cubit.dart';
@@ -19,6 +20,7 @@ import '../cubits/sprint_cubit.dart';
 import '../cubits/tasks_cubit.dart';
 import '../cubits/timer_cubit.dart';
 import '../widgets/common.dart';
+import 'activity_screen.dart' show formatActivityDuration, formatActivityName;
 import 'planner_dialog.dart';
 
 /// Главная страница: таймер + «Запланировано» + «Сделано» — один поток,
@@ -1067,6 +1069,8 @@ class _DoneRow extends StatelessWidget {
             icon: const Icon(Icons.more_vert, size: 16),
             onSelected: (value) {
               switch (value) {
+                case 'activity':
+                  _showActivity(context);
                 case 'repeat':
                   context.read<TasksCubit>().add(
                     entry.task,
@@ -1078,15 +1082,79 @@ class _DoneRow extends StatelessWidget {
                   cubit.deleteEntry(entry);
               }
             },
-            itemBuilder: (context) => [
-              PopupMenuItem(value: 'repeat', child: Text(S.menuRepeat)),
-              PopupMenuItem(value: 'fill', child: Text(S.menuFillBlanks)),
-              const PopupMenuDivider(),
-              PopupMenuItem(value: 'delete', child: Text(S.delete)),
-            ],
+            itemBuilder: (context) {
+              final showActivity =
+                  Platform.isWindows && _hasActivityCubit(context);
+              return [
+                if (showActivity)
+                  PopupMenuItem(
+                    value: 'activity',
+                    child: Text(S.menuSessionActivity),
+                  ),
+                PopupMenuItem(value: 'repeat', child: Text(S.menuRepeat)),
+                PopupMenuItem(value: 'fill', child: Text(S.menuFillBlanks)),
+                const PopupMenuDivider(),
+                PopupMenuItem(value: 'delete', child: Text(S.delete)),
+              ];
+            },
           ),
         ],
       ),
+    );
+  }
+
+  bool _hasActivityCubit(BuildContext context) {
+    try {
+      context.read<ActivityCubit>();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _showActivity(BuildContext context) {
+    final cubit = context.read<ActivityCubit>();
+    final rows = cubit.segmentsFor(entry);
+    final distracting = cubit.state.distracting;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        return AlertDialog(
+          title: Text(entry.task.isEmpty ? '—' : entry.task),
+          content: rows.isEmpty
+              ? Text(
+                  S.sessionActivityEmpty,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : SingleChildScrollView(
+                  child: ListBody(
+                    children: [
+                      for (final r in rows)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Text(
+                            '${formatActivityName(r.app, r.title)} — ${formatActivityDuration(r.seconds)}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: distracting.contains(r.key)
+                                  ? theme.colorScheme.error
+                                  : null,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(S.close),
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -491,6 +491,12 @@ abstract final class S {
       _t('отвлечения $percent%', 'distractions $percent%');
   static String activityPomoFocus(int percent) =>
       _t('в помидорах фокус $percent%', 'focus in pomodoros $percent%');
+  static String get menuSessionActivity =>
+      _t('Что было открыто', 'What was open');
+  static String get sessionActivityEmpty => _t(
+    'Нет данных: трекер не работал во время этого помидора',
+    'No data: activity tracker was not running during this pomodoro',
+  );
 
   // Общее
   static String get retry => _t('Повторить', 'Retry');

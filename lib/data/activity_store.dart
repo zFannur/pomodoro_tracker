@@ -44,29 +44,111 @@ class ActivityEntry {
   }
 }
 
-/// Все данные трекера: день «yyyy-MM-dd» → записи (ключ `app|title`) и
-/// множество «отвлекающих» ключей.
+/// Отрезок активности в одном окне во время помидора.
+class ActivitySegment {
+  ActivitySegment({
+    required this.from,
+    required this.to,
+    required this.app,
+    this.title = '',
+  });
+
+  final DateTime from;
+  DateTime to;
+  final String app;
+  final String title;
+
+  Map<String, dynamic> toJson() => {
+    'from': from.toIso8601String(),
+    'to': to.toIso8601String(),
+    'app': app,
+    'title': title,
+  };
+
+  static ActivitySegment? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final app = json['app'];
+    if (app is! String || app.isEmpty) return null;
+    final fromStr = json['from'];
+    final toStr = json['to'];
+    if (fromStr is! String || toStr is! String) return null;
+    final from = DateTime.tryParse(fromStr);
+    final to = DateTime.tryParse(toStr);
+    if (from == null || to == null) return null;
+    return ActivitySegment(
+      from: from,
+      to: to,
+      app: app,
+      title: json['title'] as String? ?? '',
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ActivitySegment &&
+          runtimeType == other.runtimeType &&
+          from == other.from &&
+          to == other.to &&
+          app == other.app &&
+          title == other.title;
+
+  @override
+  int get hashCode => Object.hash(from, to, app, title);
+}
+
+/// Все данные трекера: день «yyyy-MM-dd» → агрегаты дня, отрезки помидоров
+/// и множество «отвлекающих» ключей.
 class ActivityData {
   final Map<String, Map<String, ActivityEntry>> days = {};
+  final Map<String, List<ActivitySegment>> focusSegments = {};
   final Set<String> distracting = {};
 
   Map<String, dynamic> toJson() => {
     for (final day in days.entries)
       if (day.value.isNotEmpty)
         day.key: [for (final e in day.value.values) e.toJson()],
+    _segmentsKey: {
+      for (final day in focusSegments.entries)
+        if (day.value.isNotEmpty)
+          day.key: [for (final s in day.value) s.toJson()],
+    },
     _distractingKey: distracting.toList()..sort(),
   };
 
   static ActivityData fromJson(Object? json) {
     final data = ActivityData();
-    if (json is! Map<String, dynamic>) return data;
+    if (json is! Map) return data;
     for (final item in json.entries) {
-      final value = item.value;
-      if (value is! List) continue;
       if (item.key == _distractingKey) {
-        data.distracting.addAll(value.whereType<String>());
+        final value = item.value;
+        if (value is List) {
+          data.distracting.addAll(value.whereType<String>());
+        }
         continue;
       }
+      if (item.key == _segmentsKey) {
+        final rawSegments = item.value;
+        if (rawSegments is Map) {
+          for (final segEntry in rawSegments.entries) {
+            final segKey = segEntry.key;
+            if (segKey is! String) continue;
+            final segList = segEntry.value;
+            if (segList is! List) continue;
+            final list = <ActivitySegment>[];
+            for (final raw in segList) {
+              final segment = ActivitySegment.fromJson(raw);
+              if (segment != null) list.add(segment);
+            }
+            if (list.isNotEmpty) {
+              data.focusSegments[segKey] = list;
+            }
+          }
+        }
+        continue;
+      }
+      final value = item.value;
+      if (value is! List) continue;
       final day = <String, ActivityEntry>{};
       for (final raw in value) {
         final entry = ActivityEntry.fromJson(raw);
@@ -80,6 +162,9 @@ class ActivityData {
 
 /// Ключ списка «отвлекающих» среди ключей-дат в activity.json.
 const _distractingKey = 'distracting';
+
+/// Ключ словаря отрезков помидоров в activity.json.
+const _segmentsKey = 'segments';
 
 /// JSON-файл активности в AppData (локальные данные машины, в синк не едет).
 class ActivityStore {
