@@ -753,13 +753,18 @@ class TasksCubit extends Cubit<TasksState> {
 
   bool get hasTodos => state.todo.isNotEmpty;
 
-  /// Индекс конкретного инстанса (identical): защита от устаревших индексов
-  /// в колбэках меню/диалогов и от Equatable-равных дубликатов после split.
-  int todoIndexOf(PomoTask task) =>
-      state.todo.indexWhere((t) => identical(t, task));
+  /// Id переживает замену экземпляра, а для старых задач без id важна identity.
+  int _taskIndexOf(List<PomoTask> tasks, PomoTask task) {
+    final id = task.id;
+    if (id == null || id.isEmpty) {
+      return tasks.indexWhere((t) => identical(t, task));
+    }
+    return tasks.indexWhere((t) => t.id == id);
+  }
 
-  int plannerIndexOf(PomoTask task) =>
-      state.planner.indexWhere((t) => identical(t, task));
+  int todoIndexOf(PomoTask task) => _taskIndexOf(state.todo, task);
+
+  int plannerIndexOf(PomoTask task) => _taskIndexOf(state.planner, task);
 
   /// Сколько последних удалённых задач помнит корзина.
   static const _trashCap = 30;

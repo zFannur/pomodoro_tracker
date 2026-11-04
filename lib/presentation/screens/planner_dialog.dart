@@ -289,8 +289,12 @@ class _PlannerDialogState extends State<_PlannerDialog> {
 
     return ListTile(
       dense: true,
-      leading: CategoryChip(task.category),
+      leading: CategoryChip(
+        task.category,
+        onTap: () => _editPlannerTask(context, cubit, task),
+      ),
       title: Text(task.description),
+      onTap: () => _editPlannerTask(context, cubit, task),
       subtitle: task.due == null
           ? null
           : Text(
@@ -338,6 +342,30 @@ class _PlannerDialogState extends State<_PlannerDialog> {
         ],
       ),
     );
+  }
+
+  void _editPlannerTask(BuildContext context, TasksCubit cubit, PomoTask task) {
+    showTaskEditDialog(
+      context,
+      title: S.editTask,
+      category: task.category,
+      description: task.description,
+      firstStep: task.firstStep,
+      cue: task.cue,
+      cueAt: task.cueAt,
+    ).then((result) {
+      if (result == null) return;
+      final index = cubit.plannerIndexOf(task);
+      if (index < 0) return;
+      cubit.plannerEdit(
+        index,
+        category: result.category.isEmpty ? null : result.category,
+        description: result.description.isEmpty ? null : result.description,
+        firstStep: result.firstStep,
+        cue: result.cue,
+        cueAt: result.cueAt,
+      );
+    });
   }
 
   static String _plannerTabLabel(PlannerTab tab) {
