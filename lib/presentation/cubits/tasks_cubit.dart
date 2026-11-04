@@ -411,6 +411,7 @@ class TasksCubit extends Cubit<TasksState> {
       interruptions: 0,
       manual: true,
       frog: task.frog,
+      taskId: task.id ?? '',
     );
     await onHistoryWritten?.call();
     if (rest <= 0 && task.week) await onTaskClosed?.call(task);
@@ -589,6 +590,7 @@ class TasksCubit extends Cubit<TasksState> {
       manual: false,
       startedAt: result.startedAt,
       frog: current?.frog ?? false,
+      taskId: current?.id ?? '',
     );
     if (state.todo.isEmpty && current != null) {
       await _notify.event(settings, title: S.appTitle, body: S.todoEmptyDone);
@@ -634,6 +636,7 @@ class TasksCubit extends Cubit<TasksState> {
     required bool manual,
     DateTime? startedAt,
     bool frog = false,
+    String taskId = '',
   }) async {
     final settings = _settings();
     final now = DateTime.now();
@@ -675,6 +678,7 @@ class TasksCubit extends Cubit<TasksState> {
       minutes: duration,
       category: category,
       task: description,
+      taskId: taskId,
       delayMinutes: delayMin,
       interruptions: interruptions,
       manual: manual,

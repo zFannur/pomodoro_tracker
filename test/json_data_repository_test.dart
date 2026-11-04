@@ -62,6 +62,60 @@ void main() {
   Map<String, dynamic> readDoc() =>
       jsonDecode(dataFile().readAsStringSync()) as Map<String, dynamic>;
 
+  test('новые поля переживают запись и повторное чтение', () async {
+    mirror = false;
+    final r = repo();
+    const task = PomoTask(id: 'task', description: 'тест', category: 'x',
+        durationMinutes: 25, firstStep: 'открыть файл', cue: 'после кофе',
+        cueAt: '09:30', deferrals: 3);
+    final session = PomoSession(id: 'session', start: DateTime(2026, 7, 20, 9),
+        minutes: 25, category: 'x', task: 'тест', taskId: 'task');
+    const direction = Direction(id: 'dir', name: 'курс', why: 'свобода');
+    final plannerTask = task.copyWith(id: 'planner');
+    await r.saveTasks(TasksFile(todo: [task], planner: [plannerTask]));
+    await r.addSession(session, 8);
+    await r.saveCourse((directions: [direction], milestones: []));
+    final doc = readDoc();
+    expect((doc['todo'] as List).single, containsPair('fs', 'открыть файл'));
+    expect(doc['days']['2026-07-20']['s'][0]['tid'], 'task');
+    expect(doc['dirs'][0]['why'], 'свобода');
+    final fresh = repo();
+    final tasks = (await fresh.load()).getOrElse((f) => fail(f.message));
+    expect(tasks.todo.single, task);
+    expect(tasks.planner.single, plannerTask);
+    expect((await fresh.day(DateTime(2026, 7, 20), 8))
+        .getOrElse((f) => fail(f.message)).sessions.single, session);
+    expect((await fresh.loadCourse()).getOrElse((f) => fail(f.message))
+        .directions.single, direction);
+  });
+
+  test('старый JSON: значения по умолчанию и пустые ключи не пишутся', () async {
+    mirror = false;
+    dataFile().writeAsStringSync(jsonEncode({
+      'todo': [{'id': 't', 'desc': 'тест', 'cat': 'x', 'min': 25}],
+      'days': {'2026-07-20': {'s': [{'id': 's', 't': '09:00', 'm': 25}]}},
+      'dirs': [{'id': 'd', 'name': 'курс'}],
+    }));
+    final r = repo();
+    final tasks = (await r.load()).getOrElse((f) => fail(f.message));
+    final task = tasks.todo.single;
+    expect([task.firstStep, task.cue, task.cueAt], ['', '', '']);
+    expect(task.deferrals, 0);
+    final day = (await r.day(DateTime(2026, 7, 20), 8))
+        .getOrElse((f) => fail(f.message));
+    expect(day.sessions.single.taskId, '');
+    final course = (await r.loadCourse()).getOrElse((f) => fail(f.message));
+    expect(course.directions.single.why, '');
+    await r.saveTasks(tasks);
+    final doc = readDoc();
+    final taskJson = doc['todo'][0] as Map;
+    for (final key in ['fs', 'cue', 'cueAt', 'df']) {
+      expect(taskJson.containsKey(key), isFalse);
+    }
+    expect((doc['days']['2026-07-20']['s'][0] as Map).containsKey('tid'), isFalse);
+    expect((doc['dirs'][0] as Map).containsKey('why'), isFalse);
+  });
+
   test('миграция: задачи из tasks.json, журнал и спринты из валта', () async {
     File('${dataDir.path}/tasks.json').writeAsStringSync(
       jsonEncode({

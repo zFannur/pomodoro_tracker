@@ -14,6 +14,7 @@ class PomoSession extends Equatable {
     this.interruptions = 0,
     this.manual = false,
     this.frog = false,
+    this.taskId = '',
   });
 
   /// Стабильный идентификатор записи. Нужен синку (union по id при слиянии
@@ -26,6 +27,7 @@ class PomoSession extends Equatable {
   final int minutes;
   final String category;
   final String task;
+  final String taskId;
 
   /// Простой (задержка) перед этим помидором, минуты.
   final int delayMinutes;
@@ -50,6 +52,7 @@ class PomoSession extends Equatable {
     int? interruptions,
     bool? manual,
     bool? frog,
+    String? taskId,
   }) {
     return PomoSession(
       id: id ?? this.id,
@@ -61,6 +64,7 @@ class PomoSession extends Equatable {
       interruptions: interruptions ?? this.interruptions,
       manual: manual ?? this.manual,
       frog: frog ?? this.frog,
+      taskId: taskId ?? this.taskId,
     );
   }
 
@@ -73,6 +77,7 @@ class PomoSession extends Equatable {
     minutes,
     category,
     task,
+    taskId,
     delayMinutes,
     interruptions,
     manual,

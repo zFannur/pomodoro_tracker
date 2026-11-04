@@ -20,10 +20,12 @@ class Direction extends Equatable {
     this.status = DirectionStatus.active,
     this.order = 0,
     this.categories = const [],
+    this.why = '',
   });
 
   final String id;
   final String name;
+  final String why;
 
   /// Имя заметки в Obsidian для связи с контекстом и материалами.
   final String note;
@@ -46,6 +48,7 @@ class Direction extends Equatable {
     DirectionStatus? status,
     int? order,
     List<String>? categories,
+    String? why,
   }) {
     return Direction(
       id: id ?? this.id,
@@ -55,6 +58,7 @@ class Direction extends Equatable {
       status: status ?? this.status,
       order: order ?? this.order,
       categories: categories ?? this.categories,
+      why: why ?? this.why,
     );
   }
 
@@ -62,6 +66,7 @@ class Direction extends Equatable {
   List<Object?> get props => [
     id,
     name,
+    why,
     note,
     horizon,
     status,

@@ -45,6 +45,15 @@ List<String> ids(Object? raw) => [
 ];
 
 void main() {
+  test('первый шаг задачи победителя сохраняется при слиянии', () {
+    for (final localWins in [true, false]) {
+      final withStep = doc(todo: [{...task('a'), 'fs': 'открыть файл'}]);
+      final withoutStep = doc(todo: [task('a')]);
+      final merged = decode(mergeData(localWins ? withStep : withoutStep,
+          localWins ? withoutStep : withStep, localWins: localWins));
+      expect(merged['todo'][0]['fs'], 'открыть файл');
+    }
+  });
   test('локального снимка нет — удалённый возвращается дословно', () {
     final remote = doc(todo: [task('a')]);
     expect(mergeData(null, remote, localWins: true), remote);

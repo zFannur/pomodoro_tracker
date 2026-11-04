@@ -8,6 +8,7 @@ import 'package:pomodoro_tracker/domain/entities/pomo_session.dart';
 import 'package:pomodoro_tracker/domain/entities/pomo_task.dart';
 import 'package:pomodoro_tracker/domain/repositories.dart';
 import 'package:pomodoro_tracker/presentation/cubits/tasks_cubit.dart';
+import 'package:pomodoro_tracker/presentation/cubits/timer_cubit.dart';
 import 'package:pomodoro_tracker/services/notify_service.dart';
 
 /// Репозиторий задач в памяти.
@@ -92,6 +93,33 @@ void main() {
 
   List<String> plannerNames() =>
       cubit.state.planner.map((t) => t.description).toList();
+
+  test('таймер и ручная отметка записывают id выбранной задачи', () async {
+    await seed(todo: [t('первая', minutes: 50).copyWith(id: 'first'),
+      t('вторая').copyWith(id: 'second')]);
+    await cubit.completeFromTimer(PomodoroResult(workedMinutes: 25, delayMs: 0,
+        interruptions: 0, startedAt: DateTime(2026, 7, 20, 9)));
+    expect(journal.written.single.taskId, 'first');
+    await cubit.markDone(1);
+    expect(journal.written.last.taskId, 'second');
+    await cubit.close();
+  });
+
+  test('split сохраняет план старта и переносы в обеих частях', () async {
+    final original = t('задача', minutes: 50).copyWith(id: 'original',
+        firstStep: 'открыть', cue: 'утром', cueAt: '09:30', deferrals: 3);
+    await seed(todo: [original]);
+    await cubit.split(0);
+    expect(repo.file.todo, hasLength(2));
+    for (final part in repo.file.todo) {
+      expect(part.firstStep, 'открыть');
+      expect(part.cue, 'утром');
+      expect(part.cueAt, '09:30');
+      expect(part.deferrals, 3);
+    }
+    expect(repo.file.todo.map((t) => t.id).toSet(), hasLength(2));
+    await cubit.close();
+  });
 
   test('plannerReorder переставляет и сохраняет', () async {
     await seed(planner: [t('a'), t('b'), t('c')]);

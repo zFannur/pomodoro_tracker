@@ -38,6 +38,10 @@ class PomoTask extends Equatable {
     this.frog = false,
     this.week = false,
     this.milestoneId = '',
+    this.firstStep = '',
+    this.cue = '',
+    this.cueAt = '',
+    this.deferrals = 0,
     this.id,
   });
 
@@ -62,6 +66,10 @@ class PomoTask extends Equatable {
 
   /// Веха, которую двигает ⭐-задача недели.
   final String milestoneId;
+  final String firstStep;
+  final String cue;
+  final String cueAt;
+  final int deferrals;
 
   /// Сколько помидоров показывать на строке при длине помидора [pomodoroMinutes].
   int pomos(int pomodoroMinutes) => pomodoroMinutes <= 0
@@ -96,6 +104,10 @@ class PomoTask extends Equatable {
     String? milestoneId,
     bool clearMilestoneId = false,
     String? id,
+    String? firstStep,
+    String? cue,
+    String? cueAt,
+    int? deferrals,
   }) {
     return PomoTask(
       description: description ?? this.description,
@@ -107,6 +119,10 @@ class PomoTask extends Equatable {
       milestoneId:
           clearMilestoneId ? '' : (milestoneId ?? this.milestoneId),
       id: id ?? this.id,
+      firstStep: firstStep ?? this.firstStep,
+      cue: cue ?? this.cue,
+      cueAt: cueAt ?? this.cueAt,
+      deferrals: deferrals ?? this.deferrals,
     );
   }
 
@@ -120,6 +136,10 @@ class PomoTask extends Equatable {
     frog,
     week,
     milestoneId,
+    firstStep,
+    cue,
+    cueAt,
+    deferrals,
   ];
 }
 

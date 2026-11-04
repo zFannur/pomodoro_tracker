@@ -371,23 +371,9 @@ class JsonDataRepository
 
   List<PomoTask> _tasks(Object? raw) => [
     if (raw is List)
-      for (final e in raw.whereType<Map<String, dynamic>>()) _taskFrom(e),
+      for (final e in raw.whereType<Map<String, dynamic>>())
+        _Doc._taskFromJson(e, legacy: true),
   ];
-
-  PomoTask _taskFrom(Map<String, dynamic> j) {
-    final minutes = (j['min'] as num?)?.toInt() ?? 1;
-    final due = j['due'];
-    return PomoTask(
-      id: j['id'] as String?,
-      description: j['desc'] as String? ?? '',
-      category: j['cat'] as String? ?? 'прочее',
-      durationMinutes: minutes < 1 ? 1 : minutes,
-      due: due is String ? DateTime.tryParse(due) : null,
-      frog: j['frog'] == true,
-      week: j['week'] == true,
-      milestoneId: j['ms'] as String? ?? '',
-    );
-  }
 
   // -- журнал -----------------------------------------------------------------
 
@@ -918,19 +904,27 @@ class _Doc {
   static List<PomoTask> _taskList(Object? raw) => [
     if (raw is List)
       for (final e in raw.whereType<Map<String, dynamic>>())
-        PomoTask(
-          id: e['id'] as String?,
-          description: e['desc'] as String? ?? '',
-          category: e['cat'] as String? ?? 'прочее',
-          durationMinutes: ((e['min'] as num?)?.toInt() ?? 1).clamp(1, 1 << 30),
-          due: e['due'] is String
-              ? DateTime.tryParse(e['due'] as String)
-              : null,
-          frog: e['frog'] == true,
-          week: e['week'] == true,
-          milestoneId: e['ms'] as String? ?? '',
-        ),
+        _taskFromJson(e),
   ];
+
+  static PomoTask _taskFromJson(Map<String, dynamic> j, {bool legacy = false}) {
+    final minutes = (j['min'] as num?)?.toInt() ?? 1;
+    final due = j['due'];
+    return PomoTask(
+      id: j['id'] as String?,
+      description: j['desc'] as String? ?? '',
+      category: j['cat'] as String? ?? 'прочее',
+      durationMinutes: legacy ? max(1, minutes) : minutes.clamp(1, 1 << 30),
+      due: due is String ? DateTime.tryParse(due) : null,
+      frog: j['frog'] == true,
+      week: j['week'] == true,
+      milestoneId: j['ms'] as String? ?? '',
+      firstStep: j['fs'] as String? ?? '',
+      cue: j['cue'] as String? ?? '',
+      cueAt: j['cueAt'] as String? ?? '',
+      deferrals: (j['df'] as num?)?.toInt() ?? 0,
+    );
+  }
 
   static List<KanbanColumn> _kanbanColumns(Object? raw) {
     if (raw is! Map<String, dynamic> || raw['columns'] is! List) {
@@ -959,6 +953,10 @@ class _Doc {
     if (t.frog) 'frog': true,
     if (t.week) 'week': true,
     if (t.milestoneId.isNotEmpty) 'ms': t.milestoneId,
+    if (t.firstStep.isNotEmpty) 'fs': t.firstStep,
+    if (t.cue.isNotEmpty) 'cue': t.cue,
+    if (t.cueAt.isNotEmpty) 'cueAt': t.cueAt,
+    if (t.deferrals != 0) 'df': t.deferrals,
   };
 
   static DayLog _dayFrom(DateTime date, Map<String, dynamic> json) {
@@ -996,6 +994,7 @@ class _Doc {
       minutes: (j['m'] as num?)?.toInt() ?? 1,
       category: j['c'] as String? ?? '',
       task: j['d'] as String? ?? '',
+      taskId: j['tid'] as String? ?? '',
       delayMinutes: (j['dl'] as num?)?.toInt() ?? 0,
       interruptions: (j['in'] as num?)?.toInt() ?? 0,
       manual: j['man'] == true,
@@ -1009,6 +1008,7 @@ class _Doc {
     'm': s.minutes,
     'c': s.category,
     'd': s.task,
+    if (s.taskId.isNotEmpty) 'tid': s.taskId,
     if (s.delayMinutes != 0) 'dl': s.delayMinutes,
     if (s.interruptions != 0) 'in': s.interruptions,
     if (s.manual) 'man': true,
@@ -1025,6 +1025,7 @@ class _Doc {
     return Direction(
       id: j['id'] as String? ?? '',
       name: j['name'] as String? ?? '',
+      why: j['why'] as String? ?? '',
       note: j['note'] as String? ?? '',
       horizon: hor is String ? DateTime.tryParse(hor) : null,
       status: st,
@@ -1038,6 +1039,7 @@ class _Doc {
   static Map<String, dynamic> _directionJson(Direction d) => {
     'id': d.id,
     'name': d.name,
+    if (d.why.isNotEmpty) 'why': d.why,
     if (d.note.isNotEmpty) 'note': d.note,
     if (d.horizon != null) 'hor': dateKey(d.horizon!),
     'st': d.status.name,
