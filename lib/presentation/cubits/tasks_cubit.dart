@@ -417,12 +417,22 @@ class TasksCubit extends Cubit<TasksState> {
     if (rest <= 0 && task.week) await onTaskClosed?.call(task);
   }
 
-  Future<void> edit(int index, {String? description, String? category}) async {
+  Future<void> edit(
+    int index, {
+    String? description,
+    String? category,
+    String? firstStep,
+    String? cue,
+    String? cueAt,
+  }) async {
     final todo = [...state.todo];
     if (index < 0 || index >= todo.length) return;
     todo[index] = todo[index].copyWith(
       description: description,
       category: category?.trim().replaceAll(' ', '-'),
+      firstStep: firstStep,
+      cue: cue,
+      cueAt: cueAt,
     );
     await _persist(todo: todo);
   }
@@ -523,14 +533,54 @@ class TasksCubit extends Cubit<TasksState> {
     int index, {
     String? description,
     String? category,
+    String? firstStep,
+    String? cue,
+    String? cueAt,
   }) async {
     final planner = [...state.planner];
     if (index < 0 || index >= planner.length) return;
     planner[index] = planner[index].copyWith(
       description: description,
       category: category?.trim().replaceAll(' ', '-'),
+      firstStep: firstStep,
+      cue: cue,
+      cueAt: cueAt,
     );
     await _persist(planner: planner);
+  }
+
+  Future<void> setPlan(
+    String taskId, {
+    String? firstStep,
+    String? cue,
+    String? cueAt,
+  }) async {
+    final index = state.todo.indexWhere((task) => task.id == taskId);
+    if (index >= 0) {
+      await edit(index, firstStep: firstStep, cue: cue, cueAt: cueAt);
+      return;
+    }
+    final indexPlanner = state.planner.indexWhere((task) => task.id == taskId);
+    if (indexPlanner >= 0) {
+      await plannerEdit(
+        indexPlanner,
+        firstStep: firstStep,
+        cue: cue,
+        cueAt: cueAt,
+      );
+    }
+  }
+
+  Future<void> addSmaller(PomoTask parent, String description) async {
+    final text = description.trim();
+    if (text.isEmpty) return;
+    final task = PomoTask(
+      id: newId(),
+      description: text.length > 255 ? text.substring(0, 255) : text,
+      category: parent.category,
+      durationMinutes: _pomodoroMinutes,
+    );
+    await _persist(todo: [task, ...state.todo]);
   }
 
   /// Восстановить задачу из корзины — наверх «Сегодня» или в планировщик,
@@ -568,7 +618,9 @@ class TasksCubit extends Cubit<TasksState> {
     final todo = [...state.todo];
     final current = todo.isEmpty ? null : todo.first;
     if (current != null) {
-      final f = math.max(result.workedMinutes, settings.scheme.pomodoro);
+      final f = result.warmup
+          ? result.workedMinutes
+          : math.max(result.workedMinutes, settings.scheme.pomodoro);
       if (settings.completeRemove || current.durationMinutes > f) {
         final rest = current.durationMinutes - f;
         if (rest <= 0) {
@@ -619,8 +671,10 @@ class TasksCubit extends Cubit<TasksState> {
 
   /// Вернуть завершённую карточку в «Сегодня», не создавая запись журнала.
   Future<void> restoreKanbanCard(KanbanCard card) async {
-    final exists = [...state.todo, ...state.planner]
-        .any((task) => task.id == card.taskId);
+    final exists = [
+      ...state.todo,
+      ...state.planner,
+    ].any((task) => task.id == card.taskId);
     if (exists) return;
     await _persist(todo: [card.toTask(), ...state.todo]);
   }

@@ -15,6 +15,7 @@ class TimerSnapshot {
     required this.delaysMs,
     required this.savedAt,
     this.overtime = 0,
+    this.warmup = false,
     this.startedAt,
   });
 
@@ -31,6 +32,7 @@ class TimerSnapshot {
   /// восстановлении всегда попадал в ветку «дотикал» и молча выбрасывался —
   /// вместе со всем отработанным сверх нормы временем.
   final int overtime;
+  final bool warmup;
 
   /// Реальное начало фазы: нужно, чтобы дописать помидор задним числом.
   final DateTime? startedAt;
@@ -45,6 +47,7 @@ class TimerSnapshot {
     'delaysMs': delaysMs,
     'savedAt': savedAt.millisecondsSinceEpoch,
     if (overtime != 0) 'overtime': overtime,
+    if (warmup) 'warmup': true,
     if (startedAt != null) 'startedAt': startedAt!.millisecondsSinceEpoch,
   };
 
@@ -62,6 +65,7 @@ class TimerSnapshot {
         json['savedAt'] as int? ?? 0,
       ),
       overtime: json['overtime'] as int? ?? 0,
+      warmup: json['warmup'] == true,
       startedAt: json['startedAt'] is int
           ? DateTime.fromMillisecondsSinceEpoch(json['startedAt'] as int)
           : null,

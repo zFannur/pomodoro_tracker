@@ -31,7 +31,11 @@ class TimerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kanbanEnabled = context.watch<SettingsCubit>().state.settings.kanbanEnabled;
+    final kanbanEnabled = context
+        .watch<SettingsCubit>()
+        .state
+        .settings
+        .kanbanEnabled;
     const content = Column(
       children: [
         _TimerBlock(),
@@ -120,7 +124,8 @@ class _TimerBlock extends StatelessWidget {
 
     final doneCount = journal.sessions.length;
     final phase = switch (timer.mode) {
-      TimerMode.pomodoro => '${S.pomodoroWord}${doneCount + 1}',
+      TimerMode.pomodoro =>
+        timer.warmup ? S.warmupTitle : '${S.pomodoroWord}${doneCount + 1}',
       TimerMode.shortBreak => S.shortBreakTitle,
       TimerMode.longBreak => S.longBreakTitle,
     };
@@ -428,7 +433,8 @@ class _NowCard extends StatelessWidget {
     Milestone? milestone;
     if (sprint != null && sprint.milestoneId.isNotEmpty) {
       final sprintMilestone = directionsState.milestoneById(sprint.milestoneId);
-      if (sprintMilestone != null && sprintMilestone.directionId == direction.id) {
+      if (sprintMilestone != null &&
+          sprintMilestone.directionId == direction.id) {
         milestone = sprintMilestone;
       }
     }
@@ -501,6 +507,17 @@ class _NowCard extends StatelessWidget {
                 CategoryChip(current.category),
               ],
             ),
+            if (current.firstStep.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                '▸ ${current.firstStep}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
             // Нить: <Направление> → <веха> для осознанности текущего помидора.
             if (_buildThreadLine(context, current) case final thread?) ...[
               const SizedBox(height: 4),
@@ -947,6 +964,9 @@ class _TaskRow extends StatelessWidget {
       title: S.editTask,
       category: task.category,
       description: task.description,
+      firstStep: task.firstStep,
+      cue: task.cue,
+      cueAt: task.cueAt,
     ).then((r) {
       if (r == null) return;
       final index = cubit.todoIndexOf(task);
@@ -955,6 +975,9 @@ class _TaskRow extends StatelessWidget {
         index,
         category: r.category.isEmpty ? null : r.category,
         description: r.description.isEmpty ? null : r.description,
+        firstStep: r.firstStep,
+        cue: r.cue,
+        cueAt: r.cueAt,
       );
     });
   }

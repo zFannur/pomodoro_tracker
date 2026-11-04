@@ -19,6 +19,20 @@ abstract final class S {
 
   // Таймер
   static String get pomodoroWord => _t('ПОМИДОР', 'POMODORO');
+  static String get warmupTitle => _t('РАЗГОН', 'WARM-UP');
+  static String get warmupDoneTitle => _t('Разгон пройден', 'Warm-up complete');
+  static String get warmupDoneBody => _t(
+    'Продолжай, пока идёт. «Готово» — когда хватит.',
+    'Keep going while it flows. Press Done when you have had enough.',
+  );
+  static String get fieldFirstStep => _t('Первый шаг', 'First step');
+  static String get startPlan => _t('План старта', 'Start plan');
+  static String get cueLabel => _t('Когда…', 'When…');
+  static String get cueHint =>
+      _t('сяду после завтрака', 'I sit down after breakfast');
+  static String get addTime => _t('+ время', '+ time');
+  static String remindAt(String time) =>
+      _t('Напомнить в $time', 'Remind at $time');
   static String get takeShortBreak =>
       _t('Пора сделать короткий перерыв.', 'Time for a short break.');
   static String get takeLongBreak =>

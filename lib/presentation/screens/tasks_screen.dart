@@ -484,6 +484,9 @@ class _TodayRow extends StatelessWidget {
       title: S.editTask,
       category: task.category,
       description: task.description,
+      firstStep: task.firstStep,
+      cue: task.cue,
+      cueAt: task.cueAt,
     ).then((r) {
       if (r == null) return;
       final index = cubit.todoIndexOf(task);
@@ -492,6 +495,9 @@ class _TodayRow extends StatelessWidget {
         index,
         category: r.category.isEmpty ? null : r.category,
         description: r.description.isEmpty ? null : r.description,
+        firstStep: r.firstStep,
+        cue: r.cue,
+        cueAt: r.cueAt,
       );
     });
   }
@@ -615,10 +621,7 @@ class _TodayRow extends StatelessWidget {
           ),
         );
         return narrow
-            ? ReorderableDelayedDragStartListener(
-                index: viewIndex,
-                child: tile,
-              )
+            ? ReorderableDelayedDragStartListener(index: viewIndex, child: tile)
             : tile;
       },
     );
@@ -782,6 +785,9 @@ class _BucketRow extends StatelessWidget {
       title: S.editTask,
       category: task.category,
       description: task.description,
+      firstStep: task.firstStep,
+      cue: task.cue,
+      cueAt: task.cueAt,
     ).then((r) {
       if (r == null) return;
       final index = cubit.plannerIndexOf(task);
@@ -790,6 +796,9 @@ class _BucketRow extends StatelessWidget {
         index,
         category: r.category.isEmpty ? null : r.category,
         description: r.description.isEmpty ? null : r.description,
+        firstStep: r.firstStep,
+        cue: r.cue,
+        cueAt: r.cueAt,
       );
     });
   }
@@ -919,10 +928,7 @@ class _BucketRow extends StatelessWidget {
           ),
         );
         return narrow
-            ? ReorderableDelayedDragStartListener(
-                index: viewIndex,
-                child: tile,
-              )
+            ? ReorderableDelayedDragStartListener(index: viewIndex, child: tile)
             : tile;
       },
     );
@@ -1117,7 +1123,6 @@ class PomosBadge extends StatelessWidget {
   final PomoTask task;
   final int pomodoro;
   final bool inPlanner;
-
 
   /// Шаг оценки. Индекс берём в момент нажатия: список мог сдвинуться.
   void _step(TasksCubit cubit, {required bool add}) {

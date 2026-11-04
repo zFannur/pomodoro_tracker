@@ -8,6 +8,7 @@ import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/tasks_cubit.dart';
+import 'first_step_field.dart';
 
 /// Карточка-секция с заголовком.
 class SectionCard extends StatelessWidget {
@@ -119,52 +120,51 @@ class DaysBarChart extends StatelessWidget {
                   day: day,
                   onDayTap: onDayTap,
                   child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (day.count > 0)
-                        Text(
-                          '${day.count}',
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                      const SizedBox(height: 2),
-                      // Столбик берёт то, что осталось после подписей, а не
-                      // фиксированную долю от «height − 40»: запас в 40 точек
-                      // был угадан под обычный шрифт и переполнял колонку,
-                      // когда подписи выше (крупный системный шрифт).
-                      Flexible(
-                        child: FractionallySizedBox(
-                          heightFactor: day.count == 0
-                              ? null
-                              : day.count / maxCount,
-                          alignment: Alignment.bottomCenter,
-                          child: Container(
-                            height: day.count == 0 ? 3 : null,
-                            decoration: BoxDecoration(
-                              color: day.count == 0
-                                  ? scheme.surfaceContainerHighest
-                                  : (goal > 0 && day.count >= goal
-                                        ? scheme.primary
-                                        : scheme.primary.withValues(
-                                            alpha: 0.45,
-                                          )),
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(3),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (day.count > 0)
+                          Text(
+                            '${day.count}',
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                        const SizedBox(height: 2),
+                        // Столбик берёт то, что осталось после подписей, а не
+                        // фиксированную долю от «height − 40»: запас в 40 точек
+                        // был угадан под обычный шрифт и переполнял колонку,
+                        // когда подписи выше (крупный системный шрифт).
+                        Flexible(
+                          child: FractionallySizedBox(
+                            heightFactor: day.count == 0
+                                ? null
+                                : day.count / maxCount,
+                            alignment: Alignment.bottomCenter,
+                            child: Container(
+                              height: day.count == 0 ? 3 : null,
+                              decoration: BoxDecoration(
+                                color: day.count == 0
+                                    ? scheme.surfaceContainerHighest
+                                    : (goal > 0 && day.count >= goal
+                                          ? scheme.primary
+                                          : scheme.primary.withValues(
+                                              alpha: 0.45,
+                                            )),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(3),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${day.date.day}',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
+                        const SizedBox(height: 4),
+                        Text(
+                          '${day.date.day}',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -239,9 +239,7 @@ class DayDoneList extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(e.key, style: theme.textTheme.bodyMedium),
-                ),
+                Expanded(child: Text(e.key, style: theme.textTheme.bodyMedium)),
                 const SizedBox(width: 8),
                 Text(
                   '${e.value.pomos} 🍅 · ${formatMinutesUi(e.value.minutes)}',
@@ -387,18 +385,18 @@ class HeatmapCalendar extends StatelessWidget {
                     final day = index < cells.length ? cells[index] : null;
                     final intensity = day == null ? 0.0 : day.count / maxCount;
                     final cell = Container(
-                        width: 12,
-                        height: 12,
-                        margin: const EdgeInsets.all(1),
-                        decoration: BoxDecoration(
-                          color: day == null || day.count == 0
-                              ? scheme.surfaceContainerHighest
-                              : scheme.primary.withValues(
-                                  alpha: 0.25 + 0.75 * intensity,
-                                ),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      );
+                      width: 12,
+                      height: 12,
+                      margin: const EdgeInsets.all(1),
+                      decoration: BoxDecoration(
+                        color: day == null || day.count == 0
+                            ? scheme.surfaceContainerHighest
+                            : scheme.primary.withValues(
+                                alpha: 0.25 + 0.75 * intensity,
+                              ),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    );
                     return Tooltip(
                       message: day == null
                           ? ''
@@ -525,96 +523,195 @@ void registerCategory(SettingsCubit settings, String category) {
 /// Диалог редактирования задачи/записи: категория — выбор из списка ИЛИ
 /// свободный ввод новой (она сразу регистрируется в настройках).
 /// [minutes] != null — добавляется поле минут (записи «Сделано»).
-Future<({String category, String description, int? minutes})?>
+Future<
+  ({
+    String category,
+    String description,
+    int? minutes,
+    String firstStep,
+    String cue,
+    String cueAt,
+  })?
+>
 showTaskEditDialog(
   BuildContext context, {
   required String title,
   required String category,
   required String description,
   int? minutes,
+  String firstStep = '',
+  String cue = '',
+  String cueAt = '',
 }) {
   // Кубит — до showDialog: builder ленив, исходный context может умереть.
   final settingsCubit = context.read<SettingsCubit>();
   final categories = settingsCubit.state.settings.categories.keys.toList();
   final catController = TextEditingController(text: category);
   final descController = TextEditingController(text: description);
+  final stepController = TextEditingController(text: firstStep);
+  final cueController = TextEditingController(text: cue);
+  var time = cueAt;
   final minController = minutes == null
       ? null
       : TextEditingController(text: '$minutes');
-  return showDialog<({String category, String description, int? minutes})>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text(title),
-      content: SizedBox(
-        width: 380,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DropdownMenu<String>(
-              controller: catController,
-              initialSelection: categories.contains(category)
-                  ? category
-                  : null,
-              // Клик в поле — курсор: можно вписать новую категорию.
-              requestFocusOnTap: true,
-              expandedInsets: EdgeInsets.zero,
-              label: Text(S.categoryHint),
-              dropdownMenuEntries: [
-                for (final c in categories)
-                  DropdownMenuEntry(value: c, label: c),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descController,
-              decoration: InputDecoration(
-                labelText: S.descriptionHint,
-                isDense: true,
-                border: const OutlineInputBorder(),
+  final route =
+      DialogRoute<
+        ({
+          String category,
+          String description,
+          int? minutes,
+          String firstStep,
+          String cue,
+          String cueAt,
+        })
+      >(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: 380,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DropdownMenu<String>(
+                    controller: catController,
+                    initialSelection: categories.contains(category)
+                        ? category
+                        : null,
+                    // Клик в поле — курсор: можно вписать новую категорию.
+                    requestFocusOnTap: true,
+                    expandedInsets: EdgeInsets.zero,
+                    label: Text(S.categoryHint),
+                    dropdownMenuEntries: [
+                      for (final c in categories)
+                        DropdownMenuEntry(value: c, label: c),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: descController,
+                    decoration: InputDecoration(
+                      labelText: S.descriptionHint,
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  if (minutes == null)
+                    StatefulBuilder(
+                      builder: (context, setDialogState) => ExpansionTile(
+                        title: Text(S.startPlan),
+                        initiallyExpanded:
+                            firstStep.isNotEmpty ||
+                            cue.isNotEmpty ||
+                            cueAt.isNotEmpty,
+                        children: [
+                          FirstStepField(controller: stepController),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: cueController,
+                            decoration: InputDecoration(
+                              labelText: S.cueLabel,
+                              hintText: S.cueHint,
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                          Wrap(
+                            children: [
+                              ActionChip(
+                                label: Text(
+                                  time.isEmpty ? S.addTime : S.remindAt(time),
+                                ),
+                                onPressed: () async {
+                                  final parts = time.split(':');
+                                  final hour = parts.length == 2
+                                      ? int.tryParse(parts[0])
+                                      : null;
+                                  final minute = parts.length == 2
+                                      ? int.tryParse(parts[1])
+                                      : null;
+                                  final selected = await showTimePicker(
+                                    context: context,
+                                    initialTime:
+                                        hour != null &&
+                                            minute != null &&
+                                            hour < 24 &&
+                                            minute < 60
+                                        ? TimeOfDay(hour: hour, minute: minute)
+                                        : TimeOfDay.now(),
+                                  );
+                                  if (selected != null && context.mounted) {
+                                    setDialogState(
+                                      () => time =
+                                          '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}',
+                                    );
+                                  }
+                                },
+                              ),
+                              if (time.isNotEmpty)
+                                IconButton(
+                                  tooltip: S.delete,
+                                  onPressed: () =>
+                                      setDialogState(() => time = ''),
+                                  icon: const Icon(Icons.close),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (minController != null) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: minController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: S.minutesField,
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            if (minController != null) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: minController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: S.minutesField,
-                  isDense: true,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(S.close),
+            ),
+            FilledButton(
+              onPressed: () {
+                final cat = catController.text.trim();
+                registerCategory(settingsCubit, cat);
+                Navigator.of(dialogContext).pop((
+                  category: cat,
+                  description: descController.text.trim(),
+                  firstStep: stepController.text.trim(),
+                  cue: cueController.text.trim(),
+                  cueAt: time,
+                  minutes: minController == null
+                      ? null
+                      : int.tryParse(minController.text.trim()),
+                ));
+              },
+              child: Text(S.save),
+            ),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: Text(S.close),
-        ),
-        FilledButton(
-          onPressed: () {
-            final cat = catController.text.trim();
-            registerCategory(settingsCubit, cat);
-            Navigator.of(dialogContext).pop((
-              category: cat,
-              description: descController.text.trim(),
-              minutes: minController == null
-                  ? null
-                  : int.tryParse(minController.text.trim()),
-            ));
-          },
-          child: Text(S.save),
-        ),
-      ],
-    ),
-  ).whenComplete(() {
+      );
+  final result = Navigator.of(context, rootNavigator: true).push(route);
+  route.completed.whenComplete(() {
     catController.dispose();
     descController.dispose();
+    stepController.dispose();
+    cueController.dispose();
     minController?.dispose();
   });
+  return result;
 }
 
 /// Общий вид ошибки с кнопкой повтора.

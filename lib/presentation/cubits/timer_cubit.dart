@@ -22,12 +22,14 @@ class PomodoroResult {
     required this.delayMs,
     required this.interruptions,
     required this.startedAt,
+    this.warmup = false,
   });
 
   final int workedMinutes;
   final int delayMs;
   final int interruptions;
   final DateTime startedAt;
+  final bool warmup;
 }
 
 class TimerState extends Equatable {
@@ -42,6 +44,7 @@ class TimerState extends Equatable {
     this.overtime = 0,
     this.confirmArmed = false,
     this.foreign = false,
+    this.warmup = false,
   });
 
   final TimerMode mode;
@@ -72,6 +75,7 @@ class TimerState extends Equatable {
   /// записи в журнал не делаем — иначе оба устройства записали бы один и тот
   /// же помидор дважды.
   final bool foreign;
+  final bool warmup;
 
   bool get inOvertime => overtime > 0;
 
@@ -94,6 +98,7 @@ class TimerState extends Equatable {
     int? overtime,
     bool? confirmArmed,
     bool? foreign,
+    bool? warmup,
   }) {
     return TimerState(
       mode: mode ?? this.mode,
@@ -106,6 +111,7 @@ class TimerState extends Equatable {
       overtime: overtime ?? this.overtime,
       confirmArmed: confirmArmed ?? this.confirmArmed,
       foreign: foreign ?? this.foreign,
+      warmup: warmup ?? this.warmup,
     );
   }
 
@@ -121,6 +127,7 @@ class TimerState extends Equatable {
     overtime,
     confirmArmed,
     foreign,
+    warmup,
   ];
 }
 
@@ -223,6 +230,7 @@ class TimerCubit extends Cubit<TimerState> {
             interruptions: saved.interruptions,
             delaysMs: saved.delaysMs,
             overtime: saved.overtime + elapsed.inSeconds,
+            warmup: saved.warmup,
           ),
         );
         return;
@@ -243,6 +251,7 @@ class TimerCubit extends Cubit<TimerState> {
             series: saved.series,
             interruptions: saved.interruptions,
             delaysMs: saved.delaysMs,
+            warmup: saved.warmup,
           ),
         );
         return;
@@ -261,8 +270,17 @@ class TimerCubit extends Cubit<TimerState> {
           series: saved.series,
           interruptions: saved.interruptions,
           delaysMs: saved.delaysMs,
+          warmup: saved.warmup,
         ),
       );
+      if (saved.warmup && mode == TimerMode.pomodoro) {
+        emit(
+          state.copyWith(
+            overtime: math.max(1, now.difference(endtime).inSeconds),
+          ),
+        );
+        return;
+      }
       if (mode == TimerMode.pomodoro) {
         await _completePomodoro(workedSeconds: saved.total, silent: true);
       } else {
@@ -282,6 +300,7 @@ class TimerCubit extends Cubit<TimerState> {
           interruptions: saved.interruptions,
           delaysMs: saved.delaysMs + elapsed.inMilliseconds,
           overtime: saved.overtime,
+          warmup: saved.warmup,
         ),
       );
       _startedAt = saved.startedAt;
@@ -350,6 +369,33 @@ class TimerCubit extends Cubit<TimerState> {
     _publish();
   }
 
+  void startWarmup(int minutes) {
+    if (state.mode != TimerMode.pomodoro || state.running || minutes <= 0) {
+      return;
+    }
+    if (state.paused) {
+      resume();
+      return;
+    }
+    final seconds = minutes * 60;
+    emit(state.copyWith(remaining: seconds, total: seconds, warmup: true));
+    start();
+  }
+
+  void startRest(int minutes) {
+    if (!state.stopped || minutes <= 0) return;
+    final seconds = minutes * 60;
+    emit(
+      state.copyWith(
+        mode: TimerMode.shortBreak,
+        remaining: seconds,
+        total: seconds,
+        warmup: false,
+      ),
+    );
+    start();
+  }
+
   void pause() {
     if (!state.running) return;
     _claim();
@@ -391,6 +437,7 @@ class TimerCubit extends Cubit<TimerState> {
         delaysMs: 0,
         interruptions: 0,
         overtime: 0,
+        warmup: false,
       ),
     );
     _save();
@@ -478,8 +525,18 @@ class TimerCubit extends Cubit<TimerState> {
         emit(state.copyWith(run: TimerRun.stopped, foreign: false));
         return;
       }
-      if (settings.flowtime && state.mode == TimerMode.pomodoro) {
+      if ((settings.flowtime || state.warmup) &&
+          state.mode == TimerMode.pomodoro) {
         emit(state.copyWith(remaining: 0, overtime: 1));
+        if (state.warmup) {
+          unawaited(
+            _notify.event(
+              settings,
+              title: S.warmupDoneTitle,
+              body: S.warmupDoneBody,
+            ),
+          );
+        }
         return;
       }
       _finishPhase();
@@ -538,6 +595,7 @@ class TimerCubit extends Cubit<TimerState> {
       workedMinutes: math.max(1, (workedSeconds / 60).ceil()),
       delayMs: state.delaysMs,
       interruptions: state.interruptions,
+      warmup: state.warmup,
       startedAt:
           _startedAt ?? clock.now().subtract(Duration(seconds: workedSeconds)),
     );
@@ -626,6 +684,7 @@ class TimerCubit extends Cubit<TimerState> {
         'remaining': state.remaining,
         'total': state.total,
         'overtime': state.overtime,
+        if (state.warmup) 'warmup': true,
         if (_phaseEnd != null) 'endsAt': _phaseEnd!.millisecondsSinceEpoch,
       }),
     );
@@ -663,6 +722,7 @@ class TimerCubit extends Cubit<TimerState> {
         delaysMs: 0,
         overtime: (snap['overtime'] as num?)?.toInt() ?? 0,
         foreign: true,
+        warmup: snap['warmup'] == true,
       ),
     );
   }
@@ -690,6 +750,7 @@ class TimerCubit extends Cubit<TimerState> {
           interruptions: state.interruptions,
           delaysMs: state.delaysMs,
           overtime: state.overtime,
+          warmup: state.warmup,
           startedAt: _startedAt,
           savedAt: clock.now(),
         ),
