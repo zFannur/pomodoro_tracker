@@ -12,6 +12,7 @@ import '../cubits/sprint_cubit.dart';
 import '../cubits/tasks_cubit.dart';
 import '../widgets/common.dart';
 import '../widgets/deferrals_badge.dart';
+import '../widgets/windows_dialog.dart';
 
 /// Экран «Задачи»: quick-add + сворачиваемые группы (Сегодня и корзины
 /// планировщика одним потоком) + «Сделано за неделю». Тот же TasksCubit,
@@ -913,6 +914,15 @@ class _BucketRow extends StatelessWidget {
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert, size: 16),
                 onSelected: (value) {
+                  if (value == 'windows') {
+                    showTaskWindowsDialog(
+                      context,
+                      taskId: task.id ?? '',
+                      description: task.description,
+                      category: task.category,
+                    );
+                    return;
+                  }
                   if (value == 'delete') {
                     final i = cubit.plannerIndexOf(task);
                     if (i < 0) return;
@@ -937,6 +947,11 @@ class _BucketRow extends StatelessWidget {
                         value: tab.name,
                         child: Text('→ ${plannerTabLabel(tab)}'),
                       ),
+                  if (hasWindowsTracker(context))
+                    PopupMenuItem(
+                      value: 'windows',
+                      child: Text(S.menuTaskWindows),
+                    ),
                   const PopupMenuDivider(),
                   PopupMenuItem(value: 'delete', child: Text(S.delete)),
                 ],

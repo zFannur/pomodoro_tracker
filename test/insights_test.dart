@@ -234,4 +234,74 @@ void main() {
       0,
     );
   });
+
+  group('sessionsOfTask', () {
+    PomoSession pomo(
+      String id,
+      DateTime start, {
+      String taskId = '',
+      String task = 'Подключить webhook',
+      String category = 'work',
+      bool manual = false,
+    }) => PomoSession(
+      id: id,
+      start: start,
+      minutes: 25,
+      category: category,
+      task: task,
+      taskId: taskId,
+      manual: manual,
+    );
+
+    test('по taskId, независимо от описания; порядок по старту', () {
+      final days = [
+        day(2, sessions: [pomo('b', at.add(const Duration(days: 1)), taskId: 't1')]),
+        day(1, sessions: [
+          pomo('a', at, taskId: 't1', task: 'Старое имя'),
+          pomo('x', at, taskId: 't2'),
+        ]),
+      ];
+      final result = sessionsOfTask(
+        days,
+        taskId: 't1',
+        description: 'Подключить webhook',
+        category: 'work',
+      );
+      expect(result.map((s) => s.id), ['a', 'b']);
+    });
+
+    test('старые записи без taskId — по описанию и категории', () {
+      final days = [
+        day(1, sessions: [
+          pomo('old', at),
+          pomo('other-cat', at, category: 'home'),
+          pomo('other-desc', at, task: 'Другое'),
+          pomo('new-other', at, taskId: 't2'),
+        ]),
+      ];
+      final result = sessionsOfTask(
+        days,
+        taskId: 't1',
+        description: 'Подключить webhook',
+        category: 'work',
+      );
+      expect(result.map((s) => s.id), ['old']);
+    });
+
+    test('у задачи без id ищем по описанию и категории; ручные не берём', () {
+      final days = [
+        day(1, sessions: [
+          pomo('a', at, taskId: 't1'),
+          pomo('m', at, manual: true),
+        ]),
+      ];
+      final result = sessionsOfTask(
+        days,
+        taskId: '',
+        description: 'Подключить webhook',
+        category: 'work',
+      );
+      expect(result.map((s) => s.id), ['a']);
+    });
+  });
 }

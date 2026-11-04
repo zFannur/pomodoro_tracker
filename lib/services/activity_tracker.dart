@@ -8,7 +8,7 @@ import 'package:win32/win32.dart';
 
 import '../data/activity_store.dart';
 import '../data/markdown_codec.dart' show dateKey;
-import '../domain/entities/pomo_session.dart' show logicalDate;
+import '../domain/entities/pomo_session.dart' show PomoSession, logicalDate;
 
 /// Период опроса активного окна, сек. Каждый тик прибавляет столько же.
 const activityTickSeconds = 5;
@@ -160,6 +160,36 @@ List<ActivityRow> segmentsSummary(
   ];
   rows.sort((a, b) => b.seconds.compareTo(a.seconds));
   return rows;
+}
+
+/// Окна всех помидоров [sessions], сложенные по app+title, по убыванию.
+/// Окно помидора — от start − 1 мин до конца + 1 мин (запас на неточность
+/// старта и опроса), день отрезков — логический день старта. Единственное
+/// место, где живёт это правило: и «Что было открыто», и «Окна задачи» идут сюда.
+List<ActivityRow> segmentsForSessions(
+  Map<String, List<ActivitySegment>> byDay,
+  Iterable<PomoSession> sessions,
+) {
+  final sum = <String, ActivityRow>{};
+  for (final s in sessions) {
+    final segments = byDay[dateKey(logicalDate(s.start))] ?? const [];
+    final from = s.start.subtract(const Duration(minutes: 1));
+    final to = s.start.add(Duration(minutes: s.minutes + 1));
+    for (final row in segmentsSummary(segments, from, to)) {
+      final k = '${row.app}|${row.title}';
+      final prev = sum[k];
+      sum[k] = prev == null
+          ? row
+          : (
+              key: row.key,
+              app: row.app,
+              title: row.title,
+              seconds: prev.seconds + row.seconds,
+              focusSeconds: prev.focusSeconds + row.focusSeconds,
+            );
+    }
+  }
+  return sum.values.toList()..sort((a, b) => b.seconds.compareTo(a.seconds));
 }
 
 /// Удаляет дни старше [keep] суток (включая [today]). Ключи — «yyyy-MM-dd»,

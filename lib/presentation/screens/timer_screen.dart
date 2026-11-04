@@ -25,8 +25,8 @@ import '../widgets/cause_chips.dart';
 import '../widgets/common.dart';
 import '../widgets/day_card.dart';
 import '../widgets/episode_sheet.dart';
-import 'activity_screen.dart' show formatActivityDuration, formatActivityName;
 import '../widgets/kanban_board.dart';
+import '../widgets/windows_dialog.dart';
 
 /// Главная страница: таймер + «Запланировано» + «Сделано» — один поток,
 /// как на оригинале.
@@ -1228,6 +1228,13 @@ class _DoneRow extends StatelessWidget {
               switch (value) {
                 case 'activity':
                   _showActivity(context);
+                case 'taskWindows':
+                  showTaskWindowsDialog(
+                    context,
+                    taskId: entry.taskId,
+                    description: entry.task,
+                    category: entry.category,
+                  );
                 case 'repeat':
                   context.read<TasksCubit>().add(
                     entry.task,
@@ -1240,14 +1247,18 @@ class _DoneRow extends StatelessWidget {
               }
             },
             itemBuilder: (context) {
-              final showActivity =
-                  Platform.isWindows && _hasActivityCubit(context);
+              final showActivity = hasWindowsTracker(context);
               return [
-                if (showActivity)
+                if (showActivity) ...[
                   PopupMenuItem(
                     value: 'activity',
                     child: Text(S.menuSessionActivity),
                   ),
+                  PopupMenuItem(
+                    value: 'taskWindows',
+                    child: Text(S.menuTaskWindowsAll),
+                  ),
+                ],
                 PopupMenuItem(value: 'repeat', child: Text(S.menuRepeat)),
                 PopupMenuItem(value: 'fill', child: Text(S.menuFillBlanks)),
                 const PopupMenuDivider(),
@@ -1260,58 +1271,14 @@ class _DoneRow extends StatelessWidget {
     );
   }
 
-  bool _hasActivityCubit(BuildContext context) {
-    try {
-      context.read<ActivityCubit>();
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
+  /// Окна одного помидора — общий диалог без раскладки по помидорам.
   void _showActivity(BuildContext context) {
     final cubit = context.read<ActivityCubit>();
-    final rows = cubit.segmentsFor(entry);
-    final distracting = cubit.state.distracting;
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-        return AlertDialog(
-          title: Text(entry.task.isEmpty ? '—' : entry.task),
-          content: rows.isEmpty
-              ? Text(
-                  S.sessionActivityEmpty,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: ListBody(
-                    children: [
-                      for (final r in rows)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text(
-                            '${formatActivityName(r.app, r.title)} — ${formatActivityDuration(r.seconds)}',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: distracting.contains(r.key)
-                                  ? theme.colorScheme.error
-                                  : null,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(S.close),
-            ),
-          ],
-        );
-      },
+    showWindowsDialog(
+      context,
+      title: entry.task.isEmpty ? '—' : entry.task,
+      subtitle: windowsSubtitle([entry], cubit.segmentsFor(entry)),
+      rows: () => cubit.segmentsFor(entry),
     );
   }
 

@@ -184,13 +184,12 @@ class ActivityCubit extends Cubit<ActivityState> {
   }
 
   /// Отрезки активности, попадающие в окно помидора [s].
-  List<ActivityRow> segmentsFor(PomoSession s) {
-    final dayKey = dateKey(logicalDate(s.start));
-    final segments = _tracker.data.focusSegments[dayKey] ?? const [];
-    final from = s.start.subtract(const Duration(minutes: 1));
-    final to = s.start.add(Duration(minutes: s.minutes + 1));
-    return segmentsSummary(segments, from, to);
-  }
+  List<ActivityRow> segmentsFor(PomoSession s) =>
+      segmentsForSessions(_tracker.data.focusSegments, [s]);
+
+  /// Окна нескольких помидоров, сложенные по app+title.
+  List<ActivityRow> segmentsForAll(Iterable<PomoSession> sessions) =>
+      segmentsForSessions(_tracker.data.focusSegments, sessions);
 
   @override
   Future<void> close() async {

@@ -10,6 +10,7 @@ import '../cubits/settings_cubit.dart';
 import '../cubits/tasks_cubit.dart';
 import 'ai_consent.dart';
 import 'first_step_field.dart';
+import 'windows_dialog.dart';
 
 /// Карточка-секция с заголовком.
 class SectionCard extends StatelessWidget {
@@ -494,9 +495,13 @@ void showUndoSnack(BuildContext context, {required VoidCallback onUndo}) {
 
 /// Меню ⋮ задачи из «Сегодня»: помидоры, готово, разбить/слить, корзины.
 class TaskMenu extends StatelessWidget {
-  const TaskMenu({required this.task, super.key});
+  const TaskMenu({required this.task, this.isWindows, super.key});
 
   final PomoTask task;
+
+  /// Подмена `Platform.isWindows` для тестов: пункт «Окна задачи» только там.
+  @visibleForTesting
+  final bool? isWindows;
 
   @override
   Widget build(BuildContext context) {
@@ -504,6 +509,15 @@ class TaskMenu extends StatelessWidget {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert, size: 18),
       onSelected: (value) {
+        if (value == 'windows') {
+          showTaskWindowsDialog(
+            context,
+            taskId: task.id ?? '',
+            description: task.description,
+            category: task.category,
+          );
+          return;
+        }
         // Индекс в момент выбора: пока меню было открыто, помидор мог
         // дотикать и сдвинуть список.
         final index = cubit.todoIndexOf(task);
@@ -551,6 +565,8 @@ class TaskMenu extends StatelessWidget {
         PopupMenuItem(value: 'doneAll', child: Text(S.menuCloseWhole)),
         PopupMenuItem(value: 'split', child: Text(S.menuSplit)),
         PopupMenuItem(value: 'merge', child: Text(S.menuMerge)),
+        if (hasWindowsTracker(context, isWindows: isWindows))
+          PopupMenuItem(value: 'windows', child: Text(S.menuTaskWindows)),
         const PopupMenuDivider(),
         PopupMenuItem(value: 'inbox', child: Text('↩ ${S.menuToInbox}')),
         PopupMenuItem(value: 'tomorrow', child: Text(S.menuToTomorrow)),

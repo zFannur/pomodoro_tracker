@@ -614,6 +614,46 @@ abstract final class S {
     'Нет данных: трекер не работал во время этого помидора',
     'No data: activity tracker was not running during this pomodoro',
   );
+  // Окна задачи (диалог «Что было открыто» / «Окна задачи»)
+  static String get menuTaskWindows => _t('Окна задачи', 'Task windows');
+  static String get menuTaskWindowsAll =>
+      _t('Окна всей задачи', 'Windows of the whole task');
+  static String get windowsNoPomos => _t(
+    'По этой задаче ещё не было помидоров',
+    'No pomodoros for this task yet',
+  );
+  static String get windowsEmptyTask => _t(
+    'Нет данных: трекер не работал во время этих помидоров',
+    'No data: activity tracker was not running during these pomodoros',
+  );
+  static String get windowsTrackerNote => _t(
+    'Трекер работает только на Windows и хранит 60 дней',
+    'The tracker works on Windows only and keeps 60 days',
+  );
+  static String windowsSubtitle(int pomos, String total, String seen) => _t(
+    '$pomos ${_pomoWord(pomos)} · $total · трекер видел $seen',
+    '$pomos ${pomos == 1 ? 'pomodoro' : 'pomodoros'} · $total · tracker saw $seen',
+  );
+  static String windowsWork(int percent) =>
+      _t('Работа $percent%', 'Work $percent%');
+  static String windowsDistractions(int percent) =>
+      _t('Отвлечения $percent%', 'Distractions $percent%');
+  static String windowsMore(int count) => _t('Ещё $count', '$count more');
+  static String get windowsBySession => _t('По помидорам', 'By pomodoro');
+  static String get windowsFlagTip =>
+      _t('Отметить как отвлекающее', 'Mark as distracting');
+  static String windowsSessionLabel(DateTime start, int minutes, String clock) {
+    const ruDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    const enDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final day = _t(ruDays[start.weekday - 1], enDays[start.weekday - 1]);
+    return '$day $clock · $minutes $minShort';
+  }
+
+  static String _pomoWord(int n) => switch (n % 10) {
+    1 when n % 100 != 11 => 'помидор',
+    2 || 3 || 4 when n % 100 < 10 || n % 100 >= 20 => 'помидора',
+    _ => 'помидоров',
+  };
   static String get activitySelect => _t('Выбрать', 'Select');
   static String get activityDeleteDay =>
       _t('Удалить за этот день', 'Delete for this day');

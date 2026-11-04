@@ -352,6 +352,27 @@ String _cutRunes(String s, int max) {
       : String.fromCharCodes(runes.take(max)).trimRight();
 }
 
+/// Помидоры задачи, по времени старта. Ищем по taskId; у старых записей
+/// (до P01) taskId пуст — тогда совпадение описания И категории. Ручные
+/// отметки не берём: таймер их не вёл, окон у них нет.
+List<PomoSession> sessionsOfTask(
+  List<DayLog> days, {
+  required String taskId,
+  required String description,
+  required String category,
+}) {
+  final result = [
+    for (final day in days)
+      for (final s in day.sessions)
+        if (!s.manual &&
+            (s.taskId.isNotEmpty && taskId.isNotEmpty
+                ? s.taskId == taskId
+                : s.task == description && s.category == category))
+          s,
+  ]..sort((a, b) => a.start.compareTo(b.start));
+  return result;
+}
+
 /// Пункты IPS (Svartdal & Steel 2017), которые считаются наоборот: 2, 6, 9.
 const ipsReversed = {1, 5, 8};
 

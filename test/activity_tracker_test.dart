@@ -488,6 +488,130 @@ void main() {
     });
   });
 
+  group('segmentsForSessions', () {
+    PomoSession pomo(String id, DateTime start, {int minutes = 25}) =>
+        PomoSession(
+          id: id,
+          start: start,
+          minutes: minutes,
+          category: 'work',
+          task: 'test',
+        );
+
+    test('две сессии в разные дни складываются по app+title', () {
+      final day1 = DateTime(2026, 10, 5, 10);
+      final day2 = DateTime(2026, 10, 6, 14);
+      final byDay = {
+        '2026-10-05': [
+          ActivitySegment(
+            from: day1,
+            to: day1.add(const Duration(minutes: 20)),
+            app: 'code.exe',
+          ),
+          ActivitySegment(
+            from: day1.add(const Duration(minutes: 20)),
+            to: day1.add(const Duration(minutes: 25)),
+            app: 'chrome.exe',
+            title: 'YouTube',
+          ),
+        ],
+        '2026-10-06': [
+          ActivitySegment(
+            from: day2,
+            to: day2.add(const Duration(minutes: 10)),
+            app: 'code.exe',
+          ),
+        ],
+      };
+      final rows = segmentsForSessions(byDay, [
+        pomo('a', day1),
+        pomo('b', day2),
+      ]);
+      expect(rows, hasLength(2));
+      expect(rows[0].app, 'code.exe');
+      expect(rows[0].seconds, 20 * 60 + 10 * 60);
+      expect(rows[0].focusSeconds, rows[0].seconds);
+      expect(rows[1].title, 'YouTube');
+      expect(rows[1].seconds, 5 * 60);
+    });
+
+    test('отрезок режется по окну: старт − 1 мин … конец + 1 мин', () {
+      final start = DateTime(2026, 10, 5, 10);
+      final byDay = {
+        '2026-10-05': [
+          // За 5 минут до помидора: в окно попадает последняя минута.
+          ActivitySegment(
+            from: start.subtract(const Duration(minutes: 5)),
+            to: start,
+            app: 'slack.exe',
+          ),
+          // Длится дольше помидора: в окно попадает 25 + 1 минута.
+          ActivitySegment(
+            from: start,
+            to: start.add(const Duration(minutes: 40)),
+            app: 'code.exe',
+          ),
+        ],
+      };
+      final rows = segmentsForSessions(byDay, [pomo('a', start)]);
+      expect(
+        {for (final r in rows) r.app: r.seconds},
+        {'code.exe': 26 * 60, 'slack.exe': 60},
+      );
+    });
+
+    test('нет отрезков в дне или нет сессий — пусто', () {
+      final start = DateTime(2026, 10, 5, 10);
+      expect(segmentsForSessions({}, [pomo('a', start)]), isEmpty);
+      expect(
+        segmentsForSessions({
+          '2026-10-05': [
+            ActivitySegment(from: start, to: start.add(const Duration(minutes: 5)), app: 'a.exe'),
+          ],
+        }, const []),
+        isEmpty,
+      );
+    });
+
+    test('помидор в 02:00 берёт отрезки логического дня (вчерашнего)', () {
+      final start = DateTime(2026, 10, 6, 2);
+      final byDay = {
+        '2026-10-05': [
+          ActivitySegment(
+            from: start,
+            to: start.add(const Duration(minutes: 10)),
+            app: 'code.exe',
+          ),
+        ],
+      };
+      final rows = segmentsForSessions(byDay, [pomo('a', start)]);
+      expect(rows.single.seconds, 600);
+    });
+
+    test('segmentsFor кубита совпадает с segmentsForSessions из одной сессии', () {
+      final tracker = ActivityTracker(
+        store: ActivityStore(),
+        inPomodoro: () => true,
+      );
+      final start = DateTime(2026, 10, 5, 10);
+      tracker.data.focusSegments['2026-10-05'] = [
+        ActivitySegment(
+          from: start,
+          to: start.add(const Duration(minutes: 7)),
+          app: 'code.exe',
+        ),
+      ];
+      final cubit = ActivityCubit(tracker);
+      final session = pomo('a', start);
+      expect(
+        cubit.segmentsFor(session),
+        segmentsForSessions(tracker.data.focusSegments, [session]),
+      );
+      expect(cubit.segmentsForAll([session, session]).single.seconds, 840);
+      cubit.close();
+    });
+  });
+
   group('deleteActivity', () {
     test('за один день не трогает другие дни', () {
       final data = ActivityData();
