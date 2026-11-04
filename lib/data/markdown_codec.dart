@@ -545,6 +545,12 @@ String serializeCourse(
     final dir = active[i];
     buf.write('\n### ${i + 1}. ${dir.name}\n');
 
+    // «Зачем» — цитатой под заголовком; одной строкой, чтобы переводы строк
+    // из синка не ломали цитату. План старта задач сюда не зеркалим: хвост
+    // строки задачи ломает parsePlanLine, а он нужен миграции.
+    final why = dir.why.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (why.isNotEmpty) buf.write('> Зачем: $why\n');
+
     // Пустые поля (горизонт, заметка, категории) опускаются без пустых строк.
     if (dir.horizon != null) {
       buf.write(

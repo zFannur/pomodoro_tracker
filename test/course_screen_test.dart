@@ -263,6 +263,60 @@ void main() {
   );
 
   testWidgets(
+    'пункт меню «Зачем» сохраняет значение и показывает строку на карточке',
+    (tester) async {
+      final course = (
+        directions: const [
+          Direction(id: 'd1', name: 'Свой продукт', order: 0),
+        ],
+        milestones: const <Milestone>[],
+      );
+      await pumpCourseScreen(
+        tester,
+        course: course,
+        size: const Size(1280, 900),
+      );
+      final cubit = tester
+          .element(find.byType(CourseScreen))
+          .read<DirectionsCubit>();
+
+      // Пока «Зачем» пусто, строки на карточке нет.
+      expect(find.text('свобода работать на себя'), findsNothing);
+
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(S.courseWhy));
+      await tester.pumpAndSettle();
+
+      // Подсказка из задачи и ограничение в 120 символов.
+      expect(find.text(S.courseWhyHint), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).maxLength, 120);
+
+      await tester.enterText(find.byType(TextField), 'свобода работать на себя');
+      await tester.tap(find.text(S.save));
+      await tester.pumpAndSettle();
+
+      expect(cubit.state.directions.single.why, 'свобода работать на себя');
+      final line = find.text('свобода работать на себя');
+      expect(line, findsOneWidget);
+      final text = tester.widget<Text>(line);
+      expect(text.style?.fontStyle, FontStyle.italic);
+      expect(text.maxLines, 1);
+
+      // Пустое значение очищает поле, строка исчезает.
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(S.courseWhy));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '');
+      await tester.tap(find.text(S.save));
+      await tester.pumpAndSettle();
+      expect(cubit.state.directions.single.why, '');
+      expect(find.text('свобода работать на себя'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'экран не переполняется на узком экране (380px) и на широком (1400px)',
     (tester) async {
       final course = (

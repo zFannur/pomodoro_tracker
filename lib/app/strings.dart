@@ -527,6 +527,11 @@ abstract final class S {
   static String get courseObsidianNote =>
       _t('Заметка в Obsidian', 'Obsidian note');
   static String get courseHorizon => _t('Горизонт', 'Horizon');
+  static String get courseWhy => _t('Зачем', 'Why');
+  static String get courseWhyHint => _t(
+    'Что изменится в жизни, когда это направление сделано?',
+    'What will change in your life once this direction is done?',
+  );
   static String get courseNoHorizon => _t('Без горизонта', 'No horizon');
   static String get courseRename => _t('Переименовать', 'Rename');
   static String get courseLadderPassed =>

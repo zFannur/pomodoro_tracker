@@ -352,6 +352,32 @@ void main() {
       expect(md, isNot(contains('\n\n\n')));
     });
 
+    test('«Зачем» идёт цитатой под заголовком; без него строки нет', () {
+      const directions = [
+        Direction(
+          id: 'a',
+          name: 'С ценностью',
+          order: 0,
+          why: 'свобода работать\nна себя',
+          categories: ['работа'],
+        ),
+        Direction(id: 'b', name: 'Без ценности', order: 1),
+      ];
+      final md = serializeCourse(directions, const []);
+      // Сразу под заголовком, одной строкой, перед остальными полями.
+      expect(
+        md,
+        contains(
+          '### 1. С ценностью\n'
+          '> Зачем: свобода работать на себя\n'
+          '- категории: работа\n',
+        ),
+      );
+      // У второго направления ни цитаты, ни пустой «Зачем».
+      expect(md, contains('### 2. Без ценности\n- веха 0 из 0\n'));
+      expect('> Зачем:'.allMatches(md), hasLength(1));
+    });
+
     test('порядок направлений и вех — по order', () {
       final directions = [
         const Direction(id: 'd3', name: 'Третье', order: 30),

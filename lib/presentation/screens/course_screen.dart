@@ -256,6 +256,8 @@ class _CourseBodyState extends State<_CourseBody> {
                           _showHorizonDialog(context, dir);
                         case 'note':
                           _showNoteDialog(context, dir);
+                        case 'why':
+                          _showWhyDialog(context, dir);
                         case 'pause':
                           cubit.setStatus(dir.id, DirectionStatus.paused);
                         case 'close':
@@ -282,6 +284,10 @@ class _CourseBodyState extends State<_CourseBody> {
                         child: Text(S.courseObsidianNote),
                       ),
                       PopupMenuItem(
+                        value: 'why',
+                        child: Text(S.courseWhy),
+                      ),
+                      PopupMenuItem(
                         value: 'pause',
                         child: Text(S.coursePause),
                       ),
@@ -298,6 +304,17 @@ class _CourseBodyState extends State<_CourseBody> {
                   ),
                 ],
               ),
+              // «Зачем» — одной строкой под названием, чтобы ценность была на виду
+              if (dir.why.trim().isNotEmpty)
+                Text(
+                  dir.why.trim(),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontStyle: FontStyle.italic,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               const SizedBox(height: 8),
 
               // Лестница одной строкой: текст прогресса + заметная сегментная полоса
@@ -1101,6 +1118,20 @@ class _CourseBodyState extends State<_CourseBody> {
     }).whenComplete(controller.dispose);
   }
 
+  /// Диалог «Зачем»: одна строка до 120 символов. Пустое значение очищает поле.
+  void _showWhyDialog(BuildContext context, Direction dir) {
+    showDialog<String>(
+      context: context,
+      builder: (_) => _WhyDialog(initial: dir.why),
+    ).then((why) {
+      if (why != null && context.mounted) {
+        context.read<DirectionsCubit>().updateDirection(
+              dir.copyWith(why: why),
+            );
+      }
+    });
+  }
+
   void _confirmDeleteDirection(BuildContext context, Direction dir) {
     showDialog<bool>(
       context: context,
@@ -1310,6 +1341,54 @@ class _CourseBodyState extends State<_CourseBody> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Диалог «Зачем». Контроллер живёт в State: освобождать его по завершении
+/// showDialog нельзя — поле ещё строится во время анимации закрытия.
+class _WhyDialog extends StatefulWidget {
+  const _WhyDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_WhyDialog> createState() => _WhyDialogState();
+}
+
+class _WhyDialogState extends State<_WhyDialog> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(S.courseWhy),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 120,
+        decoration: InputDecoration(
+          hintText: S.courseWhyHint,
+          border: const OutlineInputBorder(),
+        ),
+        onSubmitted: (val) => Navigator.of(context).pop(val.trim()),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(S.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+          child: Text(S.save),
+        ),
+      ],
     );
   }
 }

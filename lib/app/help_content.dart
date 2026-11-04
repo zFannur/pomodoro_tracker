@@ -318,6 +318,13 @@ const _ru = <HelpSection>[
       'категориях, засчитывается ему само — включая прошлую историю. '
       'Привязывать задачи к направлению руками не нужно.',
     ),
+    Heading('«Зачем» у направления'),
+    Para(
+      'В меню ⋮ направления есть пункт «Зачем»: одна строка о том, что '
+      'изменится в жизни, когда направление сделано. Она видна на карточке '
+      'и в `Курс.md`, а способ «Зачем это мне» показывает её, когда задача '
+      'кажется бессмысленной.',
+    ),
     Heading('Корзины — это сроки, спринт — это ⭐'),
     Para(
       'Входящие, Завтра, Эта неделя, Позже — когда делать. Спринт — только '
@@ -1095,6 +1102,13 @@ const _en = <HelpSection>[
       'A direction holds a list of categories. Everything done in those '
       'categories counts toward it automatically — including past history. '
       'You never link tasks to a direction by hand.',
+    ),
+    Heading('A direction\'s "Why"'),
+    Para(
+      'The direction\'s ⋮ menu has a "Why" item: one line about what will '
+      'change in your life once the direction is done. It shows on the card '
+      'and in `Курс.md`, and the "Why this matters to me" approach shows it '
+      'when a task feels pointless.',
     ),
     Heading('Buckets are deadlines, the sprint is ⭐'),
     Para(

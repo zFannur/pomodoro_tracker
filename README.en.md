@@ -8,7 +8,9 @@
 
 A Pomodoro-technique timer with a precise model of series, idle time and
 focus, a task screen with collapsible groups — plus a personal focus system
-(frog of the day, sprint tasks, Flowtime). Tasks, pomodoro history and sprints
+(frog of the day, sprint tasks, Flowtime) and self-observation: the app notices
+when a task is not going, asks why, offers one approach and a week later checks
+whether it helped. Tasks, pomodoro history and sprints
 sync across devices through your own Google Drive and are mirrored into an
 Obsidian vault as plain `.md` files for reading, search and git.
 
@@ -18,7 +20,7 @@ Obsidian vault as plain `.md` files for reading, search and git.
 [![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Android-0078D6?logo=windows&logoColor=white)](#quick-start)
 [![Storage](https://img.shields.io/badge/Storage-Markdown-3FA45B?logo=markdown&logoColor=white)](#data-storage)
-[![Tests](https://img.shields.io/badge/tests-209%20passing-3FA45B.svg)](#tests)
+[![Tests](https://img.shields.io/badge/tests-635%20passing-3FA45B.svg)](#tests)
 
 <img src="docs/screenshot-timer.png" width="820" alt="Timer screen">
 
@@ -26,7 +28,8 @@ Obsidian vault as plain `.md` files for reading, search and git.
 
 No service accounts, no telemetry, no third-party servers: the only cloud is
 your own Google Drive, and only if you connect it yourself. Without sync the
-app is fully local.
+app is fully local. The single exception is the optional AI hints: they stay
+off until you paste your own DeepSeek key ([what is sent](#ai-deepseek)).
 
 ## Why
 
@@ -39,7 +42,8 @@ middleman service.
 > 📘 **Not sure where to start?** — [How to use it](docs/КАК-ПОЛЬЗОВАТЬСЯ.md)
 > (in Russian): the working order step by step, daily/weekly/monthly rituals,
 > common mistakes. This README is the feature reference; that file is the
-> operating manual.
+> operating manual. The same help lives inside the app: **F1** or the **"?"**
+> button on the screens.
 
 ---
 
@@ -118,6 +122,12 @@ A single-page flow:
 The window title shows `MM:SS category` while running — visible from the
 taskbar.
 
+Above "NOW" sits the **Day card** (sleep, energy, "how was your day" in the
+evening, a "Yesterday…" line and today's "if — then" plan); under the task name,
+its **first step**; next to Start, a **"Not going well"** button that opens the
+Episode sheet ("what is in the way?"). Details — [focus system](#focus-system)
+and the in-app help (F1).
+
 ### Tasks
 
 A full-screen task manager over the same list the timer uses:
@@ -156,6 +166,10 @@ Strategic level above sprints and days (3–12 month horizon):
 - **Direction cards** — active directions (focus on 2–4 main ones), milestone
   ladders with relative order and progress, next milestone, actual velocity
   calculation (milestones/mo) and estimated completion date;
+- **"Why"** — an item in the direction's ⋮ menu: one line (up to 120
+  characters) about what will change in your life once the direction is done.
+  Shown on the card, written to `Курс.md`, and offered by the "Why this matters
+  to me" approach when a task feels pointless;
 - **Collapsible "Paused" and "Completed" blocks** — guilt-free pause and an
   archive of finished directions;
 - **Weekly closures feed** — cross-direction chronicle of wins (`2026-W29`,
@@ -165,6 +179,31 @@ Strategic level above sprints and days (3–12 month horizon):
 - **Monthly review** — low-friction review at the start of each month:
   milestones closed, stalled directions (no closures for 6 weeks or more) prompting
   to pause or make #1.
+
+### Review
+
+The last tab (formerly "Activity") has three sub-tabs:
+
+- **Week** — tiles (first pomodoro, idle, 🐸 first, deferrals, and on Windows
+  distractions) with the change against last week and against the "observation
+  week"; the week's causes and the approach that helped most; how well-being
+  relates to work (once there is enough data); the **weekly experiment** —
+  hypothesis, approach, metric, before/after and a verdict; the IPS procrastination
+  scale once a month; "✨ AI review" if AI is on;
+- **Episodes** — every "can't start / got distracted / stopped / deferred"
+  moment of the last 14 days, filterable by cause: the approach and whether it
+  worked. On Windows an idle episode has **"What was open instead"** — the
+  windows that were open in place of a pomodoro;
+- **Windows** (Windows only) — the activity tracker: how long in which app and
+  tab, with a "distracting" mark. It also feeds **"Task windows"** (the task's ⋮
+  menu — what was open across all of its pomodoros, with the share of
+  distractions) and "What was open" for a single pomodoro. The data is local:
+  windows during pomodoros are kept 60 days, outside pomodoros 14, and never go
+  to sync or to AI.
+
+The first week with episodes is the **observation week**: approaches are not
+offered, so there is something to compare against (a "Help anyway" button is
+there).
 
 ---
 
@@ -179,7 +218,14 @@ On top of the classic timer, a personal focus system:
 | **NOW (WIP = 1)** | One task in progress — the top of the list. |
 | **Flowtime** | The pomodoro finishes — the timer quietly keeps counting up (`+ MM:SS`) until you press "Done". Doesn't break your flow. Toggled in Settings. |
 | **"Where did you leave off?"** | Stopping a running pomodoro asks a one-line question. The answer goes into the day journal's `## Notes`. Skippable. |
-| **Stuck hint** | Idle > 10 min → "Break it down to a 5-minute step — and start." |
+| **Stuck?** | Idle > 10 min → a "What is in the way →" chip opens the Episode sheet. On Windows, if you are at the computer, one notification arrives after 15 minutes (can be turned off). |
+| **Episode sheet** | Three steps: a cause (one of 7: not sure where to start, too big, boring, afraid it won't be good, no energy, don't see the point, interrupted) → an approach (one of 9; the one that helped you most often comes first) → the action and the timer start. "Just note it" is always an option. |
+| **Procrastination signals** | The app notices idle time, distraction during a pomodoro (Windows), a stopped pomodoro, a deferred task that was already due, and a 🐸 with no pomodoro all day. From the third deferral a task gets a `↻3` badge. Answering is optional. |
+| **First step** | A ≤5-minute action on a task (the "Start plan" field in the editor). Shown under the title in "NOW". |
+| **"If — then"** | "When ___, I ___": a situation (and optionally a reminder time) + the first step. The plan is shown in the morning and in "NOW". |
+| **Warm-up** | A 10-minute pomodoro that does not end at the bell but flows into Flowtime. Next to it, an "honest rest": 10 minutes off-screen. |
+| **Day card** | Sleep and energy in the morning, a day rating in the evening (1–5, one tap), a "Yesterday…" line without grades, and the "if — then" plan. Can be turned off in Settings. |
+| **Weekly experiment** | One approach per week, the metric is computed automatically; at the end a verdict — works / no difference / worse / not enough data. A working approach moves to the front of the Episode sheet. |
 | **Overload warning** | More than 3 tasks in a day → a reminder about "🐸 + 2 tasks". |
 | **Frog stat** | "🐸 N / M" — days with a frog out of **active** days. No streak. |
 
@@ -204,6 +250,7 @@ Group a project's tasks under one category and watch its counter.
 | `Esc` `Esc` | Stop (or Skip break) — **double press**, second one within 1.5s. The button turns red while armed. |
 | `+` / `−` | Pomodoros of the first task (`Shift` — by 4) |
 | `Ctrl+N` | Tasks screen with the cursor in the quick-add field — from anywhere |
+| `F1` | Help (the same as the "?" button on the screens) |
 
 On the Tasks screen: `Enter` — to Inbox, `Ctrl+Enter` — to Today.
 Click the pomodoro count: `+1`, `Alt`-click `−1`, `Shift` — ×4.
@@ -273,6 +320,12 @@ overwritten** (a note at the top says so). Edit the weekly milestone in the
 app. Mirrors can be turned off in Settings.
 
 `Входящие.md` is the only file read back.
+
+Self-observation is mirrored in the same format: the day file gets
+`## Самочувствие` and `## Откладывания` sections, the sprint file gets
+`## Эксперимент` and `## Разбор`, and `Курс.md` gets a `> Зачем: …` line under a
+direction. A task's start plan (first step, "when") deliberately does **not**
+reach `Задачи.md`.
 
 ```markdown
 <!-- Зеркало Помодоро Трекера: правки здесь не читаются. -->
@@ -347,6 +400,7 @@ when the goal, the milestone or the "done" list actually changes.
 ## Направления
 
 ### 1. Помидоро Трекер
+> Зачем: свобода работать на себя
 - горизонт: 2026-12
 - заметка: [[Направления/Помидоро Трекер]]
 - категории: проекты, работа
@@ -467,7 +521,10 @@ instead of release), or the clients are spread across separate projects.
   during breaks);
 - system notifications, a one-minute warning, raising the window;
 - **custom notification texts** — one per line, a random one is picked;
-- **Telegram** — mirror notifications through your own bot (token + chat id).
+- **Telegram** — mirror notifications through your own bot (token + chat id);
+- **"Remind me when idle"** and **"Alert when distracted during a pomodoro"** —
+  self-observation notifications (Windows), one per idle stretch and per
+  pomodoro.
 
 ### App
 
@@ -481,8 +538,31 @@ instead of release), or the clients are spread across separate projects.
   gets that scheme's pomodoro length when estimated). A new category can be
   typed right in the task edit dialog — it registers instantly and shows up
   in every dropdown;
+- **Day card on the timer** — show or hide it;
 - **Google Drive** — task sync connection
   (see [the section above](#google-drive-sync)).
+
+### AI (DeepSeek)
+
+An optional tab. The AI **does not chat**: it fills three fixed slots in the
+scenario, each has a rule-based fallback, and without a key everything else
+works as before.
+
+- **what it does:** ✨ suggests three first steps for a task; helps check a
+  thought ("A more accurate thought"); writes the week's "AI review" (2–3
+  sentences and up to three patterns) and may suggest an experiment. The answer
+  is validated in code: unknown approaches and metrics are dropped, lengths are
+  trimmed. If the text shows signs of a serious state, a suggestion to talk to a
+  close person or a specialist is shown instead of a hint;
+- **what is sent to the API** (`api.deepseek.com`, a server in China): the task
+  text, its category and direction, the thought from the Episode sheet, the
+  weekly numbers and up to 20 thoughts from episodes. **Never sent:** window
+  titles, "where did you leave off" notes, keys of other services. Consent is
+  asked before the first request;
+- **where the key lives:** in the local `settings.json` (like the Telegram
+  token); it never reaches sync or the mirrors — enter it separately on the
+  phone. Next to it, a "Model" field (`deepseek-flash` by default) and a
+  "Check" button.
 
 Category names and the markdown files themselves always stay in whatever
 language you typed them in — the interface language only affects the app's
@@ -565,7 +645,7 @@ lib/
 ```bash
 flutter pub get
 flutter analyze          # should be clean
-flutter test             # 209 tests
+flutter test             # 635 tests
 flutter run -d windows   # debug
 flutter build windows --release
 flutter build apk --release
