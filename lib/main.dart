@@ -19,6 +19,7 @@ import 'domain/entities/app_settings.dart';
 import 'domain/entities/pomo_session.dart' show logicalDate;
 import 'presentation/cubits/activity_cubit.dart';
 import 'presentation/cubits/directions_cubit.dart';
+import 'presentation/cubits/insight_cubit.dart';
 import 'presentation/cubits/journal_cubit.dart';
 import 'presentation/cubits/settings_cubit.dart';
 import 'presentation/cubits/sprint_cubit.dart';
@@ -117,6 +118,28 @@ Future<void> main() async {
   late final SprintCubit sprintCubit;
   final statsCubit = StatsCubit(dataRepository, () => settings().dailyGoal);
   final directionsCubit = DirectionsCubit(dataRepository, dataRepository);
+  late final ActivityTracker activityTracker;
+  final insightCubit = InsightCubit(
+    dataRepository, dataRepository, dataRepository, settings,
+    distractPercent: Platform.isWindows ? (from, to) {
+      final data = activityTracker.data;
+      final rows = segmentsSummary(
+        [for (final segments in data.focusSegments.values) ...segments], from, to,
+      );
+      final total = rows.fold<int>(0, (sum, row) => sum + row.focusSeconds);
+      if (total == 0) return null;
+      final distracted = rows.where((row) => data.distracting.contains(row.key))
+          .fold<int>(0, (sum, row) => sum + row.focusSeconds);
+      return 100 * distracted / total;
+    } : null,
+  );
+
+  Future<void> refreshViews() async {
+    await statsCubit.refresh();
+    await sprintCubit.refresh();
+    await directionsCubit.refresh();
+    await insightCubit.refresh();
+  }
 
   tasksCubit = TasksCubit(
     dataRepository,
@@ -169,9 +192,7 @@ Future<void> main() async {
     notify,
     onDayChanged: () async {
       await rolloverCheck();
-      await statsCubit.refresh();
-      await sprintCubit.refresh();
-      await directionsCubit.refresh();
+      await refreshViews();
     },
   );
   final timerCubit = TimerCubit(
@@ -183,9 +204,7 @@ Future<void> main() async {
     onPomodoroComplete: (result) async {
       await tasksCubit.completeFromTimer(result);
       await journalCubit.refresh();
-      await statsCubit.refresh();
-      await sprintCubit.refresh();
-      await directionsCubit.refresh();
+      await refreshViews();
     },
   );
 
@@ -197,9 +216,7 @@ Future<void> main() async {
   reloadVault = () async {
     await tasksCubit.load();
     await journalCubit.refresh();
-    await statsCubit.refresh();
-    await sprintCubit.refresh();
-    await directionsCubit.refresh();
+    await refreshViews();
     timerCubit.adoptRemote(
       (await dataRepository.loadTimer()).getOrElse((_) => null),
     );
@@ -209,16 +226,12 @@ Future<void> main() async {
   // перезапуска.
   tasksCubit.onHistoryWritten = () async {
     await journalCubit.refresh();
-    await statsCubit.refresh();
-    await sprintCubit.refresh();
-    await directionsCubit.refresh();
+    await refreshViews();
   };
   // Ручная правка журнала (удалили запись, поправили минуты) — статистика и
   // спринт иначе показывали старые цифры до перезапуска.
   journalCubit.onJournalChanged = () async {
-    await statsCubit.refresh();
-    await sprintCubit.refresh();
-    await directionsCubit.refresh();
+    await refreshViews();
   };
 
   // Google Drive синк: data.json целиком — задачи, журнал, спринты.
@@ -266,9 +279,7 @@ Future<void> main() async {
     await drainInbox();
     await Future.wait([
       journalCubit.refresh(),
-      statsCubit.refresh(),
-      sprintCubit.refresh(),
-      directionsCubit.refresh(),
+      refreshViews(),
     ]);
     await timerCubit.restore();
 
@@ -282,17 +293,16 @@ Future<void> main() async {
     }
   }
 
-  unawaited(bootstrap());
-
   // Трекер активности (только Windows, иначе no-op): локальные данные в
   // activity.json, в синк не едут. Секунды копятся и «в помидоре».
-  final activityTracker = ActivityTracker(
+  activityTracker = ActivityTracker(
     store: ActivityStore(),
     inPomodoro: () =>
         timerCubit.state.running && timerCubit.state.mode == TimerMode.pomodoro,
   );
   final activityCubit = ActivityCubit(activityTracker);
   unawaited(activityTracker.start());
+  unawaited(bootstrap());
 
   runApp(
     MultiBlocProvider(
@@ -303,6 +313,7 @@ Future<void> main() async {
         BlocProvider.value(value: statsCubit),
         BlocProvider.value(value: sprintCubit),
         BlocProvider.value(value: directionsCubit),
+        BlocProvider.value(value: insightCubit),
         BlocProvider.value(value: timerCubit),
         BlocProvider.value(value: syncCubit),
         BlocProvider.value(value: activityCubit),

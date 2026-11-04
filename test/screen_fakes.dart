@@ -10,6 +10,7 @@ import 'package:pomodoro_tracker/domain/entities/pomo_task.dart';
 import 'package:pomodoro_tracker/domain/entities/sprint.dart';
 import 'package:pomodoro_tracker/domain/repositories.dart';
 import 'package:pomodoro_tracker/presentation/cubits/directions_cubit.dart';
+import 'package:pomodoro_tracker/presentation/cubits/insight_cubit.dart';
 import 'package:pomodoro_tracker/presentation/cubits/journal_cubit.dart';
 import 'package:pomodoro_tracker/presentation/cubits/settings_cubit.dart';
 import 'package:pomodoro_tracker/presentation/cubits/sprint_cubit.dart';
@@ -156,6 +157,11 @@ class FakeCourse implements DirectionRepository {
       Either.right(unit);
 }
 
+class FakeInsights implements InsightRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class FakeSettings implements SettingsRepository {
   @override
   Future<Either<Failure, AppSettings>> load() async =>
@@ -228,6 +234,8 @@ Future<ScreenHarness> pumpScreen(
 
   final directions = DirectionsCubit(FakeCourse(), journalRepo);
   await directions.refresh();
+  final insight = InsightCubit(FakeInsights(), journalRepo, FakeSprints(), current);
+  await insight.refresh();
 
   await tester.pumpWidget(
     MaterialApp(
@@ -240,6 +248,7 @@ Future<ScreenHarness> pumpScreen(
           BlocProvider.value(value: stats),
           BlocProvider.value(value: timer),
           BlocProvider.value(value: directions),
+          BlocProvider.value(value: insight),
         ],
         child: Scaffold(body: screen),
       ),
@@ -255,6 +264,7 @@ Future<ScreenHarness> pumpScreen(
     await stats.close();
     await timer.close();
     await directions.close();
+    await insight.close();
     await settings.close();
   });
 }
