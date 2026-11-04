@@ -31,6 +31,7 @@ import 'presentation/cubits/tasks_cubit.dart';
 import 'presentation/cubits/timer_cubit.dart';
 import 'presentation/home_shell.dart';
 import 'services/activity_tracker.dart';
+import 'services/ai_service.dart';
 import 'services/drive_sync_service.dart';
 import 'services/frog_rollover.dart';
 import 'services/nudge_service.dart';
@@ -109,6 +110,12 @@ Future<void> main() async {
   if (settings().deviceId.isEmpty) {
     await settingsCubit.update(settings().copyWith(deviceId: newId()));
   }
+  // DeepSeek: без ключа или без согласия запросов нет, кнопки ✨ скрыты.
+  final ai = AiService(
+    settings,
+    onConsent: () =>
+        settingsCubit.update(settings().copyWith(aiConsent: true)),
+  );
 
   // Всё состояние живёт в data.json (AppData) и синхронизируется целиком;
   // валт получает markdown-зеркало и отдаёт захват через «Входящие.md».
@@ -385,6 +392,7 @@ Future<void> main() async {
         BlocProvider.value(value: timerCubit),
         BlocProvider.value(value: syncCubit),
         BlocProvider.value(value: activityCubit),
+        RepositoryProvider.value(value: ai),
       ],
       child: PomodoroApp(
         onWindowFocus: onForeground,

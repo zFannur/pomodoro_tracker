@@ -8,6 +8,7 @@ import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/tasks_cubit.dart';
+import 'ai_consent.dart';
 import 'first_step_field.dart';
 
 /// Карточка-секция с заголовком.
@@ -598,6 +599,7 @@ showTaskEditDialog(
 }) {
   // Кубит — до showDialog: builder ленив, исходный context может умереть.
   final settingsCubit = context.read<SettingsCubit>();
+  final ai = aiOf(context);
   final categories = settingsCubit.state.settings.categories.keys.toList();
   final catController = TextEditingController(text: category);
   final descController = TextEditingController(text: description);
@@ -661,7 +663,20 @@ showTaskEditDialog(
                             cue.isNotEmpty ||
                             cueAt.isNotEmpty,
                         children: [
-                          FirstStepField(controller: stepController),
+                          // Описание и категорию можно править в этом же
+                          // диалоге — ✨ берёт их текущие значения.
+                          ListenableBuilder(
+                            listenable: Listenable.merge([
+                              descController,
+                              catController,
+                            ]),
+                            builder: (_, _) => FirstStepField(
+                              controller: stepController,
+                              ai: ai,
+                              task: descController.text,
+                              category: catController.text,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           TextField(
                             controller: cueController,

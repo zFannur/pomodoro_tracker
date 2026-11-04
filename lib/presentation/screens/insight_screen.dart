@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
+import '../../core/failure.dart';
 import '../../data/markdown_codec.dart' show sprintId, two;
 import '../../domain/entities/episode.dart';
 import '../../domain/entities/experiment.dart';
@@ -12,10 +13,12 @@ import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../../domain/insights.dart';
 import '../../domain/strategies.dart';
+import '../../services/ai_service.dart';
 import '../cubits/insight_cubit.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/tasks_cubit.dart';
 import '../home_shell.dart';
+import '../widgets/ai_consent.dart';
 import '../widgets/common.dart';
 import '../widgets/episode_sheet.dart';
 import '../widgets/ips_dialog.dart';
@@ -104,6 +107,12 @@ class _WeekTabState extends State<_WeekTab> {
   /// «Не сейчас»: предложение скрыто до следующего открытия вкладки «Разбор».
   bool _dismissed = false;
 
+  /// Эксперимент из ответа ИИ — только на эту сессию и только для своей недели:
+  /// в разборе он не хранится, после перезапуска снова работает правило.
+  ({String week, Experiment experiment})? _aiExperiment;
+  bool _aiBusy = false;
+  bool _aiConcern = false;
+
   @override
   void initState() {
     super.initState();
@@ -120,6 +129,68 @@ class _WeekTabState extends State<_WeekTab> {
     if (_dismissed && homeTab.value == kInsightTab) {
       setState(() => _dismissed = false);
     }
+  }
+
+  Future<void> _askAi(AiService ai, InsightCubit insight) async {
+    if (_aiBusy || !await ensureAiConsent(context, ai) || !mounted) return;
+    setState(() => _aiBusy = true);
+    final week = sprintId(logicalDate(clock.now()));
+    final result = await ai.weeklyReview(insight.aiPayload());
+    if (!mounted) return;
+    final failure = result.fold((f) => f, (_) => null);
+    if (failure != null) {
+      setState(() {
+        _aiBusy = false;
+        _aiConcern = failure is AiConcern;
+      });
+      if (failure is! AiConcern) {
+        ScaffoldMessenger.maybeOf(
+          context,
+        )?.showSnackBar(SnackBar(content: Text(failure.message)));
+      }
+      return;
+    }
+    final answer = result.getOrElse((_) => throw StateError('review'));
+    final exp = answer.experiment;
+    setState(() {
+      _aiConcern = false;
+      _aiExperiment = exp == null ? null : (week: week, experiment: exp);
+    });
+    await insight.saveReview(answer.review);
+    if (mounted) setState(() => _aiBusy = false);
+  }
+
+  /// Слот ИИ: сохранённый разбор (без нового вызова) + кнопка, если есть ключ.
+  Widget? _aiSection(InsightCubit insight, WeekReview? review) {
+    final ai = aiOf(context);
+    final available = ai != null && ai.available;
+    if (!available) return review == null ? null : _ReviewCard(review);
+    final button = _aiBusy
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : TextButton.icon(
+            onPressed: () => _askAi(ai, insight),
+            icon: const Icon(Icons.auto_awesome, size: 18),
+            label: Text(review == null ? S.aiReview : S.aiReviewRefresh),
+          );
+    final theme = Theme.of(context);
+    if (_aiConcern) {
+      return SectionCard(
+        title: S.reviewTitle,
+        trailing: button,
+        child: Text(
+          S.aiConcern,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+    if (review != null) return _ReviewCard(review, trailing: button);
+    return Align(alignment: Alignment.centerLeft, child: button);
   }
 
   @override
@@ -141,7 +212,8 @@ class _WeekTabState extends State<_WeekTab> {
     final observation = insight.observation;
     final windows = parseSessionWindows(settings.sessionWindows);
     final review = state.sprint?.review;
-    final Widget? ai = widget.aiSlot ?? (review == null ? null : _ReviewCard(review));
+    final Widget? ai = widget.aiSlot ?? _aiSection(insight, review);
+    final aiExperiment = _aiExperiment;
 
     return Center(
       child: ConstrainedBox(
@@ -177,6 +249,14 @@ class _WeekTabState extends State<_WeekTab> {
               showWindows: widget.showWindows,
               dismissed: _dismissed,
               onDismiss: () => setState(() => _dismissed = true),
+              aiSuggestion:
+                  aiExperiment != null &&
+                      aiExperiment.week == sprintId(today) &&
+                      (widget.showWindows ||
+                          aiExperiment.experiment.metric !=
+                              InsightMetric.distract)
+                  ? aiExperiment.experiment
+                  : null,
             ),
             if (ai != null) ...[const SizedBox(height: 12), ai],
             _IpsSection(days: state.days, today: today),
@@ -427,6 +507,7 @@ class _ExperimentSection extends StatelessWidget {
     required this.showWindows,
     required this.dismissed,
     required this.onDismiss,
+    this.aiSuggestion,
   });
 
   final InsightCubit insight;
@@ -435,7 +516,24 @@ class _ExperimentSection extends StatelessWidget {
   final bool dismissed;
   final VoidCallback onDismiss;
 
+  /// Проверенный эксперимент из разбора ИИ; без baseline — его считаем здесь.
+  final Experiment? aiSuggestion;
+
   Experiment? _suggest() {
+    if (aiSuggestion case final ai?) {
+      final base =
+          metricValue(insight.previousWeek, ai.metric) ??
+          switch (insight.baselineInsight) {
+            final week? => metricValue(week, ai.metric),
+            null => null,
+          };
+      return Experiment(
+        hypothesis: ai.hypothesis,
+        strategy: ai.strategy,
+        metric: ai.metric,
+        baseline: base,
+      );
+    }
     for (final week in [insight.previousWeek, insight.baselineInsight]) {
       if (week == null) continue;
       final e = suggestExperiment(
@@ -787,15 +885,17 @@ Future<Experiment?> _customExperiment(
 }
 
 class _ReviewCard extends StatelessWidget {
-  const _ReviewCard(this.review);
+  const _ReviewCard(this.review, {this.trailing});
 
   final WeekReview review;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SectionCard(
       title: S.reviewTitle,
+      trailing: trailing,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

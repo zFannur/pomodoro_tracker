@@ -934,6 +934,74 @@ abstract final class S {
     '▸ When $cue → $then${at.isEmpty ? '' : ' · $at'}',
   );
 
+  // ИИ (DeepSeek)
+  static String get tabAi => _t('ИИ', 'AI');
+  static String get aiEnabledLabel =>
+      _t('Подсказки ИИ (DeepSeek)', 'AI hints (DeepSeek)');
+  static String get aiKeyLabel => _t('API-ключ', 'API key');
+  static String get aiShowKey => _t('Показать ключ', 'Show key');
+  static String get aiHideKey => _t('Скрыть ключ', 'Hide key');
+  static String get aiGetKey => _t('Получить ключ', 'Get a key');
+  static String get aiModelLabel => _t('Модель', 'Model');
+  static String get aiModelHint => 'deepseek-flash = V4.1 Flash';
+  static String get aiCheck => _t('Проверить', 'Check');
+  static String get aiKeyWorks => _t('Ключ работает', 'The key works');
+  static String get aiPrivacy => _t(
+    'Уходит: текст задачи, мысли из листа эпизода, недельные цифры. '
+        'Не уходит: окна, заметки, ключи других сервисов. '
+        'Сервер DeepSeek — в Китае.',
+    'Sent: task text, thoughts from the episode sheet, weekly numbers. '
+        'Not sent: windows, notes, keys of other services. '
+        'The DeepSeek server is in China.',
+  );
+  static String get aiConsentText => _t(
+    'Текст задачи и мысли уйдут в DeepSeek (Китай). Продолжить?',
+    'The task text and thoughts will be sent to DeepSeek (China). Continue?',
+  );
+  static String get aiConsentYes =>
+      _t('Да, не спрашивать', "Yes, don't ask again");
+  static String get aiUnavailable => _t(
+    'ИИ выключен или не задан ключ',
+    'AI is off or the key is not set',
+  );
+  static String get aiEmpty =>
+      _t('DeepSeek вернул пустой ответ', 'DeepSeek returned an empty answer');
+  static String get aiBadKey => _t('Ключ не подходит', 'The key is not valid');
+  static String get aiNoBalance =>
+      _t('На счёте DeepSeek нет денег', 'Your DeepSeek balance is empty');
+  static String get aiBusy => _t(
+    'Слишком много запросов, попробуй через минуту',
+    'Too many requests, try again in a minute',
+  );
+  static String get aiError => _t('DeepSeek не ответил', 'DeepSeek did not answer');
+  static String get aiRejected => _t(
+    'DeepSeek отклонил запрос — проверь модель',
+    'DeepSeek rejected the request — check the model',
+  );
+  static String get aiConcern => _t(
+    'Похоже, сейчас тяжело не с задачей. Об этом стоит поговорить с '
+        'близким человеком или специалистом.',
+    "It sounds like this is about more than the task. It's worth talking "
+        'to someone close to you or a professional.',
+  );
+  static String get aiSuggestStep =>
+      _t('Подсказать первый шаг', 'Suggest a first step');
+  static String get aiSuggestThought =>
+      _t('Подсказать, как сказать точнее', 'Suggest a more accurate thought');
+  static String get aiReview => _t('Разбор от ИИ', 'AI review');
+  static String get aiReviewRefresh => _t('Обновить', 'Refresh');
+  static String thinkingPattern(String name) =>
+      _t('Похоже на: $name', 'Looks like: $name');
+  static String thinkingPatternName(String id) => switch (id) {
+    'all_or_nothing' => _t('всё или ничего', 'all-or-nothing'),
+    'catastrophizing' => _t('катастрофизация', 'catastrophizing'),
+    'should' => _t('долженствование', 'should statements'),
+    'mind_reading' => _t('чтение мыслей', 'mind reading'),
+    'discounting' => _t('обесценивание', 'discounting the positive'),
+    'overgeneralizing' => _t('сверхобобщение', 'overgeneralizing'),
+    _ => '',
+  };
+
   // Общее
   static String get retry => _t('Повторить', 'Retry');
   static String get errorPrefix => _t('Ошибка: ', 'Error: ');

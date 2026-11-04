@@ -240,6 +240,118 @@ CheckInSplit? checkInSplit(
   );
 }
 
+/// Вход недельного разбора ИИ: только агрегаты и мысли из листа эпизода.
+/// Имена окон (`app`), описания задач, категории и заметки дня сюда не
+/// попадают — их нет ни в одном поле ниже, и это проверяет тест.
+/// [days] — последние дни журнала; мысли берутся за [current] и прошлую
+/// неделю (разбор обычно делают в понедельник, когда текущая почти пуста).
+Map<String, Object?> reviewPayload({
+  required String week,
+  required bool observation,
+  required DateTime monday,
+  required WeekInsight current,
+  required WeekInsight previous,
+  WeekInsight? baseline,
+  required List<DayLog> days,
+  List<SessionWindow> windows = const [],
+  Experiment? experiment,
+  Experiment? lastExperiment,
+}) {
+  double? round(double? v) => v == null ? null : (v * 10).round() / 10;
+  Map<String, Object?> metrics(WeekInsight w) => {
+    for (final m in InsightMetric.values)
+      m.name: ?round(metricValue(w, m)),
+  };
+  Map<String, Object?> summary(WeekInsight w) => {
+    'activeDays': w.activeDays,
+    'episodes': w.episodes,
+    'metrics': metrics(w),
+    'causes': {for (final e in w.causes.entries) e.key.name: e.value},
+    'strategies': {
+      for (final e in w.strategies.entries)
+        e.key.name: {'tries': e.value.tries, 'wins': e.value.wins},
+    },
+  };
+  Map<String, Object?> exp(Experiment e, WeekInsight w, {bool verdict = false}) {
+    final now = metricValue(w, e.metric);
+    return {
+      'hypothesis': e.hypothesis,
+      'strategy': e.strategy.name,
+      'metric': e.metric.name,
+      'was': round(e.baseline),
+      'now': round(now),
+      if (verdict)
+        'verdict': (e.verdict ??
+                verdictFor(
+                  metric: e.metric,
+                  baseline: e.baseline,
+                  now: now,
+                  days: w.activeDays,
+                ))
+            .name,
+    };
+  }
+
+  final from = DateTime(monday.year, monday.month, monday.day - 7);
+  final to = DateTime(monday.year, monday.month, monday.day + 7);
+  final recent = [
+    for (final d in days)
+      if (!d.date.isBefore(from) && d.date.isBefore(to)) d,
+  ];
+  final thoughts =
+      [
+          for (final d in recent)
+            for (final e in d.episodes)
+              if (e.thought.trim().isNotEmpty) e,
+        ]
+        ..sort((a, b) => b.at.compareTo(a.at));
+  final wellbeingFrom = DateTime(monday.year, monday.month, monday.day - 21);
+  final month = [
+    for (final d in days)
+      if (!d.date.isBefore(wellbeingFrom) && d.date.isBefore(to)) d,
+  ];
+  final wellbeing = <String, Map<String, Object?>>{};
+  for (final field in CheckInField.values) {
+    for (final m in [InsightMetric.idle, InsightMetric.frogFirst]) {
+      final split = checkInSplit(month, field, m, windows: windows);
+      if (split == null || split.good == null || split.bad == null) continue;
+      (wellbeing[field.name] ??= {})[m.name] = {
+        'good': round(split.good),
+        'bad': round(split.bad),
+        'goodDays': split.goodDays,
+        'badDays': split.badDays,
+      };
+    }
+  }
+  return {
+    'week': week,
+    'observation': observation,
+    'current': summary(current),
+    'previous': summary(previous),
+    if (baseline != null) 'baseline': {'metrics': metrics(baseline)},
+    if (wellbeing.isNotEmpty) 'wellbeing': wellbeing,
+    if (lastExperiment != null)
+      'experiment': exp(lastExperiment, previous, verdict: true),
+    if (experiment != null) 'currentExperiment': exp(experiment, current),
+    if (thoughts.isNotEmpty)
+      'thoughts': [
+        for (final e in thoughts.take(20))
+          {
+            'cause': ?e.cause?.name,
+            'thought': _cutRunes(e.thought, 120),
+          },
+      ],
+  };
+}
+
+String _cutRunes(String s, int max) {
+  final text = s.trim().replaceAll(RegExp(r'\s+'), ' ');
+  final runes = text.runes;
+  return runes.length <= max
+      ? text
+      : String.fromCharCodes(runes.take(max)).trimRight();
+}
+
 /// Пункты IPS (Svartdal & Steel 2017), которые считаются наоборот: 2, 6, 9.
 const ipsReversed = {1, 5, 8};
 

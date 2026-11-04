@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
+import '../../core/failure.dart';
 import '../../domain/entities/episode.dart';
 import '../../domain/entities/pomo_task.dart';
+import '../../services/ai_service.dart';
 import '../cubits/directions_cubit.dart';
 import '../cubits/insight_cubit.dart';
 import '../cubits/tasks_cubit.dart';
 import '../cubits/timer_cubit.dart';
+import 'ai_consent.dart';
 import 'cause_chips.dart';
 import 'first_step_field.dart';
 
@@ -23,6 +26,7 @@ Future<void> showEpisodeSheet(
   final tasks = context.read<TasksCubit>();
   final timer = context.read<TimerCubit>();
   final directions = context.read<DirectionsCubit>();
+  final ai = aiOf(context);
   final content = _EpisodeSheet(
     source: source,
     task: task,
@@ -31,6 +35,7 @@ Future<void> showEpisodeSheet(
     tasks: tasks,
     timer: timer,
     directions: directions,
+    ai: ai,
   );
   if (MediaQuery.sizeOf(context).width < 600) {
     return showModalBottomSheet<void>(
@@ -55,6 +60,7 @@ class _EpisodeSheet extends StatefulWidget {
     required this.tasks,
     required this.timer,
     required this.directions,
+    this.ai,
   });
 
   final EpisodeSource source;
@@ -64,6 +70,7 @@ class _EpisodeSheet extends StatefulWidget {
   final TasksCubit tasks;
   final TimerCubit timer;
   final DirectionsCubit directions;
+  final AiService? ai;
 
   @override
   State<_EpisodeSheet> createState() => _EpisodeSheetState();
@@ -391,6 +398,8 @@ class _EpisodeSheetState extends State<_EpisodeSheet> {
               ] else if (kind != null) ...[
                 _StrategyCard(
                   kind: kind,
+                  cause: cause,
+                  ai: widget.ai,
                   task: widget.task,
                   draft: _draft,
                   firstStep: _firstStep,
@@ -461,6 +470,8 @@ class _StrategyDraft {
 class _StrategyCard extends StatelessWidget {
   const _StrategyCard({
     required this.kind,
+    required this.cause,
+    required this.ai,
     required this.task,
     required this.draft,
     required this.firstStep,
@@ -471,6 +482,8 @@ class _StrategyCard extends StatelessWidget {
   });
 
   final StrategyKind kind;
+  final Cause? cause;
+  final AiService? ai;
   final PomoTask? task;
   final _StrategyDraft draft;
   final TextEditingController firstStep;
@@ -538,7 +551,18 @@ class _StrategyCard extends StatelessWidget {
               const SizedBox(height: 12),
               if (kind == StrategyKind.firstStep ||
                   (task?.firstStep.trim().isEmpty ?? true))
-                FirstStepField(controller: firstStep)
+                FirstStepField(
+                  controller: firstStep,
+                  ai: ai,
+                  task: task?.description ?? '',
+                  category: task?.category ?? '',
+                  direction: direction?.name ?? '',
+                  milestone: direction == null
+                      ? ''
+                      : directions.state.next(direction.id)?.title ?? '',
+                  cause: cause,
+                  thought: draft.thought,
+                )
               else
                 Text('${S.fieldThen} ${firstStep.text}'),
             ],
@@ -586,7 +610,13 @@ class _StrategyCard extends StatelessWidget {
             if (kind == StrategyKind.thought) ...[
               _field(S.fieldThought, draft.thought, (v) => draft.thought = v),
               _field(S.fieldFact, draft.fact, (v) => draft.fact = v),
-              _field(S.fieldAlt, draft.alt, (v) => draft.alt = v),
+              _AltField(
+                draft: draft,
+                ai: ai,
+                cause: cause,
+                task: task?.description ?? '',
+                onChanged: onChanged,
+              ),
             ],
             if (kind == StrategyKind.defuse && draft.thought.trim().isNotEmpty)
               Text(S.defuseLine(draft.thought)),
@@ -640,6 +670,137 @@ class _StrategyCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// «Как сказать точнее» с ✨: reframe заполняет поле, над ним — паттерн
+/// мысли и сократовский вопрос. Без ключа — обычное поле.
+class _AltField extends StatefulWidget {
+  const _AltField({
+    required this.draft,
+    required this.ai,
+    required this.cause,
+    required this.task,
+    required this.onChanged,
+  });
+
+  final _StrategyDraft draft;
+  final AiService? ai;
+  final Cause? cause;
+  final String task;
+  final VoidCallback onChanged;
+
+  @override
+  State<_AltField> createState() => _AltFieldState();
+}
+
+class _AltFieldState extends State<_AltField> {
+  late final _controller = TextEditingController(text: widget.draft.alt);
+  bool _busy = false;
+  Reframe? _hint;
+  bool _concern = false;
+  String _error = '';
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reframe(AiService ai) async {
+    if (!await ensureAiConsent(context, ai) || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = '';
+    });
+    final result = await ai.reframe(
+      thought: widget.draft.thought.trim(),
+      cause: widget.cause,
+      task: widget.task,
+    );
+    if (!mounted) return;
+    result.match(
+      (failure) => setState(() {
+        _busy = false;
+        _hint = null;
+        _concern = failure is AiConcern;
+        _error = failure is AiConcern ? '' : failure.message;
+      }),
+      (hint) {
+        setState(() {
+          _busy = false;
+          _concern = false;
+          _hint = hint;
+          if (hint.alternative.isNotEmpty) {
+            _controller.text = hint.alternative;
+            widget.draft.alt = hint.alternative;
+          }
+        });
+        widget.onChanged();
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final ai = widget.ai;
+    final hint = _hint;
+    final canSuggest =
+        ai != null && ai.available && widget.draft.thought.trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_concern)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(S.aiConcern, style: muted),
+            )
+          else if (hint != null) ...[
+            if (hint.pattern != 'none')
+              Text(
+                S.thinkingPattern(S.thinkingPatternName(hint.pattern)),
+                style: theme.textTheme.labelMedium,
+              ),
+            if (hint.question.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(hint.question, style: muted),
+              ),
+          ],
+          TextField(
+            controller: _controller,
+            decoration: InputDecoration(
+              labelText: S.fieldAlt,
+              border: const OutlineInputBorder(),
+              suffixIcon: canSuggest
+                  ? AiButton(
+                      tooltip: S.aiSuggestThought,
+                      busy: _busy,
+                      onPressed: () => _reframe(ai),
+                    )
+                  : null,
+            ),
+            onChanged: (v) {
+              widget.draft.alt = v;
+              widget.onChanged();
+            },
+          ),
+          if (_error.isNotEmpty)
+            Text(
+              _error,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+        ],
       ),
     );
   }

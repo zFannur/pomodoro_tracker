@@ -3,14 +3,17 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/strings.dart';
 import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/kanban.dart';
 import '../../domain/entities/pomo_task.dart';
+import '../../services/ai_service.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/sync_cubit.dart';
 import '../cubits/sprint_cubit.dart';
+import '../widgets/ai_consent.dart';
 
 void showSettingsDialog(BuildContext context) {
   // Резолвим кубит сразу, а не внутри builder: тот вызывается лениво, и к
@@ -18,6 +21,7 @@ void showSettingsDialog(BuildContext context) {
   // экран за диалогом успел перестроиться).
   final cubit = context.read<SettingsCubit>();
   final sprintCubit = context.read<SprintCubit>();
+  final ai = aiOf(context);
   showDialog<void>(
     context: context,
     builder: (_) => MultiBlocProvider(
@@ -25,13 +29,15 @@ void showSettingsDialog(BuildContext context) {
         BlocProvider.value(value: cubit),
         BlocProvider.value(value: sprintCubit),
       ],
-      child: const _SettingsDialog(),
+      child: _SettingsDialog(ai: ai),
     ),
   );
 }
 
 class _SettingsDialog extends StatelessWidget {
-  const _SettingsDialog();
+  const _SettingsDialog({this.ai});
+
+  final AiService? ai;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +46,7 @@ class _SettingsDialog extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640, maxHeight: 680),
         child: DefaultTabController(
-           length: 4,
+           length: 5,
           child: Column(
             children: [
               Padding(
@@ -67,6 +73,7 @@ class _SettingsDialog extends StatelessWidget {
                   Tab(text: S.tabNotify),
                    Tab(text: S.tabApp),
                    Tab(text: S.tabKanban),
+                  Tab(text: S.tabAi),
                 ],
               ),
               Expanded(
@@ -79,6 +86,7 @@ class _SettingsDialog extends StatelessWidget {
                         _NotifyTab(settings: settings),
                         _AppTab(settings: settings),
                         const _KanbanTab(),
+                        _AiTab(settings: settings, ai: ai),
                       ],
                     );
                   },
@@ -923,6 +931,110 @@ class _KanbanColumnSetting extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Вкладка «ИИ»
+// ---------------------------------------------------------------------------
+
+class _AiTab extends StatefulWidget {
+  const _AiTab({required this.settings, required this.ai});
+
+  final AppSettings settings;
+  final AiService? ai;
+
+  @override
+  State<_AiTab> createState() => _AiTabState();
+}
+
+class _AiTabState extends State<_AiTab> {
+  static final _keysPage = Uri.parse('https://platform.deepseek.com/api_keys');
+  bool _checking = false;
+
+  Future<void> _check(AiService ai) async {
+    if (!await ensureAiConsent(context, ai) || !mounted) return;
+    setState(() => _checking = true);
+    final result = await ai.ping();
+    if (!mounted) return;
+    setState(() => _checking = false);
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(result.fold((f) => f.message, (_) => S.aiKeyWorks)),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final settings = widget.settings;
+    final ai = widget.ai;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text(S.aiEnabledLabel),
+          value: settings.aiEnabled,
+          onChanged: (v) => _update(context, settings.copyWith(aiEnabled: v)),
+        ),
+        _TextRow(
+          label: S.aiKeyLabel,
+          value: settings.aiKey,
+          obscure: true,
+          revealable: true,
+          onChanged: (v) => _update(context, settings.copyWith(aiKey: v)),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => launchUrl(_keysPage),
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: Text(S.aiGetKey),
+          ),
+        ),
+        _TextRow(
+          label: S.aiModelLabel,
+          value: settings.aiModel,
+          helper: S.aiModelHint,
+          onChanged: (v) => _update(
+            context,
+            settings.copyWith(
+              aiModel: v.isEmpty ? AppSettings.defaultAiModel : v,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            FilledButton.tonal(
+              onPressed:
+                  ai == null || _checking || settings.aiKey.trim().isEmpty
+                  ? null
+                  : () => _check(ai),
+              child: Text(S.aiCheck),
+            ),
+            if (_checking) ...[
+              const SizedBox(width: 12),
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text(
+          S.aiPrivacy,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Google Drive синк
 // ---------------------------------------------------------------------------
 
@@ -1175,11 +1287,17 @@ class _TextRow extends StatefulWidget {
     required this.value,
     required this.onChanged,
     this.obscure = false,
+    this.revealable = false,
+    this.helper,
   });
 
   final String label;
   final String value;
   final bool obscure;
+
+  /// Кнопка-глаз: показать скрытое значение.
+  final bool revealable;
+  final String? helper;
   final ValueChanged<String> onChanged;
 
   @override
@@ -1191,6 +1309,7 @@ class _TextRowState extends State<_TextRow> {
   late final TextEditingController _controller = TextEditingController(
     text: widget.value,
   );
+  late bool _hidden = widget.obscure;
 
   @override
   void dispose() {
@@ -1208,15 +1327,27 @@ class _TextRowState extends State<_TextRow> {
         },
         child: TextField(
           controller: _controller,
-          obscureText: widget.obscure,
+          obscureText: _hidden,
           // Отдаём значение сразу, а не только при потере фокуса: на телефоне
           // нажатие «Подключить» фокус с поля не снимает, и введённый ID
           // не успевал попасть в настройки — вход падал как «поле пустое».
           onChanged: (v) => widget.onChanged(v.trim()),
           decoration: InputDecoration(
             labelText: widget.label,
+            helperText: widget.helper,
             isDense: true,
             border: const OutlineInputBorder(),
+            suffixIcon: widget.revealable
+                ? IconButton(
+                    tooltip: _hidden ? S.aiShowKey : S.aiHideKey,
+                    icon: Icon(
+                      _hidden
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () => setState(() => _hidden = !_hidden),
+                  )
+                : null,
           ),
         ),
       ),

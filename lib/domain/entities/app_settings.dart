@@ -166,6 +166,10 @@ class AppSettings extends Equatable {
     this.kanbanEnabled = false,
     this.dayCard = true,
     this.dayCardHidden = '',
+    this.aiEnabled = false,
+    this.aiKey = '',
+    this.aiModel = defaultAiModel,
+    this.aiConsent = false,
   });
 
   factory AppSettings.fromJson(
@@ -248,6 +252,13 @@ class AppSettings extends Equatable {
       kanbanEnabled: json['kanbanEnabled'] as bool? ?? false,
       dayCard: json['dayCard'] as bool? ?? true,
       dayCardHidden: json['dayCardHidden'] as String? ?? '',
+      aiEnabled: json['aiEnabled'] as bool? ?? false,
+      aiKey: json['aiKey'] as String? ?? '',
+      aiModel: switch (json['aiModel']) {
+        final String m when m.trim().isNotEmpty => m.trim(),
+        _ => defaultAiModel,
+      },
+      aiConsent: json['aiConsent'] as bool? ?? false,
     );
   }
 
@@ -276,6 +287,10 @@ class AppSettings extends Equatable {
   ];
 
   static const defaultCategories = ['работа', 'личное'];
+
+  /// У DeepSeek напрямую это DeepSeek-V4.1-Flash; имена уже менялись,
+  /// поэтому модель — поле настроек, а не константа в сервисе.
+  static const defaultAiModel = 'deepseek-flash';
 
   /// Свёрнутые по умолчанию группы экрана «Задачи».
   static const defaultCollapsedGroups = [
@@ -395,6 +410,17 @@ class AppSettings extends Equatable {
   /// Локально: настройки не синхронизируются.
   final String dayCardHidden;
 
+  /// Подсказки DeepSeek в трёх местах сценария (без ключа — правила).
+  final bool aiEnabled;
+
+  /// Ключ DeepSeek. Как и токен Telegram, живёт только в локальном
+  /// settings.json: настройки не синхронизируются, на телефоне — свой ввод.
+  final String aiKey;
+  final String aiModel;
+
+  /// Пользователь согласился, что текст задачи и мысли уходят в DeepSeek.
+  final bool aiConsent;
+
   TimerScheme get scheme => schemes.firstWhere(
     (s) => s.name == activeScheme,
     orElse: () => schemes.isEmpty ? defaultSchemes.first : schemes.first,
@@ -445,6 +471,10 @@ class AppSettings extends Equatable {
     'kanbanEnabled': kanbanEnabled,
     'dayCard': dayCard,
     'dayCardHidden': dayCardHidden,
+    'aiEnabled': aiEnabled,
+    'aiKey': aiKey,
+    'aiModel': aiModel,
+    'aiConsent': aiConsent,
   };
 
   AppSettings copyWith({
@@ -492,6 +522,10 @@ class AppSettings extends Equatable {
     bool? kanbanEnabled,
     bool? dayCard,
     String? dayCardHidden,
+    bool? aiEnabled,
+    String? aiKey,
+    String? aiModel,
+    bool? aiConsent,
   }) {
     return AppSettings(
       schemes: schemes ?? this.schemes,
@@ -538,6 +572,10 @@ class AppSettings extends Equatable {
       kanbanEnabled: kanbanEnabled ?? this.kanbanEnabled,
       dayCard: dayCard ?? this.dayCard,
       dayCardHidden: dayCardHidden ?? this.dayCardHidden,
+      aiEnabled: aiEnabled ?? this.aiEnabled,
+      aiKey: aiKey ?? this.aiKey,
+      aiModel: aiModel ?? this.aiModel,
+      aiConsent: aiConsent ?? this.aiConsent,
     );
   }
 
@@ -594,5 +632,9 @@ class AppSettings extends Equatable {
     kanbanEnabled,
     dayCard,
     dayCardHidden,
+    aiEnabled,
+    aiKey,
+    aiModel,
+    aiConsent,
   ];
 }

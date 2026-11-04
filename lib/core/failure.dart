@@ -14,3 +14,13 @@ final class StorageFailure extends Failure {
 final class ParseFailure extends Failure {
   const ParseFailure(super.message);
 }
+
+/// Ошибка обращения к DeepSeek: сеть, ключ, баланс или непроверенный ответ.
+final class AiFailure extends Failure {
+  const AiFailure(super.message);
+}
+
+/// Модель увидела признаки тяжёлого состояния: вместо подсказок — статичный текст.
+final class AiConcern extends Failure {
+  const AiConcern(super.message);
+}

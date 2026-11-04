@@ -176,6 +176,20 @@ class InsightCubit extends Cubit<InsightState> {
     return monday == null ? null : _week(monday);
   }
 
+  /// Обезличенный вход недельного разбора ИИ (см. [reviewPayload]).
+  Map<String, Object?> aiPayload() => reviewPayload(
+    week: sprintId(logicalDate(clock.now())),
+    observation: observation,
+    monday: _monday,
+    current: current,
+    previous: previousWeek,
+    baseline: observation ? null : baselineInsight,
+    days: state.days,
+    windows: parseSessionWindows(_settings().sessionWindows),
+    experiment: experiment,
+    lastExperiment: state.previous?.experiment,
+  );
+
   Episode? pendingEpisode(EpisodeSource source) {
     final now = clock.now();
     Episode? latest;
