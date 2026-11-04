@@ -5,14 +5,18 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/strings.dart';
 import '../../data/markdown_codec.dart';
 import '../../domain/entities/direction.dart';
+import '../../domain/insights.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../../domain/entities/sprint.dart';
 import '../cubits/directions_cubit.dart';
+import '../cubits/insight_cubit.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/sprint_cubit.dart';
 import '../cubits/tasks_cubit.dart';
+import '../home_shell.dart';
 import '../widgets/common.dart';
+import 'insight_screen.dart' show formatInsightValue;
 import 'planner_dialog.dart';
 
 /// «Неделя»: веха недели + ⭐-задачи из общего списка + факт по дням.
@@ -111,6 +115,7 @@ class _SprintBodyState extends State<_SprintBody> {
               // Веха недели — тянется из лестницы направления либо свободный текст.
               _buildMilestoneSection(context, sprint, weekTodo),
               const SizedBox(height: 12),
+              ?_experimentCard(context),
               SectionCard(
                 title: S.weekTasksTitle,
                 trailing: FilledButton.tonalIcon(
@@ -288,6 +293,48 @@ class _SprintBodyState extends State<_SprintBody> {
                 ),
               ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Эксперимент недели — только просмотр, правится на вкладке «Разбор».
+  /// Кубита может не быть в дереве (старые тесты экрана) — тогда карточки нет.
+  Widget? _experimentCard(BuildContext context) {
+    InsightCubit insight;
+    try {
+      insight = context.watch<InsightCubit>();
+    } catch (_) {
+      return null;
+    }
+    final exp = insight.experiment;
+    if (exp == null) return null;
+    final theme = Theme.of(context);
+    final week = insight.current;
+    final lag = week.firstStartIsLag;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => homeTab.value = kInsightTab,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              S.experimentCard(
+                exp.hypothesis,
+                S.metric(exp.metric),
+                formatInsightValue(exp.metric, exp.baseline, lag: lag),
+                formatInsightValue(
+                  exp.metric,
+                  metricValue(week, exp.metric),
+                  lag: lag,
+                ),
+              ),
+              style: theme.textTheme.bodyMedium,
+            ),
           ),
         ),
       ),

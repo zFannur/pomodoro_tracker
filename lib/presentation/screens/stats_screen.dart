@@ -30,49 +30,6 @@ class StatsScreen extends StatelessWidget {
   }
 }
 
-/// Плитки статистики по [perRow] в ряд. StatTile — Expanded, поэтому живёт
-/// только внутри Row; неполный последний ряд добиваем пустотой, иначе
-/// одинокая плитка растянулась бы на всю ширину.
-class _StatGrid extends StatelessWidget {
-  const _StatGrid({required this.tiles, required this.perRow});
-
-  final List<Widget> tiles;
-  final int perRow;
-
-  @override
-  Widget build(BuildContext context) {
-    final rows = <Widget>[];
-    for (var i = 0; i < tiles.length; i += perRow) {
-      final slice = tiles.skip(i).take(perRow).toList();
-      rows.add(
-        // Без CrossAxisAlignment.stretch: высота внутри прокручиваемой
-        // колонки не ограничена, растягивание даёт бесконечность и рушит
-        // всю раскладку экрана.
-        Row(
-          children: [
-            for (var j = 0; j < slice.length; j++) ...[
-              if (j > 0) const SizedBox(width: 8),
-              slice[j],
-            ],
-            for (var j = slice.length; j < perRow; j++) ...[
-              const SizedBox(width: 8),
-              const Expanded(child: SizedBox()),
-            ],
-          ],
-        ),
-      );
-    }
-    return Column(
-      children: [
-        for (var i = 0; i < rows.length; i++) ...[
-          if (i > 0) const SizedBox(height: 8),
-          rows[i],
-        ],
-      ],
-    );
-  }
-}
-
 class _StatsBody extends StatefulWidget {
   const _StatsBody({required this.state});
 
@@ -185,7 +142,7 @@ class _StatsBodyState extends State<_StatsBody> {
               const SizedBox(height: 16),
               // На телефоне пять плиток в одну строку дают по ~60dp на каждую —
               // подписи превращаются в «По…». Раскладываем по две в ряд.
-              _StatGrid(
+              StatGrid(
                 perRow: MediaQuery.sizeOf(context).width < 600 ? 2 : 5,
                 tiles: [
                   StatTile(

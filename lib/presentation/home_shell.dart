@@ -11,14 +11,22 @@ import 'cubits/insight_cubit.dart';
 import 'cubits/settings_cubit.dart';
 import 'cubits/tasks_cubit.dart';
 import 'cubits/timer_cubit.dart';
-import 'screens/activity_screen.dart';
 import 'screens/course_screen.dart';
+import 'screens/insight_screen.dart';
 import 'screens/settings_dialog.dart';
 import 'screens/sprint_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/tasks_screen.dart';
 import 'screens/timer_screen.dart';
 import 'widgets/episode_sheet.dart';
+
+/// Индекс вкладки «Разбор» в навигации.
+const kInsightTab = 5;
+
+/// Текущая вкладка оболочки. Другие экраны переходят, записывая индекс сюда;
+/// оболочка зеркалит сюда и обычные переключения, чтобы экраны знали, когда
+/// их открыли.
+final homeTab = ValueNotifier<int>(0);
 
 /// Оболочка: NavigationRail + горячие клавиши + заголовок окна с отсчётом.
 class HomeShell extends StatefulWidget {
@@ -35,10 +43,13 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onKey);
+    homeTab.value = _index;
+    homeTab.addListener(_onHomeTab);
   }
 
   @override
   void dispose() {
+    homeTab.removeListener(_onHomeTab);
     HardwareKeyboard.instance.removeHandler(_onKey);
     super.dispose();
   }
@@ -53,6 +64,7 @@ class _HomeShellState extends State<HomeShell> {
     if (event.logicalKey == LogicalKeyboardKey.keyN &&
         HardwareKeyboard.instance.isControlPressed) {
       setState(() => _index = 1);
+      homeTab.value = 1;
       TasksScreen.requestQuickAddFocus();
       return true;
     }
@@ -130,12 +142,12 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  /// Иконка «Активность»: Material в цвет темы (своего ассета нет).
-  Widget _activityIcon({required bool selected}) {
+  /// Иконка «Разбор»: Material в цвет темы (своего ассета нет).
+  Widget _insightIcon({required bool selected}) {
     return Opacity(
       opacity: selected ? 1 : 0.45,
       child: Icon(
-        Icons.timelapse,
+        selected ? Icons.insights : Icons.insights_outlined,
         size: 30,
         color: Theme.of(context).colorScheme.primary,
       ),
@@ -170,6 +182,12 @@ class _HomeShellState extends State<HomeShell> {
     // экраны живыми) — иначе оно съедает Space/Esc на другой вкладке.
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _index = i);
+    homeTab.value = i;
+  }
+
+  /// Переход с другого экрана: запись в [homeTab] со значением не текущей вкладки.
+  void _onHomeTab() {
+    if (homeTab.value != _index) _select(homeTab.value);
   }
 
   @override
@@ -189,7 +207,7 @@ class _HomeShellState extends State<HomeShell> {
         SprintScreen(),
         CourseScreen(),
         StatsScreen(),
-        ActivityScreen(),
+        InsightScreen(),
       ],
     );
     // Телефон/узкое окно — навигация снизу, шестерёнка в баре сверху.
@@ -270,9 +288,9 @@ class _HomeShellState extends State<HomeShell> {
             label: S.navStats,
           ),
           NavigationDestination(
-            icon: _activityIcon(selected: false),
-            selectedIcon: _activityIcon(selected: true),
-            label: S.navActivity,
+            icon: _insightIcon(selected: false),
+            selectedIcon: _insightIcon(selected: true),
+            label: S.navInsight,
           ),
         ],
       ),
@@ -331,9 +349,9 @@ class _HomeShellState extends State<HomeShell> {
                 label: Text(S.navStats),
               ),
               NavigationRailDestination(
-                icon: _activityIcon(selected: false),
-                selectedIcon: _activityIcon(selected: true),
-                label: Text(S.navActivity),
+                icon: _insightIcon(selected: false),
+                selectedIcon: _insightIcon(selected: true),
+                label: Text(S.navInsight),
               ),
             ],
           ),

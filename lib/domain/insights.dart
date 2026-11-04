@@ -239,3 +239,17 @@ CheckInSplit? checkInSplit(
     badDays: bad.length,
   );
 }
+
+/// Пункты IPS (Svartdal & Steel 2017), которые считаются наоборот: 2, 6, 9.
+const ipsReversed = {1, 5, 8};
+
+/// Сумма баллов IPS: 9–45, меньше — лучше. Обратные пункты считаются как 6 − x.
+/// null — ответов не девять или значение вне 1–5 (повреждённая запись).
+int? ipsScore(List<int> answers) {
+  if (answers.length != 9 || answers.any((a) => a < 1 || a > 5)) return null;
+  var sum = 0;
+  for (var i = 0; i < 9; i++) {
+    sum += ipsReversed.contains(i) ? 6 - answers[i] : answers[i];
+  }
+  return sum;
+}

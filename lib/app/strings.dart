@@ -17,7 +17,7 @@ abstract final class S {
   static String get navTasks => _t('Задачи', 'Tasks');
   static String get navSprint => _t('Спринт', 'Sprint');
   static String get navStats => _t('Статистика', 'Stats');
-  static String get navActivity => _t('Активность', 'Activity');
+  static String get navInsight => _t('Разбор', 'Review');
 
   // Таймер
   static String get pomodoroWord => _t('ПОМИДОР', 'POMODORO');
@@ -733,6 +733,173 @@ abstract final class S {
     Verdict.same => _t('без разницы', 'no difference'),
     Verdict.worse => _t('хуже', 'worse'),
     Verdict.unclear => _t('мало данных', 'not enough data'),
+  };
+
+  // Разбор
+  static String get insightTabWeek => _t('Неделя', 'Week');
+  static String get insightTabEpisodes => _t('Эпизоды', 'Episodes');
+  static String get insightTabWindows => _t('Окна', 'Windows');
+  static String insightWeekTitle(String week) =>
+      _t('Неделя $week', 'Week $week');
+  static String get insightObservationSuffix =>
+      _t('· неделя наблюдения', '· observation week');
+  static String get insightNoData => _t('мало данных', 'not enough data');
+  static String insightBase(String value) =>
+      _t('база: $value', 'baseline: $value');
+  static String lagValue(int minutes) => '+$minutes $minShort';
+  static String minutesValue(int minutes) => '$minutes $minShort';
+  static String get insightCauses => _t('Причины', 'Reasons');
+  static String causeBest(String strategy, int wins, int tries) => _t(
+    '· лучше всего: $strategy $wins/$tries',
+    '· best: $strategy $wins/$tries',
+  );
+  static String causeExternal(int n) => _t('Отвлекали: $n', 'Interrupted: $n');
+  static String get causesEmpty => _t(
+    'Пока нет отметок. Сигналы появятся сами, когда таймер стоит, а задачи есть.',
+    'No notes yet. Signals will appear on their own when the timer is idle and there are tasks.',
+  );
+  static String get wellbeingTitle =>
+      _t('Самочувствие → дела', 'Well-being → work');
+  static String wellbeingLine(
+    String field,
+    String metric,
+    String good,
+    String bad,
+  ) =>
+      '$field ≥4: ${metric.toLowerCase()} $good · ${field.toLowerCase()} ≤2: $bad';
+  static String get wellbeingHint => _t(
+    'Отмечай сон утром — через 3–4 недели здесь появится связь',
+    'Rate your sleep in the morning — in 3–4 weeks a link will show up here',
+  );
+  static String get experimentTitle => _t('Эксперимент', 'Experiment');
+  static String experimentResult(String hypothesis) =>
+      _t('Итог: $hypothesis', 'Result: $hypothesis');
+  static String experimentWasNow(String metric, String was, String now) => _t(
+    '$metric: было $was → стало $now',
+    '$metric: was $was → now $now',
+  );
+  static String experimentCurrent(
+    String metric,
+    String was,
+    String now,
+    int days,
+  ) => _t(
+    '$metric: было $was → сейчас $now · осталось $days дн.',
+    '$metric: was $was → now $now · $days d left',
+  );
+  static String experimentCard(
+    String hypothesis,
+    String metric,
+    String was,
+    String now,
+  ) => _t(
+    '🧪 $hypothesis · $metric: было $was → сейчас $now',
+    '🧪 $hypothesis · $metric: was $was → now $now',
+  );
+  static String verdictButton(Verdict v) => switch (v) {
+    Verdict.works => _t('Работает', 'Works'),
+    Verdict.same => _t('Без разницы', 'No difference'),
+    Verdict.worse => _t('Хуже', 'Worse'),
+    Verdict.unclear => _t('Мало данных', 'Not enough data'),
+  };
+  static String get experimentClear => _t('Снять', 'Drop');
+  static String get experimentTake => _t('Взять', 'Take it');
+  static String get experimentCustom => _t('Свой…', 'Custom…');
+  static String get experimentLater => _t('Не сейчас', 'Not now');
+  static String get experimentSuggested =>
+      _t('Предложение на неделю', 'Suggestion for the week');
+  static String get experimentAfterObservation => _t(
+    'Эксперименты начнутся после недели наблюдения',
+    'Experiments start after the observation week',
+  );
+  static String get experimentCustomTitle =>
+      _t('Свой эксперимент', 'Custom experiment');
+  static String get fieldHypothesis => _t('Гипотеза', 'Hypothesis');
+  static String get fieldStrategy => _t('Способ', 'Strategy');
+  static String get fieldMetric => _t('Метрика', 'Metric');
+  static String get reviewTitle => _t('Разбор недели', 'Week review');
+
+  // Эпизоды (вкладка «Разбор»)
+  static String get episodesEmpty =>
+      _t('За две недели эпизодов нет', 'No episodes in the last two weeks');
+  static String get episodeDeleted => _t('Эпизод удалён', 'Episode deleted');
+  static String get episodeNoCause => '—';
+  static String episodeDistract(String app) =>
+      _t('$app во время помидора', '$app during a pomodoro');
+  static String get episodeNoTask => _t('Без задачи', 'No task');
+  static String dayHeader(DateTime d) {
+    const ruDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    const enDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const ruMonths = [
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+    ];
+    const enMonths = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return _t(
+      '${ruDays[d.weekday - 1]}, ${d.day} ${ruMonths[d.month - 1]}',
+      '${enDays[d.weekday - 1]}, ${enMonths[d.month - 1]} ${d.day}',
+    );
+  }
+
+  // Шкала IPS
+  static String get ipsTitle =>
+      _t('Шкала откладывания', 'Procrastination scale');
+  static String get ipsSubtitle =>
+      _t('9 вопросов, 1 минута', '9 questions, 1 minute');
+  static String get ipsTake => _t('Пройти', 'Take it');
+  static String get ipsLow =>
+      _t('1 — совсем не про меня', '1 — very seldom or not true of me');
+  static String get ipsHigh =>
+      _t('5 — точно про меня', '5 — very often true of me');
+  static String monthShort(int m) {
+    const ru = [
+      'янв', 'фев', 'мар', 'апр', 'май', 'июн',
+      'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',
+    ];
+    const en = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return _t(ru[m - 1], en[m - 1]);
+  }
+
+  // Пункты IPS: Svartdal & Steel (2017), Frontiers in Psychology 8:1927,
+  // CC BY 4.0. Английский — оригинал; русский — неофициальный перевод,
+  // не валидирован. Обратные пункты (2, 6, 9) — `ipsReversed` в insights.dart.
+  static String ipsItem(int i) => switch (i) {
+    0 => _t(
+      'Я откладываю дела так долго, что это без необходимости вредит моему благополучию или эффективности',
+      'I put things off so long that my well-being or efficiency unnecessarily suffers',
+    ),
+    1 => _t(
+      'Если есть что-то, что мне нужно сделать, я берусь за это раньше, чем за менее важные дела',
+      'If there is something I should do, I get to it before attending to lesser tasks',
+    ),
+    2 => _t(
+      'Моя жизнь была бы лучше, если бы я делал некоторые дела или задачи раньше',
+      'My life would be better if I did some activities or tasks earlier',
+    ),
+    3 => _t(
+      'Когда мне нужно делать одно, я делаю другое',
+      'When I should be doing one thing, I will do another',
+    ),
+    4 => _t(
+      'К концу дня я понимаю, что мог бы потратить время лучше',
+      'At the end of the day, I know I could have spent the time better',
+    ),
+    5 => _t('Я трачу своё время с умом', 'I spend my time wisely'),
+    6 => _t(
+      'Я откладываю дела дольше, чем это разумно',
+      'I delay tasks beyond what is reasonable',
+    ),
+    7 => _t('Я прокрастинирую', 'I procrastinate'),
+    _ => _t(
+      'Я делаю всё тогда, когда считаю, что это нужно сделать',
+      'I do everything when I believe it needs to be done',
+    ),
   };
 
   // Карточка дня
