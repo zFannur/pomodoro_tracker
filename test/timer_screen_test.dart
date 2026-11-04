@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:pomodoro_tracker/core/failure.dart';
+import 'package:pomodoro_tracker/app/strings.dart';
+import 'package:pomodoro_tracker/domain/entities/episode.dart';
 import 'package:pomodoro_tracker/data/timer_state_store.dart';
 import 'package:pomodoro_tracker/domain/entities/app_settings.dart';
 import 'package:pomodoro_tracker/domain/entities/direction.dart';
@@ -10,6 +12,7 @@ import 'package:pomodoro_tracker/domain/entities/pomo_session.dart';
 import 'package:pomodoro_tracker/domain/entities/pomo_task.dart';
 import 'package:pomodoro_tracker/domain/repositories.dart';
 import 'package:pomodoro_tracker/presentation/cubits/directions_cubit.dart';
+import 'package:pomodoro_tracker/presentation/cubits/insight_cubit.dart';
 import 'package:pomodoro_tracker/presentation/cubits/journal_cubit.dart';
 import 'package:pomodoro_tracker/presentation/cubits/settings_cubit.dart';
 import 'package:pomodoro_tracker/presentation/cubits/tasks_cubit.dart';
@@ -17,6 +20,11 @@ import 'package:pomodoro_tracker/presentation/cubits/timer_cubit.dart';
 import 'package:pomodoro_tracker/presentation/screens/timer_screen.dart';
 import 'package:pomodoro_tracker/services/notify_service.dart';
 import 'package:pomodoro_tracker/services/sound_service.dart';
+import 'package:pomodoro_tracker/presentation/widgets/cause_chips.dart';
+
+import 'screen_fakes.dart' show FakeInsights, FakeSprints;
+import 'screen_fakes.dart' show pumpScreen;
+import 'episode_fakes.dart';
 
 class _FakeStore extends TimerStateStore {
   @override
@@ -116,6 +124,105 @@ class _MemCourse implements DirectionRepository {
 }
 
 void main() {
+  testWidgets('чип простоя только с 10 минут и при наличии задач', (tester) async {
+    final timer = EpisodeTimer()..seed(delay: 9 * 60000);
+    final tasks = EpisodeTasks()..seed(todo: [const PomoTask(id: 't', description: 'Задача', category: 'дело', durationMinutes: 25)]);
+    final insight = EpisodeInsight();
+    final h = await pumpScreen(tester, const Size(375, 812), const TimerScreen(),
+      timerCubit: timer, tasksCubit: tasks, insightCubit: insight);
+    expect(find.text(S.stuckChip), findsNothing);
+    timer.seed(delay: 10 * 60000);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text(S.stuckChip), findsOneWidget);
+    await tester.tap(find.text(S.stuckChip));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(S.cause(Cause.boring)));
+    await tester.pumpAndSettle();
+    expect(insight.episodes.single.source, EpisodeSource.idle);
+    await tester.tap(find.text(S.episodeJustMark));
+    await tester.pumpAndSettle();
+    tasks.seed();
+    await tester.pump();
+    await tester.pump();
+    expect(find.text(S.stuckChip), findsNothing);
+    expect(find.text(S.stuckHint), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await h.dispose();
+  });
+
+  for (final run in [TimerRun.stopped, TimerRun.paused]) {
+    testWidgets('«Не идёт» открывает manual, $run', (tester) async {
+      final insight = EpisodeInsight();
+      final timer = EpisodeTimer()..seed(run: run, remaining: 1000);
+      final h = await pumpScreen(tester, const Size(375, 812), const TimerScreen(),
+        insightCubit: insight, timerCubit: timer);
+      await tester.tap(find.byTooltip(S.notGoing));
+      await tester.pumpAndSettle();
+      expect(find.byType(CauseChips), findsOneWidget);
+      await tester.tap(find.text(S.cause(Cause.tired)));
+      await tester.pumpAndSettle();
+      expect(insight.episodes.single.source, EpisodeSource.manual);
+      expect(tester.takeException(), isNull);
+      await h.dispose();
+    });
+  }
+
+  testWidgets('чип отвлечения открывает существующий эпизод без перезапуска', (tester) async {
+    final insight = EpisodeInsight();
+    await insight.addEpisode(source: EpisodeSource.distract, app: 'YouTube');
+    final timer = EpisodeTimer()..seed(run: TimerRun.running, remaining: 987);
+    final h = await pumpScreen(tester, const Size(375, 812), const TimerScreen(),
+      insightCubit: insight, timerCubit: timer);
+    expect(find.byTooltip(S.notGoing), findsNothing);
+    await tester.tap(find.text(S.distractedChip('YouTube')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(S.cause(Cause.external)));
+    await tester.pumpAndSettle();
+    expect(insight.episodes, hasLength(1));
+    await tester.tap(find.text(S.actionContinue));
+    await tester.pumpAndSettle();
+    expect(timer.state.remaining, 987);
+    expect(timer.starts + timer.resumes, 0);
+    expect(find.text(S.distractedChip('YouTube')), findsNothing);
+    await h.dispose();
+  });
+
+  for (final choice in ['cause', 'finished', 'none']) {
+    for (final save in [false, true]) {
+      testWidgets('стоп: $choice, сохранить заметку=$save', (tester) async {
+        final insight = EpisodeInsight();
+        final timer = EpisodeTimer()..seed(run: TimerRun.running, remaining: 1000);
+        final h = await pumpScreen(tester, const Size(375, 812), const TimerScreen(),
+          insightCubit: insight, timerCubit: timer);
+        await tester.tap(find.text(S.stop));
+        await tester.pumpAndSettle();
+        expect(find.byType(ChoiceChip), findsNWidgets(8));
+        await tester.enterText(find.byType(TextFormField), 'дописал обработчик');
+        if (choice != 'none') {
+          final chip = find.text(choice == 'cause' ? S.cause(Cause.big) : S.causeFinished);
+          await tester.ensureVisible(chip);
+          await tester.tap(chip);
+          await tester.pump();
+        }
+        final button = find.text(save ? S.save : S.withoutNote);
+        await tester.ensureVisible(button);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(insight.episodes, hasLength(choice == 'cause' ? 1 : 0));
+        if (choice == 'cause') {
+          expect(insight.episodes.single.source, EpisodeSource.stop);
+          expect(insight.episodes.single.cause, Cause.big);
+          expect(insight.episodes.single.thought, isEmpty);
+          expect(insight.episodes.single.strategy, isNull);
+          expect(insight.episodes.single.taskId, 't1');
+        }
+        expect(tester.takeException(), isNull);
+        await h.dispose();
+      });
+    }
+  }
+
   /// Главный экран уже разъезжался на телефоне: описанию задачи оставалось
   /// ~40dp и текст рвался по слогам. Поэтому ловим переполнение раскладки.
   Future<Future<void> Function()> pumpAt(
@@ -137,6 +244,8 @@ void main() {
     AppSettings current() => settings.state.settings;
 
     final journalRepo = _MemJournal();
+    final insight = InsightCubit(FakeInsights(), journalRepo, FakeSprints(), current);
+    await insight.refresh();
     final tasks = TasksCubit(
       _MemTasks(),
       journalRepo,
@@ -172,6 +281,7 @@ void main() {
     // периодический таймер, и биндинг ругается на него раньше teardown.
     Future<void> dispose() async {
       await tasks.close();
+      await insight.close();
       await journal.close();
       await timer.close();
       await directions?.close();
@@ -186,6 +296,7 @@ void main() {
             BlocProvider.value(value: tasks),
             BlocProvider.value(value: journal),
             BlocProvider.value(value: timer),
+            BlocProvider.value(value: insight),
             if (directions != null) BlocProvider.value(value: directions),
           ],
           child: const Scaffold(body: TimerScreen()),

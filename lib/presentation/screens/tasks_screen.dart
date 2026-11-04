@@ -11,6 +11,7 @@ import '../cubits/settings_cubit.dart';
 import '../cubits/sprint_cubit.dart';
 import '../cubits/tasks_cubit.dart';
 import '../widgets/common.dart';
+import '../widgets/deferrals_badge.dart';
 
 /// Экран «Задачи»: quick-add + сворачиваемые группы (Сегодня и корзины
 /// планировщика одним потоком) + «Сделано за неделю». Тот же TasksCubit,
@@ -352,7 +353,9 @@ class _Group extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                     ],
-                    Text(title, style: theme.textTheme.titleSmall),
+                    Flexible(
+                      child: Text(title, style: theme.textTheme.titleSmall),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -587,6 +590,10 @@ class _TodayRow extends StatelessWidget {
                     chip,
                     const SizedBox(width: 8),
                     Flexible(child: description),
+                    if (task.deferrals >= 3) ...[
+                      const SizedBox(width: 6),
+                      DeferralsBadge(task.deferrals),
+                    ],
                     if (isNow) Padding(padding: nowPad, child: nowBadge),
                   ],
                 ),
@@ -601,6 +608,7 @@ class _TodayRow extends StatelessWidget {
                     runSpacing: 4,
                     children: [
                       chip,
+                      if (task.deferrals >= 3) DeferralsBadge(task.deferrals),
                       if (isNow) nowBadge,
                       // Переключатели 🐸/⭐ на телефоне живут здесь: справа они
                       // вместе со счётчиком и меню не оставляли описанию места.
@@ -863,6 +871,10 @@ class _BucketRow extends StatelessWidget {
                     chip,
                     const SizedBox(width: 8),
                     Flexible(child: Text(task.description)),
+                    if (task.deferrals >= 3) ...[
+                      const SizedBox(width: 6),
+                      DeferralsBadge(task.deferrals),
+                    ],
                     if (due != null) Padding(padding: duePad, child: due),
                   ],
                 ),
@@ -877,7 +889,12 @@ class _BucketRow extends StatelessWidget {
                     runSpacing: 4,
                     // ⭐ на телефоне здесь: справа он вместе со счётчиком,
                     // кнопкой «в сегодня» и меню не оставлял описанию места.
-                    children: [chip, ?due, star],
+                    children: [
+                      chip,
+                      if (task.deferrals >= 3) DeferralsBadge(task.deferrals),
+                      ?due,
+                      star,
+                    ],
                   ),
                 )
               : null,

@@ -184,7 +184,12 @@ class ScreenHarness {
 Future<ScreenHarness> pumpScreen(
   WidgetTester tester,
   Size size,
-  Widget screen,
+  Widget screen, {
+  TasksCubit? tasksCubit,
+  TimerCubit? timerCubit,
+  InsightCubit? insightCubit,
+  DirectionsCubit? directionsCubit,
+}
 ) async {
   tester.view
     ..physicalSize = size
@@ -200,7 +205,7 @@ Future<ScreenHarness> pumpScreen(
   AppSettings current() => settings.state.settings;
 
   final journalRepo = FakeJournal();
-  final tasks = TasksCubit(FakeTasks(), journalRepo, current, NotifyService());
+  final tasks = tasksCubit ?? TasksCubit(FakeTasks(), journalRepo, current, NotifyService());
   await tasks.load();
 
   final journal = JournalCubit(
@@ -223,7 +228,7 @@ Future<ScreenHarness> pumpScreen(
   final stats = StatsCubit(journalRepo, () => current().dailyGoal);
   await stats.refresh();
 
-  final timer = TimerCubit(
+  final timer = timerCubit ?? TimerCubit(
     settings: current,
     sound: SoundService(),
     notify: NotifyService(),
@@ -232,9 +237,9 @@ Future<ScreenHarness> pumpScreen(
     onPomodoroComplete: (_) async {},
   );
 
-  final directions = DirectionsCubit(FakeCourse(), journalRepo);
+  final directions = directionsCubit ?? DirectionsCubit(FakeCourse(), journalRepo);
   await directions.refresh();
-  final insight = InsightCubit(FakeInsights(), journalRepo, FakeSprints(), current);
+  final insight = insightCubit ?? InsightCubit(FakeInsights(), journalRepo, FakeSprints(), current);
   await insight.refresh();
 
   await tester.pumpWidget(

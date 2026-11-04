@@ -646,6 +646,25 @@ abstract final class S {
     Cause.external => _t('Отвлекли', 'Interrupted'),
   };
   static String get causeFinished => _t('Доделал', 'Finished');
+  static String get episodeTitle => _t('Что мешает?', 'What is getting in the way?');
+  static String get episodeTry => _t('Попробуй', 'Try this');
+  static String get episodeJustMark => _t('Только отметить', 'Just note it');
+  static String get episodeThought => _t('Мысль (по желанию)', 'Thought (optional)');
+  static String get observationNote => _t('Неделя наблюдения: просто отмечаем. Способы — со следующей недели.', 'Observation week: just take notes. Strategies start next week.');
+  static String get observationHelp => _t('Всё равно помочь →', 'Help anyway →');
+  static String get episodeDone => _t('Готово', 'Done');
+  static String get episodeOther => _t('Другой способ:', 'Another strategy:');
+  static String episodeHelped(int wins, int tries) => _t('Помогало тебе: $wins из $tries раз', 'Helped you: $wins out of $tries times');
+  static String get episodeNoStrategies => _t('Для этой причины нужен план задачи. Пока можно только отметить.', 'This reason needs a task plan. For now, just note it.');
+  static String get fieldThen => _t('То:', 'Then:');
+  static String get stuckChip => _t('Застрял? Что мешает начать →', 'Stuck? What is stopping you →');
+  static String get notGoing => _t('Не идёт', 'Not going well');
+  static String distractedChip(String app) => _t('Отвлёкся на $app — отметить причину', 'Distracted by $app — note the reason');
+  static String get whyStopped => _t('Почему остановился', 'Why did you stop?');
+  static String deferralSnack(int n) => _t('Перенос №$n. Разобрать, что мешает?', 'Deferral #$n. Explore what is getting in the way?');
+  static String get deferralAction => _t('Разобрать', 'Explore');
+  static String deferralsTooltip(int n) => _t('Переносили $n раз', 'Deferred $n times');
+  static String deferralsBadge(int n) => _t('↻$n', '↻$n');
 
   static String strategyTitle(StrategyKind k) => switch (k) {
     StrategyKind.firstStep => _t('Первый шаг на 5 минут', 'First step in 5 minutes'),

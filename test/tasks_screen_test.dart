@@ -2,13 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_tracker/presentation/screens/sprint_screen.dart';
 import 'package:pomodoro_tracker/presentation/screens/tasks_screen.dart';
+import 'package:pomodoro_tracker/app/strings.dart';
+import 'package:pomodoro_tracker/domain/entities/pomo_task.dart';
 
 import 'screen_fakes.dart';
+import 'episode_fakes.dart';
 
 /// Экраны «Задачи» и «Спринт» на телефонной и на широкой ширине.
 /// Ловим две разные беды: выход за край (RenderFlex ругается сам) и
 /// зажатый до нечитаемого текст (о нём никто не ругается — меряем).
 void main() {
+  for (final size in [const Size(375, 812), const Size(1280, 900)]) {
+    testWidgets('бейджи с третьего переноса в Сегодня и корзинах ${size.width}', (tester) async {
+      const task = PomoTask(id: 't', description: kLongTodo, category: 'длинная-категория', durationMinutes: 25);
+      final tasks = EpisodeTasks()..seed(todo: [task.copyWith(deferrals: 3)],
+        planner: [task.copyWith(id: 'p', deferrals: 3), task.copyWith(id: 'p2', deferrals: 2)]);
+      final h = await pumpScreen(tester, size, const TasksScreen(), tasksCubit: tasks);
+      expect(find.text('↻3'), findsNWidgets(2));
+      expect(find.byTooltip(S.deferralsTooltip(3)), findsNWidgets(2));
+      expect(find.text('↻2'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await h.dispose();
+    });
+  }
   const phone = Size(411, 850);
   const desktop = Size(1280, 900);
 

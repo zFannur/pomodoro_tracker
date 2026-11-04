@@ -9,17 +9,21 @@ import '../../app/strings.dart';
 import '../../app/theme.dart';
 import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/direction.dart';
+import '../../domain/entities/episode.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../../domain/entities/sprint.dart';
 import '../cubits/activity_cubit.dart';
 import '../cubits/directions_cubit.dart';
+import '../cubits/insight_cubit.dart';
 import '../cubits/journal_cubit.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/sprint_cubit.dart';
 import '../cubits/tasks_cubit.dart';
 import '../cubits/timer_cubit.dart';
+import '../widgets/cause_chips.dart';
 import '../widgets/common.dart';
+import '../widgets/episode_sheet.dart';
 import 'activity_screen.dart' show formatActivityDuration, formatActivityName;
 import '../widgets/kanban_board.dart';
 
@@ -75,41 +79,84 @@ class _TimerBlock extends StatelessWidget {
   static Future<void> _stopWithNote(BuildContext context) async {
     final timer = context.read<TimerCubit>();
     final journal = context.read<JournalCubit>();
+    final insight = context.read<InsightCubit>();
+    final task = context.read<TasksCubit>().state.current;
     final wasWorking =
         timer.state.mode == TimerMode.pomodoro &&
         (timer.state.running || timer.state.paused) &&
         timer.state.remaining < timer.state.total;
     timer.stop();
     if (!wasWorking) return;
-    final controller = TextEditingController();
-    final note = await showDialog<String>(
+    var draftNote = '';
+    Cause? cause;
+    var finished = false;
+    final result = await showDialog<({String note, Cause? cause})>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(S.whereStopped),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            helperText: S.whereStoppedHint,
-            isDense: true,
-            border: const OutlineInputBorder(),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, update) => AlertDialog(
+          title: Text(S.whereStopped),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    onChanged: (value) => draftNote = value,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      helperText: S.whereStoppedHint,
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onFieldSubmitted: (v) => Navigator.of(dialogContext)
+                        .pop((note: v, cause: cause)),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(S.whyStopped),
+                  CauseChips(
+                    selected: cause,
+                    includeFinished: true,
+                    finished: finished,
+                    onSelected: (value) => update(() {
+                      cause = value;
+                      finished = false;
+                    }),
+                    onFinished: () => update(() {
+                      cause = null;
+                      finished = !finished;
+                    }),
+                  ),
+                ],
+              ),
+            ),
           ),
-          onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext)
+                  .pop((note: '', cause: cause)),
+              child: Text(S.withoutNote),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext)
+                  .pop((note: draftNote, cause: cause)),
+              child: Text(S.save),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(S.withoutNote),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-            child: Text(S.save),
-          ),
-        ],
       ),
-    ).whenComplete(controller.dispose);
-    if (note != null && note.trim().isNotEmpty) {
+    );
+    final note = result?.note ?? '';
+    if (note.trim().isNotEmpty) {
       await journal.addNote(note);
+    }
+    if (result?.cause case final selected?) {
+      await insight.addEpisode(
+        source: EpisodeSource.stop,
+        task: task,
+        cause: selected,
+      );
     }
   }
 
@@ -120,6 +167,8 @@ class _TimerBlock extends StatelessWidget {
     final tasks = context.watch<TasksCubit>().state;
     final journal = context.watch<JournalCubit>().state;
     final settings = context.watch<SettingsCubit>().state.settings;
+    final insight = context.watch<InsightCubit>();
+    final distraction = insight.pendingEpisode(EpisodeSource.distract);
 
     final doneCount = journal.sessions.length;
     final phase = switch (timer.mode) {
@@ -283,12 +332,37 @@ class _TimerBlock extends StatelessWidget {
           const SizedBox(height: 14),
           _NowCard(task: tasks.current),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          if (distraction != null)
+            ActionChip(
+              label: Text(S.distractedChip(distraction.app), softWrap: true),
+              onPressed: () => showEpisodeSheet(
+                context,
+                source: EpisodeSource.distract,
+                task: tasks.current,
+                existing: distraction,
+              ),
+            ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            runSpacing: 8,
             children: _buttons(context, timer, settings, showDelay),
           ),
           const SizedBox(height: 8),
-          Text(
+          if (timer.stopped &&
+              timer.delaysMs >= 10 * 60000 &&
+              tasks.todo.isNotEmpty)
+            ActionChip(
+              label: Text(S.stuckChip, softWrap: true),
+              onPressed: () => showEpisodeSheet(
+                context,
+                source: EpisodeSource.idle,
+                task: tasks.current,
+                existing: insight.pendingEpisode(EpisodeSource.idle),
+              ),
+            )
+          else
+            Text(
             timer.stopped && timer.delaysMs >= 10 * 60000
                 ? S.stuckHint
                 : S.hintKeys,
@@ -318,7 +392,7 @@ class _TimerBlock extends StatelessWidget {
     );
     final stopLabel =
         '${S.stop}${timer.confirmArmed && !timer.isBreak ? '?' : ''}';
-    if (timer.inOvertime) {
+    if (timer.inOvertime && !timer.paused) {
       return [
         FilledButton.icon(
           onPressed: () => cubit.doneEarly(),
@@ -333,7 +407,7 @@ class _TimerBlock extends StatelessWidget {
         ),
       ];
     }
-    return switch (timer.run) {
+    final buttons = switch (timer.run) {
       TimerRun.stopped => [
         FilledButton.icon(
           onPressed: cubit.start,
@@ -400,6 +474,27 @@ class _TimerBlock extends StatelessWidget {
         ],
       ],
     };
+    if (timer.mode == TimerMode.pomodoro && (timer.stopped || timer.paused)) {
+      void open() => showEpisodeSheet(
+        context,
+        source: EpisodeSource.manual,
+        task: context.read<TasksCubit>().state.current,
+      );
+      buttons.add(
+        MediaQuery.sizeOf(context).width < 600
+            ? IconButton(
+                tooltip: S.notGoing,
+                onPressed: open,
+                icon: const Icon(Icons.psychology_alt_outlined),
+              )
+            : TextButton.icon(
+                onPressed: open,
+                icon: const Icon(Icons.psychology_alt_outlined),
+                label: Text(S.notGoing),
+              ),
+      );
+    }
+    return buttons;
   }
 }
 
@@ -1254,19 +1349,24 @@ class _GoalMarker extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Divider(color: color)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                Icon(Icons.star, size: 14, color: color),
-                const SizedBox(width: 4),
-                Text(
-                  reached
-                      ? '${S.goalLine} · $goal'
-                      : '${S.goalLine} · ${S.goalLeft} $goal',
-                  style: theme.textTheme.labelMedium?.copyWith(color: color),
-                ),
-              ],
+          Flexible(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star, size: 14, color: color),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      reached
+                          ? '${S.goalLine} · $goal'
+                          : '${S.goalLine} · ${S.goalLeft} $goal',
+                      style: theme.textTheme.labelMedium?.copyWith(color: color),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           Expanded(child: Divider(color: color)),

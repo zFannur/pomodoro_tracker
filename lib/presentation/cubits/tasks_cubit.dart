@@ -513,12 +513,18 @@ class TasksCubit extends Cubit<TasksState> {
     await _persist(todo: todo, planner: planner);
   }
 
-  Future<void> plannerMove(int index, PlannerTab tab) async {
+  Future<void> plannerMove(
+    int index,
+    PlannerTab tab, {
+    bool countDeferral = true,
+  }) async {
     final planner = [...state.planner];
     if (index < 0 || index >= planner.length) return;
     final task = planner[index];
     final deferred =
-        task.tab(clock.now()) == PlannerTab.due && tab != PlannerTab.due;
+        countDeferral &&
+        task.tab(clock.now()) == PlannerTab.due &&
+        tab != PlannerTab.due;
     planner[index] = task.copyWith(
       due: _dueFor(tab),
       clearDue: tab == PlannerTab.inbox,

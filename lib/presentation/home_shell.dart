@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../app/strings.dart';
+import '../domain/entities/episode.dart';
+import 'cubits/insight_cubit.dart';
 import 'cubits/settings_cubit.dart';
 import 'cubits/tasks_cubit.dart';
 import 'cubits/timer_cubit.dart';
@@ -16,6 +18,7 @@ import 'screens/sprint_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/tasks_screen.dart';
 import 'screens/timer_screen.dart';
+import 'widgets/episode_sheet.dart';
 
 /// Оболочка: NavigationRail + горячие клавиши + заголовок окна с отсчётом.
 class HomeShell extends StatefulWidget {
@@ -191,9 +194,36 @@ class _HomeShellState extends State<HomeShell> {
     );
     // Телефон/узкое окно — навигация снизу, шестерёнка в баре сверху.
     final narrow = MediaQuery.sizeOf(context).width < 600;
-    return BlocListener<TimerCubit, TimerState>(
-      listener: (context, timer) => _updateTitle(timer),
-      child: narrow ? _narrowShell(screens) : _wideShell(screens),
+    return BlocListener<InsightCubit, InsightState>(
+      listenWhen: (previous, next) => previous.lastDeferral != next.lastDeferral,
+      listener: (context, state) {
+        final deferral = state.lastDeferral;
+        if (deferral == null || deferral.count < 3) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.deferralSnack(deferral.count)),
+            action: SnackBarAction(
+              label: S.deferralAction,
+              onPressed: () {
+                final tasks = context.read<TasksCubit>().state;
+                final task = [...tasks.todo, ...tasks.planner]
+                    .where((t) => t.id == deferral.episode.taskId)
+                    .firstOrNull;
+                showEpisodeSheet(
+                  context,
+                  source: EpisodeSource.defer,
+                  task: task,
+                  existing: deferral.episode,
+                );
+              },
+            ),
+          ),
+        );
+      },
+      child: BlocListener<TimerCubit, TimerState>(
+        listener: (context, timer) => _updateTitle(timer),
+        child: narrow ? _narrowShell(screens) : _wideShell(screens),
+      ),
     );
   }
 
