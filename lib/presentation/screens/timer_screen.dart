@@ -21,7 +21,6 @@ import '../cubits/tasks_cubit.dart';
 import '../cubits/timer_cubit.dart';
 import '../widgets/common.dart';
 import 'activity_screen.dart' show formatActivityDuration, formatActivityName;
-import 'planner_dialog.dart';
 import '../widgets/kanban_board.dart';
 
 /// Главная страница: таймер + «Запланировано» + «Сделано» — один поток,
@@ -593,7 +592,6 @@ class _TodoSection extends StatelessWidget {
                 toPlanner: true,
                 toSprint: true,
               ),
-              plannerButton: true,
             ),
             const SizedBox(height: 12),
             KanbanBoard(),
@@ -654,7 +652,6 @@ class _TodoSection extends StatelessWidget {
               fallbackCategory: category,
               toPlanner: true,
             ),
-            plannerButton: true,
           ),
           const SizedBox(height: 8),
           if (tasksState.todo.length > 3)
@@ -1375,12 +1372,10 @@ class _AddTaskForm extends StatefulWidget {
   const _AddTaskForm({
     required this.onSubmit,
     this.onSubmitInbox,
-    this.plannerButton = false,
   });
 
   final void Function(String category, String text) onSubmit;
   final void Function(String category, String text)? onSubmitInbox;
-  final bool plannerButton;
 
   @override
   State<_AddTaskForm> createState() => _AddTaskFormState();
@@ -1452,22 +1447,6 @@ class _AddTaskFormState extends State<_AddTaskForm> {
           icon: const Icon(Icons.move_to_inbox_outlined, size: 20),
           onPressed: _submitInbox,
         ),
-      ],
-      if (widget.plannerButton) ...[
-        const SizedBox(width: 4),
-        // На телефоне без подписи: с ней ряд не помещался по ширине.
-        if (narrow)
-          IconButton(
-            tooltip: S.planner,
-            icon: const Icon(Icons.inbox_outlined, size: 20),
-            onPressed: () => showPlannerDialog(context),
-          )
-        else
-          OutlinedButton.icon(
-            icon: const Icon(Icons.inbox_outlined, size: 16),
-            label: Text(S.planner),
-            onPressed: () => showPlannerDialog(context),
-          ),
       ],
     ];
     final add = FilledButton.tonal(onPressed: _submit, child: Text(S.add));

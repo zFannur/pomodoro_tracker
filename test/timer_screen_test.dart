@@ -116,9 +116,8 @@ class _MemCourse implements DirectionRepository {
 }
 
 void main() {
-  /// Главный экран уже разъезжался на телефоне: кнопка «Планировщик» уходила
-  /// за правый край, а описанию задачи оставалось ~40dp и текст рвался по
-  /// слогам. Оба дефекта — переполнение раскладки, поэтому ловим его тестом.
+  /// Главный экран уже разъезжался на телефоне: описанию задачи оставалось
+  /// ~40dp и текст рвался по слогам. Поэтому ловим переполнение раскладки.
   Future<Future<void> Function()> pumpAt(
     WidgetTester tester,
     Size size, {
@@ -201,6 +200,15 @@ void main() {
     final dispose = await pumpAt(tester, const Size(411, 850));
     expect(tester.takeException(), isNull);
     expect(find.byType(TimerScreen), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    await dispose();
+  });
+
+  testWidgets('на экране таймера нет кнопки «Планировщик»', (tester) async {
+    final dispose = await pumpAt(tester, const Size(411, 850));
+
+    expect(find.text('Планировщик'), findsNothing);
+
     await tester.pumpWidget(const SizedBox());
     await dispose();
   });
