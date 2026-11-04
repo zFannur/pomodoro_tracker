@@ -191,6 +191,11 @@ class ActivityCubit extends Cubit<ActivityState> {
   List<ActivityRow> segmentsForAll(Iterable<PomoSession> sessions) =>
       segmentsForSessions(_tracker.data.focusSegments, sessions);
 
+  /// Окна вне помидоров за промежутки [windows] («что было вместо»).
+  List<ActivityRow> idleFor(
+    Iterable<({DateTime from, DateTime to})> windows,
+  ) => segmentsForWindows(_tracker.data.idleSegments, windows);
+
   @override
   Future<void> close() async {
     await _sub?.cancel();

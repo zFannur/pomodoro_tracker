@@ -56,6 +56,30 @@ bool episodeSucceeded(Episode e, List<PomoSession> sessions) => sessions.any(
       s.start.add(Duration(minutes: s.minutes)).isAfter(e.at),
 );
 
+/// Отрезок времени, когда задача «не шла»: от [e.at] − 15 мин до старта
+/// ближайшего помидора после эпизода, но не дольше 60 мин после [e.at].
+/// Только для `idle`, `manual`, `defer`; для остальных — null. Время
+/// помидоров внутри отрезка не вычитается: окна берутся из отрезков вне
+/// помидоров, там его и так нет.
+({DateTime from, DateTime to})? insteadWindow(
+  Episode e,
+  List<PomoSession> daySessions,
+) {
+  if (e.source != EpisodeSource.idle &&
+      e.source != EpisodeSource.manual &&
+      e.source != EpisodeSource.defer) {
+    return null;
+  }
+  var to = e.at.add(const Duration(minutes: 60));
+  for (final s in daySessions) {
+    // Ручная отметка таймером не велась — её «старт» ничего не обрывает.
+    if (!s.manual && !s.start.isBefore(e.at) && s.start.isBefore(to)) {
+      to = s.start;
+    }
+  }
+  return (from: e.at.subtract(const Duration(minutes: 15)), to: to);
+}
+
 Map<StrategyKind, ({int tries, int wins})> strategyStats(List<DayLog> days) {
   final result = <StrategyKind, ({int tries, int wins})>{};
   for (final day in days) {

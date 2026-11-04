@@ -19,6 +19,10 @@ const _idleLimitSeconds = 120;
 /// Сколько дней хранить.
 const _keepDays = 60;
 
+/// Сколько дней хранить отрезки вне помидоров: самый объёмный ряд, а «что
+/// было вместо» нужно недельному разбору и вкладке «Эпизоды» (14 дней).
+const keepIdleDays = 14;
+
 /// Раз в сколько сбрасывать данные на диск.
 const _flushEvery = Duration(seconds: 60);
 
@@ -90,7 +94,7 @@ void addTick(
   if (inFocus) entry.focusSeconds += seconds;
 }
 
-/// Добавляет тик активности к отрезкам помидора. Склеивает с предыдущим
+/// Добавляет тик активности к отрезкам дня. Склеивает с предыдущим
 /// отрезком, если приложение то же и пауза не превышает 2 тиков.
 void addSegmentTick(
   List<ActivitySegment> day, {
@@ -170,12 +174,21 @@ List<ActivityRow> segmentsForSessions(
   Map<String, List<ActivitySegment>> byDay,
   Iterable<PomoSession> sessions,
 ) {
+  return _sumRows([
+    for (final s in sessions)
+      segmentsSummary(
+        byDay[dateKey(logicalDate(s.start))] ?? const [],
+        s.start.subtract(const Duration(minutes: 1)),
+        s.start.add(Duration(minutes: s.minutes + 1)),
+      ),
+  ]);
+}
+
+/// Складывает несколько сводок по app+title и сортирует по убыванию.
+List<ActivityRow> _sumRows(Iterable<List<ActivityRow>> parts) {
   final sum = <String, ActivityRow>{};
-  for (final s in sessions) {
-    final segments = byDay[dateKey(logicalDate(s.start))] ?? const [];
-    final from = s.start.subtract(const Duration(minutes: 1));
-    final to = s.start.add(Duration(minutes: s.minutes + 1));
-    for (final row in segmentsSummary(segments, from, to)) {
+  for (final rows in parts) {
+    for (final row in rows) {
       final k = '${row.app}|${row.title}';
       final prev = sum[k];
       sum[k] = prev == null
@@ -192,6 +205,45 @@ List<ActivityRow> segmentsForSessions(
   return sum.values.toList()..sort((a, b) => b.seconds.compareTo(a.seconds));
 }
 
+/// Окна за промежутки [windows], сложенные по app+title, по убыванию.
+/// Пересекающиеся промежутки сначала сливаются: два эпизода одного простоя
+/// не должны посчитать одно и то же окно дважды. Отрезки берутся из
+/// логических дней начала и конца каждого промежутка.
+List<ActivityRow> segmentsForWindows(
+  Map<String, List<ActivitySegment>> byDay,
+  Iterable<({DateTime from, DateTime to})> windows,
+) {
+  final sorted = [
+    for (final w in windows)
+      if (w.to.isAfter(w.from)) w,
+  ]..sort((a, b) => a.from.compareTo(b.from));
+  final merged = <({DateTime from, DateTime to})>[];
+  for (final w in sorted) {
+    final last = merged.isEmpty ? null : merged.last;
+    if (last != null && !w.from.isAfter(last.to)) {
+      if (w.to.isAfter(last.to)) {
+        merged[merged.length - 1] = (from: last.from, to: w.to);
+      }
+    } else {
+      merged.add(w);
+    }
+  }
+  return _sumRows([
+    for (final w in merged)
+      segmentsSummary(
+        [
+          for (final k in {
+            dateKey(logicalDate(w.from)),
+            dateKey(logicalDate(w.to)),
+          })
+            ...?byDay[k],
+        ],
+        w.from,
+        w.to,
+      ),
+  ]);
+}
+
 /// Удаляет дни старше [keep] суток (включая [today]). Ключи — «yyyy-MM-dd»,
 /// поэтому сравнение строк совпадает со сравнением дат.
 void pruneDays<T>(
@@ -204,9 +256,9 @@ void pruneDays<T>(
 }
 
 /// Удаляет записи с [items] из `days` и отрезки с теми же app+title из
-/// `focusSegments`. Если [day] не указан (`null`), удаляет во всех днях,
-/// иначе только в указанном дне («yyyy-MM-dd»). Опустевшие дни удаляет
-/// из обеих карт.
+/// `focusSegments` и `idleSegments`. Если [day] не указан (`null`), удаляет
+/// во всех днях, иначе только в указанном дне («yyyy-MM-dd»). Опустевшие дни
+/// удаляет из всех карт.
 void deleteActivity(
   ActivityData data,
   Set<({String app, String title})> items, {
@@ -223,11 +275,15 @@ void deleteActivity(
         data.days.remove(d);
       }
     }
-    final segments = data.focusSegments[d];
-    if (segments != null) {
-      segments.removeWhere((seg) => keys.contains('${seg.app}|${seg.title}'));
-      if (segments.isEmpty) {
-        data.focusSegments.remove(d);
+    for (final byDay in [data.focusSegments, data.idleSegments]) {
+      final segments = byDay[d];
+      if (segments != null) {
+        segments.removeWhere(
+          (seg) => keys.contains('${seg.app}|${seg.title}'),
+        );
+        if (segments.isEmpty) {
+          byDay.remove(d);
+        }
       }
     }
   }
@@ -235,7 +291,11 @@ void deleteActivity(
   if (day != null) {
     cleanDay(day);
   } else {
-    final allDays = {...data.days.keys, ...data.focusSegments.keys};
+    final allDays = {
+      ...data.days.keys,
+      ...data.focusSegments.keys,
+      ...data.idleSegments.keys,
+    };
     for (final d in allDays) {
       cleanDay(d);
     }
@@ -281,8 +341,7 @@ class ActivityTracker {
     if (_timer != null || _disposed) return;
     data = await store.load();
     if (_disposed) return;
-    pruneDays(data.days, logicalDate(clock.now()));
-    pruneDays(data.focusSegments, logicalDate(clock.now()));
+    _prune(logicalDate(clock.now()));
     _lastFlush = clock.now();
     _pomodoroSubscription = pomodoroChanges?.listen(_observePomodoro);
     _timer = Timer.periodic(
@@ -320,9 +379,14 @@ class ActivityTracker {
     if (!_dirty) return;
     _dirty = false;
     _lastFlush = clock.now();
-    pruneDays(data.days, logicalDate(_lastFlush));
-    pruneDays(data.focusSegments, logicalDate(_lastFlush));
+    _prune(logicalDate(_lastFlush));
     await store.save(data);
+  }
+
+  void _prune(DateTime today) {
+    pruneDays(data.days, today);
+    pruneDays(data.focusSegments, today);
+    pruneDays(data.idleSegments, today, keep: keepIdleDays);
   }
 
   void poll() {
@@ -360,15 +424,17 @@ class ActivityTracker {
       seconds: activityTickSeconds,
       inFocus: inFocus,
     );
-    if (inFocus) {
-      addSegmentTick(
-        data.focusSegments.putIfAbsent(dayKey, () => []),
-        now: now,
-        app: window.exe,
-        title: title,
-        seconds: activityTickSeconds,
-      );
-    }
+    // Вне помидора — отдельный ряд: из него «что было вместо» у эпизодов.
+    addSegmentTick(
+      (inFocus ? data.focusSegments : data.idleSegments).putIfAbsent(
+        dayKey,
+        () => [],
+      ),
+      now: now,
+      app: window.exe,
+      title: title,
+      seconds: activityTickSeconds,
+    );
     _dirty = true;
     _ticks.add(null);
   }

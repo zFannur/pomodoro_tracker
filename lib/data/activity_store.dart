@@ -44,7 +44,8 @@ class ActivityEntry {
   }
 }
 
-/// Отрезок активности в одном окне во время помидора.
+/// Отрезок активности в одном окне (в помидоре или вне его — зависит от
+/// того, в каком ряду лежит).
 class ActivitySegment {
   ActivitySegment({
     required this.from,
@@ -97,24 +98,55 @@ class ActivitySegment {
   int get hashCode => Object.hash(from, to, app, title);
 }
 
-/// Все данные трекера: день «yyyy-MM-dd» → агрегаты дня, отрезки помидоров
-/// и множество «отвлекающих» ключей.
+/// Все данные трекера: день «yyyy-MM-dd» → агрегаты дня, отрезки помидоров,
+/// отрезки вне помидоров и множество «отвлекающих» ключей.
 class ActivityData {
   final Map<String, Map<String, ActivityEntry>> days = {};
   final Map<String, List<ActivitySegment>> focusSegments = {};
+
+  /// Отрезки вне помидоров («что было вместо»): самый объёмный ряд,
+  /// поэтому хранится короче основных данных.
+  final Map<String, List<ActivitySegment>> idleSegments = {};
   final Set<String> distracting = {};
 
-  Map<String, dynamic> toJson() => {
-    for (final day in days.entries)
-      if (day.value.isNotEmpty)
-        day.key: [for (final e in day.value.values) e.toJson()],
-    _segmentsKey: {
-      for (final day in focusSegments.entries)
-        if (day.value.isNotEmpty)
-          day.key: [for (final s in day.value) s.toJson()],
-    },
-    _distractingKey: distracting.toList()..sort(),
+  static Map<String, dynamic> _segmentsJson(
+    Map<String, List<ActivitySegment>> byDay,
+  ) => {
+    for (final day in byDay.entries)
+      if (day.value.isNotEmpty) day.key: [for (final s in day.value) s.toJson()],
   };
+
+  Map<String, dynamic> toJson() {
+    final idle = _segmentsJson(idleSegments);
+    return {
+      for (final day in days.entries)
+        if (day.value.isNotEmpty)
+          day.key: [for (final e in day.value.values) e.toJson()],
+      _segmentsKey: _segmentsJson(focusSegments),
+      if (idle.isNotEmpty) _idleKey: idle,
+      _distractingKey: distracting.toList()..sort(),
+    };
+  }
+
+  /// Словарь «день → отрезки» из JSON; битые отрезки и дни пропускаются.
+  static void _readSegments(
+    Object? raw,
+    Map<String, List<ActivitySegment>> into,
+  ) {
+    if (raw is! Map) return;
+    for (final segEntry in raw.entries) {
+      final segKey = segEntry.key;
+      if (segKey is! String) continue;
+      final segList = segEntry.value;
+      if (segList is! List) continue;
+      final list = <ActivitySegment>[];
+      for (final raw in segList) {
+        final segment = ActivitySegment.fromJson(raw);
+        if (segment != null) list.add(segment);
+      }
+      if (list.isNotEmpty) into[segKey] = list;
+    }
+  }
 
   static ActivityData fromJson(Object? json) {
     final data = ActivityData();
@@ -128,23 +160,13 @@ class ActivityData {
         continue;
       }
       if (item.key == _segmentsKey) {
-        final rawSegments = item.value;
-        if (rawSegments is Map) {
-          for (final segEntry in rawSegments.entries) {
-            final segKey = segEntry.key;
-            if (segKey is! String) continue;
-            final segList = segEntry.value;
-            if (segList is! List) continue;
-            final list = <ActivitySegment>[];
-            for (final raw in segList) {
-              final segment = ActivitySegment.fromJson(raw);
-              if (segment != null) list.add(segment);
-            }
-            if (list.isNotEmpty) {
-              data.focusSegments[segKey] = list;
-            }
-          }
-        }
+        _readSegments(item.value, data.focusSegments);
+        continue;
+      }
+      // Служебный ключ, не день: без этой ветки его спасало бы только то,
+      // что значение — словарь, а не список.
+      if (item.key == _idleKey) {
+        _readSegments(item.value, data.idleSegments);
         continue;
       }
       final value = item.value;
@@ -165,6 +187,10 @@ const _distractingKey = 'distracting';
 
 /// Ключ словаря отрезков помидоров в activity.json.
 const _segmentsKey = 'segments';
+
+/// Ключ словаря отрезков вне помидоров. Старые версии приложения его
+/// пропускают: значение — словарь, а днём считается только список.
+const _idleKey = 'idle';
 
 /// JSON-файл активности в AppData (локальные данные машины, в синк не едет).
 class ActivityStore {

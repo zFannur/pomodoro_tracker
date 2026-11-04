@@ -50,7 +50,8 @@ String windowsSubtitle(List<PomoSession> sessions, List<ActivityRow> rows) {
 ///
 /// [rows] — функция, а не список: после смены флажка «отвлекающее» диалог
 /// перестраивается и спрашивает строки заново. [breakdown] (необязательно) —
-/// раскладка по помидорам: подпись и окна каждого.
+/// раскладка по помидорам: подпись и окна каждого. [note] — серая строка
+/// под пустым состоянием (по умолчанию — про Windows и 60 дней).
 Future<void> showWindowsDialog(
   BuildContext context, {
   required String title,
@@ -58,6 +59,7 @@ Future<void> showWindowsDialog(
   required List<ActivityRow> Function() rows,
   List<({String label, List<ActivityRow> rows})> Function()? breakdown,
   String empty = '',
+  String note = '',
 }) {
   // Кубит — до showDialog: маршрут диалога не видит провайдеров экрана.
   final cubit = context.read<ActivityCubit>();
@@ -71,6 +73,7 @@ Future<void> showWindowsDialog(
         rows: rows,
         breakdown: breakdown,
         empty: empty,
+        note: note,
       );
       if (narrow) {
         return Dialog.fullscreen(
@@ -156,6 +159,7 @@ class _WindowsBody extends StatefulWidget {
     required this.rows,
     required this.breakdown,
     required this.empty,
+    required this.note,
   });
 
   final ActivityCubit cubit;
@@ -163,6 +167,7 @@ class _WindowsBody extends StatefulWidget {
   final List<ActivityRow> Function() rows;
   final List<({String label, List<ActivityRow> rows})> Function()? breakdown;
   final String empty;
+  final String note;
 
   @override
   State<_WindowsBody> createState() => _WindowsBodyState();
@@ -195,7 +200,10 @@ class _WindowsBodyState extends State<_WindowsBody> {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(S.windowsTrackerNote, style: muted),
+              Text(
+                widget.note.isEmpty ? S.windowsTrackerNote : widget.note,
+                style: muted,
+              ),
             ] else ...[
               const SizedBox(height: 10),
               _FocusBar(rows: rows, state: state),

@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/strings.dart';
 import '../../core/failure.dart';
 import '../../data/markdown_codec.dart' show sprintId, two;
+import '../../domain/entities/app_settings.dart' show formatClock;
 import '../../domain/entities/episode.dart';
 import '../../domain/entities/experiment.dart';
 import '../../domain/entities/pomo_session.dart';
@@ -14,6 +15,7 @@ import '../../domain/entities/pomo_task.dart';
 import '../../domain/insights.dart';
 import '../../domain/strategies.dart';
 import '../../services/ai_service.dart';
+import '../cubits/activity_cubit.dart';
 import '../cubits/insight_cubit.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/tasks_cubit.dart';
@@ -22,6 +24,7 @@ import '../widgets/ai_consent.dart';
 import '../widgets/common.dart';
 import '../widgets/episode_sheet.dart';
 import '../widgets/ips_dialog.dart';
+import '../widgets/windows_dialog.dart';
 import 'activity_screen.dart';
 
 /// Значение метрики для показа: «+25 мин» / «10:40» / «8 мин» / «12%» / «3».
@@ -78,7 +81,7 @@ class InsightScreen extends StatelessWidget {
             child: TabBarView(
               children: [
                 _WeekTab(showWindows: windows, aiSlot: aiSlot),
-                const _EpisodesTab(),
+                _EpisodesTab(showWindows: windows),
                 if (windows) const ActivityScreen(),
               ],
             ),
@@ -241,6 +244,11 @@ class _WeekTabState extends State<_WeekTab> {
             const SizedBox(height: 12),
             _CausesCard(insight: insight),
             const SizedBox(height: 12),
+            _InsteadCard(
+              insight: insight,
+              today: today,
+              showWindows: widget.showWindows,
+            ),
             _WellbeingCard(insight: insight, windows: windows, today: today),
             const SizedBox(height: 12),
             _ExperimentSection(
@@ -439,6 +447,58 @@ class _CausesCard extends StatelessWidget {
                 if (external > 0) Text(S.causeExternal(external), style: muted),
               ],
             ),
+    );
+  }
+}
+
+/// «Вместо задач»: топ-5 окон вне помидоров за «что было вместо» всех
+/// эпизодов текущей недели. Нет трекера или данных — секции нет.
+class _InsteadCard extends StatelessWidget {
+  const _InsteadCard({
+    required this.insight,
+    required this.today,
+    required this.showWindows,
+  });
+
+  final InsightCubit insight;
+  final DateTime today;
+  final bool showWindows;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!hasWindowsTracker(context, isWindows: showWindows)) {
+      return const SizedBox.shrink();
+    }
+    final monday = DateTime(
+      today.year,
+      today.month,
+      today.day - today.weekday + 1,
+    );
+    final end = DateTime(monday.year, monday.month, monday.day + 7);
+    final windows = [
+      for (final day in insight.state.days)
+        if (!day.date.isBefore(monday) && day.date.isBefore(end))
+          for (final e in day.episodes) ?insteadWindow(e, day.sessions),
+    ];
+    // read, а не watch: трекер обновляется каждые 5 с, неделе это не нужно.
+    final rows = windows.isEmpty
+        ? const <ActivityRow>[]
+        : context.read<ActivityCubit>().idleFor(windows);
+    if (rows.isEmpty) return const SizedBox.shrink();
+    final line = rows
+        .take(5)
+        .map(
+          (r) =>
+              '${r.title.isEmpty ? formatActivityName(r.app, '') : r.title} '
+              '${formatActivityDuration(r.seconds)}',
+        )
+        .join(' · ');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SectionCard(
+        title: S.insteadTitle,
+        child: Text(line, style: Theme.of(context).textTheme.bodyMedium),
+      ),
     );
   }
 }
@@ -999,7 +1059,9 @@ class _IpsSection extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _EpisodesTab extends StatefulWidget {
-  const _EpisodesTab();
+  const _EpisodesTab({required this.showWindows});
+
+  final bool showWindows;
 
   @override
   State<_EpisodesTab> createState() => _EpisodesTabState();
@@ -1021,6 +1083,7 @@ class _EpisodesTabState extends State<_EpisodesTab> {
         break;
     }
     final theme = Theme.of(context);
+    final windows = hasWindowsTracker(context, isWindows: widget.showWindows);
     final today = logicalDate(clock.now());
     final from = DateTime(today.year, today.month, today.day - 13);
     final groups = <({DayLog day, List<Episode> episodes})>[];
@@ -1077,7 +1140,8 @@ class _EpisodesTabState extends State<_EpisodesTab> {
                   style: theme.textTheme.labelLarge,
                 ),
               ),
-              for (final e in g.episodes) _EpisodeRow(day: g.day, episode: e),
+              for (final e in g.episodes)
+                _EpisodeRow(day: g.day, episode: e, windows: windows),
             ],
           ],
         ),
@@ -1087,10 +1151,58 @@ class _EpisodesTabState extends State<_EpisodesTab> {
 }
 
 class _EpisodeRow extends StatelessWidget {
-  const _EpisodeRow({required this.day, required this.episode});
+  const _EpisodeRow({
+    required this.day,
+    required this.episode,
+    required this.windows,
+  });
 
   final DayLog day;
   final Episode episode;
+
+  /// Есть трекер окон: в меню появляются «Что было вместо» / «открыто».
+  final bool windows;
+
+  String get _title => episode.task.isEmpty ? S.episodeNoTask : episode.task;
+
+  /// Помидор, внутри которого случилось отвлечение (с тем же запасом в
+  /// минуту, что и окно помидора в `segmentsForSessions`).
+  PomoSession? get _sessionOfEpisode {
+    for (final s in day.sessions) {
+      if (s.manual) continue;
+      final from = s.start.subtract(const Duration(minutes: 1));
+      final to = s.start.add(Duration(minutes: s.minutes + 1));
+      if (!episode.at.isBefore(from) && !episode.at.isAfter(to)) return s;
+    }
+    return null;
+  }
+
+  void _showInstead(BuildContext context, ({DateTime from, DateTime to}) w) {
+    final activity = context.read<ActivityCubit>();
+    final fmt = context.read<SettingsCubit>().state.settings.timeFmt;
+    showWindowsDialog(
+      context,
+      title: _title,
+      subtitle: S.insteadRange(
+        formatClock(w.from, fmt),
+        formatClock(w.to, fmt),
+        untilPomo: day.sessions.any((s) => !s.manual && s.start == w.to),
+      ),
+      rows: () => activity.idleFor([w]),
+      empty: S.insteadEmpty,
+      note: S.insteadNote,
+    );
+  }
+
+  void _showOpen(BuildContext context, PomoSession s) {
+    final activity = context.read<ActivityCubit>();
+    showWindowsDialog(
+      context,
+      title: _title,
+      subtitle: windowsSubtitle([s], activity.segmentsFor(s)),
+      rows: () => activity.segmentsFor(s),
+    );
+  }
 
   Widget _icon(ColorScheme scheme) {
     final color = scheme.onSurfaceVariant;
@@ -1135,7 +1247,11 @@ class _EpisodeRow extends StatelessWidget {
     final strategy = episode.strategy;
     final title = episode.source == EpisodeSource.distract && episode.app.isNotEmpty
         ? S.episodeDistract(episode.app)
-        : (episode.task.isEmpty ? S.episodeNoTask : episode.task);
+        : _title;
+    final instead = windows ? insteadWindow(episode, day.sessions) : null;
+    final session = windows && episode.source == EpisodeSource.distract
+        ? _sessionOfEpisode
+        : null;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1198,14 +1314,28 @@ class _EpisodeRow extends StatelessWidget {
           PopupMenuButton<String>(
             key: ValueKey('episode-menu:${episode.id}'),
             icon: Icon(Icons.more_vert, size: 18, color: scheme.onSurfaceVariant),
-            onSelected: (_) {
-              // Без отмены: эпизод — запись наблюдения, а не работа.
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(S.episodeDeleted)),
-              );
-              context.read<InsightCubit>().deleteEpisode(episode.id);
+            onSelected: (value) {
+              switch (value) {
+                case 'instead':
+                  if (instead != null) _showInstead(context, instead);
+                case 'open':
+                  if (session != null) _showOpen(context, session);
+                case 'delete':
+                  // Без отмены: эпизод — запись наблюдения, а не работа.
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(S.episodeDeleted)),
+                  );
+                  context.read<InsightCubit>().deleteEpisode(episode.id);
+              }
             },
             itemBuilder: (_) => [
+              if (instead != null)
+                PopupMenuItem(value: 'instead', child: Text(S.menuInstead)),
+              if (session != null)
+                PopupMenuItem(
+                  value: 'open',
+                  child: Text(S.menuSessionActivity),
+                ),
               PopupMenuItem(value: 'delete', child: Text(S.delete)),
             ],
           ),

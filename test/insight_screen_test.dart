@@ -13,6 +13,8 @@ import 'package:pomodoro_tracker/domain/insights.dart';
 import 'package:pomodoro_tracker/presentation/cubits/activity_cubit.dart';
 import 'package:pomodoro_tracker/presentation/cubits/insight_cubit.dart';
 import 'package:pomodoro_tracker/presentation/home_shell.dart';
+import 'package:pomodoro_tracker/presentation/screens/activity_screen.dart'
+    show formatActivityDuration;
 import 'package:pomodoro_tracker/presentation/screens/insight_screen.dart';
 import 'package:pomodoro_tracker/presentation/screens/sprint_screen.dart';
 import 'package:pomodoro_tracker/services/activity_tracker.dart';
@@ -752,6 +754,224 @@ void main() {
       await h.dispose();
       await tester.runAsync(activity.close);
       await tester.runAsync(tracker.dispose);
+    });
+  });
+
+  group('что было вместо (P13 B)', () {
+    ActivitySegment seg(DateTime from, int minutes, String app, [String t = '']) =>
+        ActivitySegment(
+          from: from,
+          to: from.add(Duration(minutes: minutes)),
+          app: app,
+          title: t,
+        );
+
+    /// «Разбор» с трекером окон; [idle] — отрезки вне помидоров по дням.
+    Future<(ScreenHarness, ActivityCubit)> openWithTracker(
+      WidgetTester tester, {
+      Map<String, List<ActivitySegment>> idle = const {},
+      Map<String, List<ActivitySegment>> focus = const {},
+      ReviewInsight? insight,
+      bool showWindows = true,
+    }) async {
+      final tracker = ActivityTracker(
+        store: _MemoryActivityStore(),
+        inPomodoro: () => false,
+      );
+      tracker.data.idleSegments.addAll(idle);
+      tracker.data.focusSegments.addAll(focus);
+      final activity = ActivityCubit(tracker);
+      final h = await pumpScreen(
+        tester,
+        const Size(1280, 3200),
+        BlocProvider.value(
+          value: activity,
+          child: InsightScreen(showWindows: showWindows),
+        ),
+        insightCubit:
+            insight ??
+            ReviewInsight(days: _days(), sprint: _sprint()),
+      );
+      return (h, activity);
+    }
+
+    final idleWeek = {
+      // Прошлая неделя: в «Вместо задач» текущей не попадает.
+      '2026-10-27': [seg(DateTime(2026, 10, 27, 8, 40), 10, 'chrome.exe', 'YouTube')],
+      '2026-11-03': [
+        seg(DateTime(2026, 11, 3, 12, 0), 50, 'chrome.exe', 'YouTube'),
+        seg(DateTime(2026, 11, 3, 13, 0), 9, 'a1.exe'),
+        seg(DateTime(2026, 11, 3, 13, 9), 8, 'a2.exe'),
+        seg(DateTime(2026, 11, 3, 13, 17), 7, 'a3.exe'),
+        seg(DateTime(2026, 11, 3, 13, 24), 6, 'a4.exe'),
+        seg(DateTime(2026, 11, 3, 13, 30), 4, 'a5.exe'),
+      ],
+      '2026-11-04': [
+        seg(DateTime(2026, 11, 4, 9, 0), 20, 'code.exe'),
+        seg(DateTime(2026, 11, 4, 9, 30), 20, 'chrome.exe', 'YouTube'),
+        seg(DateTime(2026, 11, 4, 9, 50), 5, 'telegram.exe'),
+      ],
+    };
+
+    testWidgets('эпизод простоя: «Что было вместо» — окна до помидора', (
+      tester,
+    ) async {
+      await withClock(Clock.fixed(_now), () async {
+        final (h, activity) = await openWithTracker(tester, idle: idleWeek);
+        await _tapTab(tester, S.insightTabEpisodes);
+        await tester.tap(find.byKey(const ValueKey('episode-menu:c1')));
+        await tester.pumpAndSettle();
+        expect(find.text(S.menuInstead), findsOneWidget);
+        expect(find.text(S.menuSessionActivity), findsNothing);
+        await tester.tap(find.text(S.menuInstead));
+        await tester.pumpAndSettle();
+        // c1 в 09:40, следующий помидор в 10:00: окно 09:25–10:00.
+        expect(
+          find.text(S.insteadRange('09:25', '10:00', untilPomo: true)),
+          findsOneWidget,
+        );
+        expect(find.text('Chrome: YouTube'), findsOneWidget);
+        expect(find.text('telegram'), findsOneWidget);
+        expect(find.text('code'), findsNothing);
+        await tester.tap(find.text(S.close));
+        await tester.pumpAndSettle();
+        await h.dispose();
+        await tester.runAsync(activity.close);
+      });
+    });
+
+    testWidgets('нет данных за окно — свой пустой текст и 14 дней', (
+      tester,
+    ) async {
+      await withClock(Clock.fixed(_now), () async {
+        final (h, activity) = await openWithTracker(tester);
+        await _tapTab(tester, S.insightTabEpisodes);
+        await tester.tap(find.byKey(const ValueKey('episode-menu:b2')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(S.menuInstead));
+        await tester.pumpAndSettle();
+        // После 12:00 помидоров нет: час после сигнала, без «до помидора».
+        expect(
+          find.text(S.insteadRange('11:45', '13:00', untilPomo: false)),
+          findsOneWidget,
+        );
+        expect(find.text(S.insteadEmpty), findsOneWidget);
+        expect(find.text(S.insteadNote), findsOneWidget);
+        await h.dispose();
+        await tester.runAsync(activity.close);
+      });
+    });
+
+    testWidgets('стоп — без «вместо»; без трекера пунктов окон нет', (
+      tester,
+    ) async {
+      await withClock(Clock.fixed(_now), () async {
+        final (h, activity) = await openWithTracker(tester);
+        await _tapTab(tester, S.insightTabEpisodes);
+        await tester.tap(find.byKey(const ValueKey('episode-menu:c2')));
+        await tester.pumpAndSettle();
+        expect(find.text(S.menuInstead), findsNothing);
+        expect(find.text(S.delete), findsOneWidget);
+        await h.dispose();
+        await tester.runAsync(activity.close);
+      });
+      await withClock(Clock.fixed(_now), () async {
+        final (h, _) = await _open(tester, size: const Size(1280, 3200));
+        await _tapTab(tester, S.insightTabEpisodes);
+        await tester.tap(find.byKey(const ValueKey('episode-menu:c1')));
+        await tester.pumpAndSettle();
+        expect(find.text(S.menuInstead), findsNothing);
+        expect(find.text(S.delete), findsOneWidget);
+        await h.dispose();
+      });
+    });
+
+    testWidgets('отвлечение: «Что было открыто» — окна его помидора', (
+      tester,
+    ) async {
+      await withClock(Clock.fixed(_now), () async {
+        final day = DateTime(2026, 11, 4);
+        final insight = ReviewInsight(
+          sprint: _sprint(),
+          days: [
+            DayLog(
+              date: day,
+              goal: 8,
+              sessions: [_session(day, 8)],
+              episodes: [
+                _episode(
+                  'd1',
+                  DateTime(2026, 11, 4, 8, 10),
+                  source: EpisodeSource.distract,
+                  app: 'Chrome: YouTube',
+                ),
+              ],
+            ),
+          ],
+        );
+        final (h, activity) = await openWithTracker(
+          tester,
+          insight: insight,
+          focus: {
+            '2026-11-04': [
+              seg(DateTime(2026, 11, 4, 8, 0), 15, 'code.exe'),
+              seg(DateTime(2026, 11, 4, 8, 15), 10, 'chrome.exe', 'YouTube'),
+            ],
+          },
+        );
+        await _tapTab(tester, S.insightTabEpisodes);
+        await tester.tap(find.byKey(const ValueKey('episode-menu:d1')));
+        await tester.pumpAndSettle();
+        expect(find.text(S.menuInstead), findsNothing);
+        await tester.tap(find.text(S.menuSessionActivity));
+        await tester.pumpAndSettle();
+        expect(find.text('code'), findsOneWidget);
+        expect(find.text('Chrome: YouTube'), findsOneWidget);
+        await h.dispose();
+        await tester.runAsync(activity.close);
+      });
+    });
+
+    testWidgets('Неделя: «Вместо задач» — топ-5 за текущую неделю', (
+      tester,
+    ) async {
+      await withClock(Clock.fixed(_now), () async {
+        final (h, activity) = await openWithTracker(tester, idle: idleWeek);
+        expect(find.text(S.insteadTitle), findsOneWidget);
+        // YouTube: 50 мин 3 ноября (окно b2+b3) + 20 мин сегодня (c1).
+        final line = [
+          'YouTube ${formatActivityDuration(70 * 60)}',
+          'a1 ${formatActivityDuration(9 * 60)}',
+          'a2 ${formatActivityDuration(8 * 60)}',
+          'a3 ${formatActivityDuration(7 * 60)}',
+          'a4 ${formatActivityDuration(6 * 60)}',
+        ].join(' · ');
+        expect(find.text(line), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await h.dispose();
+        await tester.runAsync(activity.close);
+      });
+    });
+
+    testWidgets('Неделя: нет данных или не Windows — секции нет', (
+      tester,
+    ) async {
+      await withClock(Clock.fixed(_now), () async {
+        final (h, activity) = await openWithTracker(tester);
+        expect(find.text(S.insteadTitle), findsNothing);
+        await h.dispose();
+        await tester.runAsync(activity.close);
+      });
+      await withClock(Clock.fixed(_now), () async {
+        final (h, activity) = await openWithTracker(
+          tester,
+          idle: idleWeek,
+          showWindows: false,
+        );
+        expect(find.text(S.insteadTitle), findsNothing);
+        await h.dispose();
+        await tester.runAsync(activity.close);
+      });
     });
   });
 }

@@ -649,6 +649,22 @@ abstract final class S {
     return '$day $clock · $minutes $minShort';
   }
 
+  // Что было вместо задачи (окна вне помидоров)
+  static String get menuInstead => _t('Что было вместо', 'What was instead');
+  static String insteadRange(String from, String to, {required bool untilPomo}) =>
+      untilPomo
+      ? _t('$from–$to · до первого помидора', '$from–$to · until the first pomodoro')
+      : '$from–$to';
+  static String get insteadEmpty => _t(
+    'Нет данных: трекер не видел окон в это время',
+    'No data: the tracker saw no windows at that time',
+  );
+  static String get insteadNote => _t(
+    'Трекер работает только на Windows, окна вне помидоров хранит 14 дней',
+    'The tracker works on Windows only and keeps windows outside pomodoros for 14 days',
+  );
+  static String get insteadTitle => _t('Вместо задач', 'Instead of tasks');
+
   static String _pomoWord(int n) => switch (n % 10) {
     1 when n % 100 != 11 => 'помидор',
     2 || 3 || 4 when n % 100 < 10 || n % 100 >= 20 => 'помидора',
