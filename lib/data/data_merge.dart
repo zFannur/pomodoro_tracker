@@ -201,7 +201,23 @@ Map<String, dynamic> _mergeDays(Object? win, Object? lose) {
       // ЛОГИЧЕСКОМУ времени: день длится 05:00→05:00, и запись в 00:30 стоит
       // в конце дня, а не в начале, как решила бы сортировка строк.
       ..sort((a, b) => _slot(a['t']).compareTo(_slot(b['t'])));
-    result[key] = {...w, 's': sessions, 'n': _mergeValues(w['n'], l['n'])};
+    final episodes = _mergeById(w['e'], l['e'])
+      ..sort((a, b) => _slot(a['t']).compareTo(_slot(b['t'])));
+    final checkIn = {..._map(l['ck']), ..._map(w['ck'])};
+    final ips = w['ips'] is List && (w['ips'] as List).isNotEmpty
+        ? w['ips'] as List
+        : l['ips'] is List
+        ? l['ips'] as List
+        : const [];
+    final merged = <String, dynamic>{
+      ...w,
+      's': sessions,
+      'n': _mergeValues(w['n'], l['n']),
+    }..removeWhere((key, _) => key == 'e' || key == 'ck' || key == 'ips');
+    if (episodes.isNotEmpty) merged['e'] = episodes;
+    if (checkIn.isNotEmpty) merged['ck'] = checkIn;
+    if (ips.isNotEmpty) merged['ips'] = ips;
+    result[key] = merged;
   }
   return result;
 }
@@ -229,7 +245,8 @@ Map<String, dynamic> _mergeSprints(Object? win, Object? lose) {
       ...l,
       ...w,
       'done': _mergeValues(w['done'], l['done']),
-      if (w['kanban'] is Map<String, dynamic> || l['kanban'] is Map<String, dynamic>)
+      if (w['kanban'] is Map<String, dynamic> ||
+          l['kanban'] is Map<String, dynamic>)
         'kanban': _mergeKanban(w['kanban'], l['kanban']),
     };
   }
@@ -303,13 +320,20 @@ void _purge(Map<String, dynamic> doc, Set<String> graves) {
       if (e['id'] is! String || !graves.contains(e['id'])) e,
   ];
 
+  Map<String, dynamic> purgeDay(Object? raw) {
+    final day = _map(raw);
+    final episodes = alive(day['e']);
+    return {
+      ...day,
+      's': alive(day['s']),
+      if (episodes.isNotEmpty) 'e': episodes,
+    }..removeWhere((key, _) => key == 'e' && episodes.isEmpty);
+  }
+
   doc['todo'] = alive(doc['todo']);
   doc['planner'] = alive(doc['planner']);
   final days = _map(doc['days']);
-  doc['days'] = {
-    for (final e in days.entries)
-      e.key: {..._map(e.value), 's': alive(_map(e.value)['s'])},
-  };
+  doc['days'] = {for (final e in days.entries) e.key: purgeDay(e.value)};
   doc['dirs'] = alive(doc['dirs']);
   doc['miles'] = alive(doc['miles']);
 }

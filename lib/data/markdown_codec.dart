@@ -2,6 +2,8 @@
 library;
 
 import '../domain/entities/direction.dart';
+import '../domain/entities/episode.dart';
+import '../domain/entities/experiment.dart';
 import '../domain/entities/pomo_session.dart';
 import '../domain/entities/pomo_task.dart';
 import '../domain/entities/sprint.dart';
@@ -249,8 +251,82 @@ String serializeDayLog(DayLog log) {
       buf.write('- $note\n');
     }
   }
+  if (!log.checkIn.isEmpty) {
+    final ck = log.checkIn;
+    buf.write('\n## Самочувствие\n');
+    buf.write(
+      [
+        if (ck.sleep != null) 'Сон ${ck.sleep}',
+        if (ck.energy != null) 'Энергия ${ck.energy}',
+        if (ck.mood != null) 'День ${ck.mood}',
+      ].join(' · '),
+    );
+    buf.write('\n');
+  }
+  if (log.episodes.isNotEmpty) {
+    buf
+      ..write('\n## Откладывания\n')
+      ..write('| Время | Сигнал | Задача | Причина | Способ | Мысль |\n')
+      ..write('|---|---|---|---|---|---|\n');
+    for (final e in log.episodes) {
+      buf.write(
+        '| ${['${two(e.at.hour)}:${two(e.at.minute)}', _sourceLabel(e.source), e.task, _causeLabel(e.cause), _strategyLabel(e.strategy), e.thought].map(_cell).join(' | ')} |\n',
+      );
+    }
+  }
   return buf.toString();
 }
+
+String _sourceLabel(EpisodeSource? source) => switch (source) {
+  EpisodeSource.idle => 'простой',
+  EpisodeSource.stop => 'стоп',
+  EpisodeSource.defer => 'перенос',
+  EpisodeSource.frog => '🐸',
+  EpisodeSource.distract => 'отвлечение',
+  EpisodeSource.manual => 'вручную',
+  null => '',
+};
+
+String _causeLabel(Cause? cause) => switch (cause) {
+  Cause.unclear => 'непонятно, с чего начать',
+  Cause.big => 'слишком большая',
+  Cause.boring => 'скучно',
+  Cause.perfect => 'боюсь сделать плохо',
+  Cause.tired => 'нет сил',
+  Cause.pointless => 'не вижу смысла',
+  Cause.external => 'отвлекли',
+  null => '',
+};
+
+String _strategyLabel(StrategyKind? strategy) => switch (strategy) {
+  StrategyKind.firstStep => 'первый шаг',
+  StrategyKind.warmup => 'только 10 минут',
+  StrategyKind.ifThen => 'план «если — то»',
+  StrategyKind.shrink => 'уменьшить задачу',
+  StrategyKind.thought => 'проверить мысль',
+  StrategyKind.defuse => 'взять чувство с собой',
+  StrategyKind.value => 'зачем это мне',
+  StrategyKind.rest => 'честный отдых',
+  StrategyKind.removeCue => 'убрать раздражитель',
+  null => '',
+};
+
+String _metricLabel(InsightMetric metric) => switch (metric) {
+  InsightMetric.firstStart => 'первый помидор',
+  InsightMetric.idle => 'простой',
+  InsightMetric.frogFirst => '🐸 первой',
+  InsightMetric.deferrals => 'переносы',
+  InsightMetric.distract => 'отвлечения',
+  InsightMetric.success => 'успех способов',
+};
+
+String _verdictLabel(Verdict? verdict) => switch (verdict) {
+  Verdict.works => 'работает',
+  Verdict.same => 'без разницы',
+  Verdict.worse => 'хуже',
+  Verdict.unclear => 'мало данных',
+  null => 'не подтверждён',
+};
 
 final _rowRe = RegExp(
   r'^\|\s*(\d{1,2}):(\d{2})\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|\s*$',
@@ -264,9 +340,13 @@ DayLog parseDayLog(String content, DateTime date, int fallbackGoal) {
   // Счётчик записей на одну и ту же минуту — разводит их id.
   final sameMinute = <String, int>{};
   var inNotes = false;
+  var inInsight = false;
   for (final line in content.split('\n')) {
     if (line.startsWith('## ')) {
       inNotes = line.startsWith('## Заметки');
+      inInsight =
+          line.startsWith('## Самочувствие') ||
+          line.startsWith('## Откладывания');
       continue;
     }
     if (inNotes) {
@@ -274,6 +354,7 @@ DayLog parseDayLog(String content, DateTime date, int fallbackGoal) {
       if (trimmed.startsWith('- ')) notes.add(trimmed.substring(2));
       continue;
     }
+    if (inInsight) continue;
     final m = _rowRe.firstMatch(line.trim());
     if (m == null) continue;
     final hour = int.parse(m.group(1)!);
@@ -368,6 +449,21 @@ String serializeSprint(
       '| ${day.count} | ${day.minutes} |\n',
     );
   }
+  if (sprint.experiment case final exp?) {
+    buf
+      ..write('\n## Эксперимент\n')
+      ..write('- Гипотеза: ${_cell(exp.hypothesis)}\n')
+      ..write('- Способ: ${_strategyLabel(exp.strategy)}\n')
+      ..write('- Метрика: ${_metricLabel(exp.metric)}\n')
+      ..write('- Было: ${exp.baseline ?? 'нет данных'}\n')
+      ..write('- Вердикт: ${_verdictLabel(exp.verdict)}\n');
+  }
+  if (sprint.review case final review?) {
+    buf.write('\n## Разбор\n${_cell(review.summary)}\n');
+    for (final pattern in review.patterns) {
+      buf.write('- ${_cell(pattern.text)} — ${_cell(pattern.evidence)}\n');
+    }
+  }
   return buf.toString();
 }
 
@@ -458,8 +554,9 @@ String serializeCourse(
 
     final note = dir.note.trim();
     if (note.isNotEmpty) {
-      final formattedNote =
-          note.startsWith('[[') && note.endsWith(']]') ? note : '[[$note]]';
+      final formattedNote = note.startsWith('[[') && note.endsWith(']]')
+          ? note
+          : '[[$note]]';
       buf.write('- заметка: $formattedNote\n');
     }
 
@@ -471,16 +568,18 @@ String serializeCourse(
     final lad = ladder(milestones, dir.id);
     final doneCount = lad.where((m) => m.done).length;
     final rate = closureRate(milestones, dir.id, currentTime);
-    final rateSuffix =
-        rate > 0 ? ' · темп ${rate.toStringAsFixed(1)} вех/мес' : '';
+    final rateSuffix = rate > 0
+        ? ' · темп ${rate.toStringAsFixed(1)} вех/мес'
+        : '';
     buf.write('- веха $doneCount из ${lad.length}$rateSuffix\n');
 
     if (lad.isNotEmpty) {
       buf.write('\n');
       for (final m in lad) {
         if (m.done) {
-          final sprintSuffix =
-              m.doneSprint.isNotEmpty ? ' `${m.doneSprint}`' : '';
+          final sprintSuffix = m.doneSprint.isNotEmpty
+              ? ' `${m.doneSprint}`'
+              : '';
           buf.write('- [x] ${m.title}$sprintSuffix\n');
         } else {
           buf.write('- [ ] ${m.title}\n');
@@ -512,4 +611,3 @@ String serializeCourse(
 
   return buf.toString();
 }
-

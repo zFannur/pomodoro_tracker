@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import 'kanban.dart';
+import 'experiment.dart';
 
 /// Недельный спринт (пн–вс): веха + задачи недели (⭐ в общем списке задач).
 class Sprint extends Equatable {
@@ -13,6 +14,8 @@ class Sprint extends Equatable {
     this.doneWeek = const [],
     this.kanbanColumns = defaultKanbanColumns,
     this.kanbanCards = const [],
+    this.experiment,
+    this.review,
   });
 
   /// Идентификатор вида `2026-W29`.
@@ -37,6 +40,10 @@ class Sprint extends Equatable {
   final List<KanbanColumn> kanbanColumns;
   final List<KanbanCard> kanbanCards;
 
+  /// null — эксперимент ещё не выбран, разбор ещё не запрашивали.
+  final Experiment? experiment;
+  final WeekReview? review;
+
   List<KanbanCard> get sortedKanbanCards => [...kanbanCards]
     ..sort((a, b) {
       final byColumn = a.columnId.compareTo(b.columnId);
@@ -53,6 +60,9 @@ class Sprint extends Equatable {
     List<String>? doneWeek,
     List<KanbanColumn>? kanbanColumns,
     List<KanbanCard>? kanbanCards,
+    Experiment? experiment,
+    bool clearExperiment = false,
+    WeekReview? review,
   }) {
     return Sprint(
       id: id,
@@ -63,20 +73,24 @@ class Sprint extends Equatable {
       doneWeek: doneWeek ?? this.doneWeek,
       kanbanColumns: kanbanColumns ?? this.kanbanColumns,
       kanbanCards: kanbanCards ?? this.kanbanCards,
+      experiment: clearExperiment ? null : (experiment ?? this.experiment),
+      review: review ?? this.review,
     );
   }
 
   @override
   List<Object?> get props => [
-        id,
-        start,
-        goal,
-        milestone,
-        milestoneId,
-        doneWeek,
-        kanbanColumns,
-        kanbanCards,
-      ];
+    id,
+    start,
+    goal,
+    milestone,
+    milestoneId,
+    doneWeek,
+    kanbanColumns,
+    kanbanCards,
+    experiment,
+    review,
+  ];
 }
 
 /// Сводка прошедшего спринта для истории.

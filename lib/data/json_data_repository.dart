@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../core/failure.dart';
 import '../domain/entities/direction.dart';
+import '../domain/entities/episode.dart';
+import '../domain/entities/experiment.dart';
 import '../domain/entities/kanban.dart';
 import '../domain/entities/pomo_session.dart';
 import '../domain/entities/pomo_task.dart';
@@ -39,6 +41,7 @@ class JsonDataRepository
         TaskRepository,
         JournalRepository,
         SprintRepository,
+        InsightRepository,
         DirectionRepository {
   JsonDataRepository(
     this._store, {
@@ -65,7 +68,7 @@ class JsonDataRepository
   static const _mirrorNote =
       '<!-- Зеркало Помодоро Трекера: правки здесь не читаются. -->\n';
 
-  /// Очередь записи. `_write`, `applyRemote` и миграция ходят в ОДИН файл, и
+  /// Очередь операций. `_guard`, `applyRemote` и миграция ходят в ОДИН файл, и
   /// раньше — через один и тот же `.tmp`: два вызова перекрывались на open с
   /// усечением, и на диск ложился битый JSON, а второй rename падал.
   Future<void> _io = Future.value();
@@ -190,11 +193,11 @@ class JsonDataRepository
   /// Записать документ: атомарно на диск, обновить надгробия, дёрнуть синк,
   /// затем обновить зеркала. Порядок важен — синк узнаёт о правке сразу,
   /// зеркало может отставать.
-  Future<void> _write(_Doc doc, {Set<String>? before}) => _serial(() async {
+  Future<void> _write(_Doc doc, {Set<String>? before}) async {
     if (before != null) _updateGraves(doc, before);
     await _dump(doc);
     onSaved?.call();
-  });
+  }
 
   /// Атомарная запись документа. Имя временного файла уникально на вызов:
   /// общий `.tmp` склеивал содержимое двух параллельных писателей.
@@ -416,9 +419,13 @@ class JsonDataRepository
         for (final s in stored.sessions)
           if (!known.contains(s.id) && !served.contains(s.id)) s,
     ];
-    final merged = arrived.isEmpty
-        ? log
-        : log.copyWith(sessions: [...log.sessions, ...arrived]);
+    // Этими полями владеют только атомарные методы InsightRepository.
+    final merged = log.copyWith(
+      sessions: [...log.sessions, ...arrived],
+      episodes: stored?.episodes ?? const [],
+      checkIn: stored?.checkIn ?? const CheckIn(),
+      ips: stored?.ips ?? const [],
+    );
     doc.days[key] = merged;
     _servedDays[key] = known;
     await _write(doc, before: before);
@@ -464,32 +471,37 @@ class JsonDataRepository
 
   // -- спринты ----------------------------------------------------------------
 
+  Sprint _sprintOf(_Doc doc, String id, int defaultGoal) {
+    final existing = doc.sprints[id];
+    if (existing != null) {
+      return existing.goal == 0
+          ? existing.copyWith(goal: defaultGoal)
+          : existing;
+    }
+    final monday = _mondayOfSprint(id);
+    if (monday == null) throw FormatException('Неизвестный спринт: $id');
+    final previous = doc.sprints.entries
+        .where((entry) => entry.key.compareTo(id) < 0)
+        .fold<Sprint?>(
+          null,
+          (latest, entry) =>
+              latest == null || entry.key.compareTo(latest.id) > 0
+              ? entry.value
+              : latest,
+        );
+    return Sprint(
+      id: id,
+      start: monday,
+      goal: defaultGoal,
+      kanbanColumns: previous?.kanbanColumns ?? defaultKanbanColumns,
+    );
+  }
+
   @override
   Future<Either<Failure, Sprint>> current(DateTime now, int defaultGoal) =>
       _guard(() async {
         final doc = await _load();
-        final id = sprintId(now);
-        final existing = doc.sprints[id];
-        if (existing == null) {
-          final previous = doc.sprints.entries
-              .where((entry) => entry.key.compareTo(id) < 0)
-              .fold<Sprint?>(
-                null,
-                (latest, entry) => latest == null ||
-                        entry.key.compareTo(latest.id) > 0
-                    ? entry.value
-                    : latest,
-              );
-          return Sprint(
-            id: id,
-            start: mondayOf(now),
-            goal: defaultGoal,
-            kanbanColumns: previous?.kanbanColumns ?? defaultKanbanColumns,
-          );
-        }
-        return existing.goal == 0
-            ? existing.copyWith(goal: defaultGoal)
-            : existing;
+        return _sprintOf(doc, sprintId(now), defaultGoal);
       });
 
   @override
@@ -500,6 +512,19 @@ class JsonDataRepository
   }) => _guard(() async {
     final doc = await _load();
     final existing = doc.sprints[sprint.id];
+    // Снимок вызывающего не владеет ни экспериментом, ни кешем разбора.
+    final saved = Sprint(
+      id: sprint.id,
+      start: sprint.start,
+      goal: sprint.goal,
+      milestone: sprint.milestone,
+      milestoneId: sprint.milestoneId,
+      doneWeek: sprint.doneWeek,
+      kanbanColumns: sprint.kanbanColumns,
+      kanbanCards: sprint.kanbanCards,
+      experiment: existing?.experiment,
+      review: existing?.review,
+    );
     // Факт в документе не хранится — он производный от журнала. Поэтому
     // сравниваем только редактируемые поля и выходим ДО записи и до onSaved:
     // иначе каждый помидор дёргал бы отправку в Drive.
@@ -510,12 +535,12 @@ class JsonDataRepository
         _sameList(existing.doneWeek, sprint.doneWeek) &&
         _sameList(existing.kanbanColumns, sprint.kanbanColumns) &&
         _sameList(existing.kanbanCards, sprint.kanbanCards)) {
-      await _mirrorSprint(doc, sprint, fact, weekTasks);
+      await _mirrorSprint(doc, saved, fact, weekTasks);
       return unit;
     }
-    doc.sprints[sprint.id] = sprint;
+    doc.sprints[sprint.id] = saved;
     await _write(doc);
-    await _mirrorSprint(doc, sprint, fact, weekTasks);
+    await _mirrorSprint(doc, saved, fact, weekTasks);
     return unit;
   });
 
@@ -557,6 +582,154 @@ class JsonDataRepository
     return summaries;
   });
 
+  // -- эпизоды и наблюдения --------------------------------------------------
+
+  @override
+  Future<Either<Failure, Unit>> addEpisode(Episode e) => _guard(() async {
+    final doc = await _load();
+    final before = doc.ids();
+    // Повторная доставка сигнала с тем же id не создаёт второй эпизод.
+    if (doc.days.values.any((d) => d.episodes.any((x) => x.id == e.id))) {
+      return unit;
+    }
+    final day = _dayOf(doc, logicalDate(e.at), 0);
+    final updated = day.copyWith(episodes: [...day.episodes, e]);
+    doc.days[dateKey(day.date)] = updated;
+    await _write(doc, before: before);
+    await _mirrorDay(updated);
+    return unit;
+  });
+
+  @override
+  Future<Either<Failure, Unit>> updateEpisode(Episode e) => _guard(() async {
+    final doc = await _load();
+    final before = doc.ids();
+    for (final day in doc.days.values.toList()) {
+      if (!day.episodes.any((x) => x.id == e.id)) continue;
+      final updated = day.copyWith(
+        episodes: [
+          for (final x in day.episodes)
+            if (x.id != e.id) x,
+        ],
+      );
+      final target = logicalDate(e.at);
+      if (dateKey(target) == dateKey(day.date)) {
+        final sameDay = day.copyWith(
+          episodes: [for (final x in day.episodes) x.id == e.id ? e : x],
+        );
+        doc.days[dateKey(day.date)] = sameDay;
+        await _write(doc, before: before);
+        await _mirrorDay(sameDay);
+      } else {
+        doc.days[dateKey(day.date)] = updated;
+        final next = _dayOf(doc, target, 0);
+        final moved = next.copyWith(episodes: [...next.episodes, e]);
+        doc.days[dateKey(target)] = moved;
+        await _write(doc, before: before);
+        await _mirrorDay(updated);
+        await _mirrorDay(moved);
+      }
+      return unit;
+    }
+    return unit;
+  });
+
+  @override
+  Future<Either<Failure, Unit>> deleteEpisode(String id) => _guard(() async {
+    final doc = await _load();
+    final before = doc.ids();
+    final changed = <DayLog>[];
+    for (final day in doc.days.values.toList()) {
+      if (!day.episodes.any((e) => e.id == id)) continue;
+      final updated = day.copyWith(
+        episodes: [
+          for (final e in day.episodes)
+            if (e.id != id) e,
+        ],
+      );
+      doc.days[dateKey(day.date)] = updated;
+      changed.add(updated);
+    }
+    if (changed.isEmpty) return unit;
+    await _write(doc, before: before);
+    for (final day in changed) {
+      await _mirrorDay(day);
+    }
+    return unit;
+  });
+
+  @override
+  Future<Either<Failure, Unit>> setCheckIn(DateTime day, CheckIn ck) =>
+      _guard(() async {
+        final doc = await _load();
+        final before = doc.ids();
+        final log = _dayOf(doc, day, 0);
+        final updated = log.copyWith(checkIn: log.checkIn.merge(ck));
+        doc.days[dateKey(log.date)] = updated;
+        await _write(doc, before: before);
+        await _mirrorDay(updated);
+        return unit;
+      });
+
+  @override
+  Future<Either<Failure, Unit>> saveIps(DateTime day, List<int> answers) =>
+      _guard(() async {
+        final doc = await _load();
+        final before = doc.ids();
+        final log = _dayOf(doc, day, 0);
+        final updated = log.copyWith(ips: List<int>.of(answers));
+        doc.days[dateKey(log.date)] = updated;
+        await _write(doc, before: before);
+        await _mirrorDay(updated);
+        return unit;
+      });
+
+  @override
+  Future<Either<Failure, Unit>> saveExperiment(
+    String sprintId,
+    Experiment? exp,
+  ) => _guard(() async {
+    final doc = await _load();
+    final before = doc.ids();
+    final sprint = _sprintOf(
+      doc,
+      sprintId,
+      0,
+    ).copyWith(experiment: exp, clearExperiment: exp == null);
+    doc.sprints[sprintId] = sprint;
+    await _write(doc, before: before);
+    await _mirrorStoredSprint(doc, sprint);
+    return unit;
+  });
+
+  @override
+  Future<Either<Failure, Unit>> saveReview(
+    String sprintId,
+    WeekReview review,
+  ) => _guard(() async {
+    final doc = await _load();
+    final before = doc.ids();
+    final sprint = _sprintOf(doc, sprintId, 0).copyWith(review: review);
+    doc.sprints[sprintId] = sprint;
+    await _write(doc, before: before);
+    await _mirrorStoredSprint(doc, sprint);
+    return unit;
+  });
+
+  Future<void> _mirrorStoredSprint(_Doc doc, Sprint sprint) => _mirrorSprint(
+    doc,
+    sprint,
+    [
+      for (final day in doc.days.values)
+        if (!day.date.isBefore(sprint.start) && !day.date.isAfter(sprint.end))
+          day,
+    ]..sort((a, b) => a.date.compareTo(b.date)),
+    [
+      for (final task in [...doc.todo, ...doc.planner])
+        if (task.week) task,
+    ],
+  );
+
   // -- курс (направления и вехи) ---------------------------------------------
 
   @override
@@ -566,10 +739,7 @@ class JsonDataRepository
       for (final d in doc.directions) d.id,
       for (final m in doc.milestones) m.id,
     };
-    return (
-      directions: [...doc.directions],
-      milestones: [...doc.milestones],
-    );
+    return (directions: [...doc.directions], milestones: [...doc.milestones]);
   });
 
   @override
@@ -710,17 +880,19 @@ class JsonDataRepository
     await _mirrorCourse(doc);
   }
 
-  Future<Either<Failure, T>> _guard<T>(Future<T> Function() body) async {
-    try {
-      return Either.right(await body());
-    } on FileSystemException catch (e) {
-      return Either.left(
-        StorageFailure('Файловая ошибка: ${e.message} ${e.path ?? ''}'),
-      );
-    } on FormatException catch (e) {
-      return Either.left(ParseFailure('Ошибка разбора: ${e.message}'));
-    }
-  }
+  // Сериализуем и чтение снимка, и его изменение: одной очереди _dump мало.
+  Future<Either<Failure, T>> _guard<T>(Future<T> Function() body) =>
+      _serial(() async {
+        try {
+          return Either.right(await body());
+        } on FileSystemException catch (e) {
+          return Either.left(
+            StorageFailure('Файловая ошибка: ${e.message} ${e.path ?? ''}'),
+          );
+        } on FormatException catch (e) {
+          return Either.left(ParseFailure('Ошибка разбора: ${e.message}'));
+        }
+      });
 }
 
 /// Документ в памяти. Кодек живёт рядом с репозиторием: формат читает и
@@ -801,6 +973,8 @@ class _Doc {
           ],
           kanbanColumns: _kanbanColumns(s['kanban']),
           kanbanCards: _kanbanCards(s['kanban']),
+          experiment: _experimentFrom(s['exp']),
+          review: _reviewFrom(s['ai']),
         );
       }
     }
@@ -856,6 +1030,8 @@ class _Doc {
       if (t.id != null) t.id!,
     for (final d in days.values)
       for (final s in d.sessions) s.id,
+    for (final d in days.values)
+      for (final e in d.episodes) e.id,
     for (final d in directions) d.id,
     for (final m in milestones) m.id,
   };
@@ -871,6 +1047,12 @@ class _Doc {
           'goal': e.value.goal,
           's': [for (final s in e.value.sessions) _sessionJson(s)],
           if (e.value.notes.isNotEmpty) 'n': e.value.notes,
+          if (e.value.episodes.isNotEmpty)
+            'e': [
+              for (final episode in e.value.episodes) _episodeJson(episode),
+            ],
+          if (!e.value.checkIn.isEmpty) 'ck': _checkInJson(e.value.checkIn),
+          if (e.value.ips.isNotEmpty) 'ips': e.value.ips,
         },
     },
     'sprints': {
@@ -881,14 +1063,14 @@ class _Doc {
           if (e.value.milestoneId.isNotEmpty)
             'milestoneId': e.value.milestoneId,
           if (e.value.doneWeek.isNotEmpty) 'done': e.value.doneWeek,
-          if (e.value.kanbanColumns.isNotEmpty || e.value.kanbanCards.isNotEmpty)
+          if (e.value.experiment case final experiment?)
+            'exp': _experimentJson(experiment),
+          if (e.value.review case final review?) 'ai': _reviewJson(review),
+          if (e.value.kanbanColumns.isNotEmpty ||
+              e.value.kanbanCards.isNotEmpty)
             'kanban': {
-              'columns': [
-                for (final c in e.value.kanbanColumns) c.toJson(),
-              ],
-              'cards': [
-                for (final c in e.value.kanbanCards) c.toJson(),
-              ],
+              'columns': [for (final c in e.value.kanbanColumns) c.toJson()],
+              'cards': [for (final c in e.value.kanbanCards) c.toJson()],
             },
         },
     },
@@ -903,8 +1085,7 @@ class _Doc {
 
   static List<PomoTask> _taskList(Object? raw) => [
     if (raw is List)
-      for (final e in raw.whereType<Map<String, dynamic>>())
-        _taskFromJson(e),
+      for (final e in raw.whereType<Map<String, dynamic>>()) _taskFromJson(e),
   ];
 
   static PomoTask _taskFromJson(Map<String, dynamic> j, {bool legacy = false}) {
@@ -931,18 +1112,18 @@ class _Doc {
       return defaultKanbanColumns;
     }
     final result = [
-      for (final e in (raw['columns'] as List).whereType<Map<String, dynamic>>())
+      for (final e
+          in (raw['columns'] as List).whereType<Map<String, dynamic>>())
         KanbanColumn.fromJson(e),
     ];
     return result.length >= 2 ? result : defaultKanbanColumns;
   }
 
   static List<KanbanCard> _kanbanCards(Object? raw) => [
-        if (raw is Map<String, dynamic> && raw['cards'] is List)
-          for (final e in (raw['cards'] as List)
-              .whereType<Map<String, dynamic>>())
-            KanbanCard.fromJson(e),
-      ];
+    if (raw is Map<String, dynamic> && raw['cards'] is List)
+      for (final e in (raw['cards'] as List).whereType<Map<String, dynamic>>())
+        KanbanCard.fromJson(e),
+  ];
 
   static Map<String, dynamic> _taskJson(PomoTask t) => {
     'id': t.id,
@@ -972,6 +1153,13 @@ class _Doc {
       notes: [
         if (json['n'] is List) ...(json['n'] as List).whereType<String>(),
       ],
+      episodes: [
+        if (json['e'] is List)
+          for (final e in (json['e'] as List).whereType<Map<String, dynamic>>())
+            _episodeFrom(date, e),
+      ],
+      checkIn: _checkInFrom(json['ck']),
+      ips: [if (json['ips'] is List) ...(json['ips'] as List).whereType<int>()],
     );
   }
 
@@ -1015,6 +1203,124 @@ class _Doc {
     if (s.frog) 'frog': true,
   };
 
+  static T? _enumFrom<T extends Enum>(List<T> values, Object? raw) {
+    for (final value in values) {
+      if (value.name == raw) return value;
+    }
+    return null;
+  }
+
+  static Episode _episodeFrom(DateTime date, Map<String, dynamic> j) {
+    final parts = '${j['t']}'.split(':');
+    final hour = int.tryParse(parts.first) ?? 0;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    return Episode(
+      id: j['id'] as String? ?? newId(),
+      at: DateTime(
+        date.year,
+        date.month,
+        hour < dayStartHour ? date.day + 1 : date.day,
+        hour,
+        minute,
+      ),
+      source: _enumFrom(EpisodeSource.values, j['src']),
+      taskId: j['tid'] as String? ?? '',
+      task: j['d'] as String? ?? '',
+      category: j['c'] as String? ?? '',
+      cause: _enumFrom(Cause.values, j['cause']),
+      strategy: _enumFrom(StrategyKind.values, j['st']),
+      thought: j['th'] as String? ?? '',
+      fact: j['fact'] as String? ?? '',
+      alt: j['alt'] as String? ?? '',
+      app: j['app'] as String? ?? '',
+    );
+  }
+
+  static Map<String, dynamic> _episodeJson(Episode e) => {
+    'id': e.id,
+    't': '${two(e.at.hour)}:${two(e.at.minute)}',
+    if (e.source case final source?) 'src': source.name,
+    if (e.taskId.isNotEmpty) 'tid': e.taskId,
+    if (e.task.isNotEmpty) 'd': e.task,
+    if (e.category.isNotEmpty) 'c': e.category,
+    if (e.cause case final cause?) 'cause': cause.name,
+    if (e.strategy case final strategy?) 'st': strategy.name,
+    if (e.thought.isNotEmpty) 'th': e.thought,
+    if (e.fact.isNotEmpty) 'fact': e.fact,
+    if (e.alt.isNotEmpty) 'alt': e.alt,
+    if (e.app.isNotEmpty) 'app': e.app,
+  };
+
+  static CheckIn _checkInFrom(Object? raw) {
+    if (raw is! Map<String, dynamic>) return const CheckIn();
+    int? rating(Object? value) =>
+        value is int && value >= 1 && value <= 5 ? value : null;
+    return CheckIn(
+      sleep: rating(raw['sl']),
+      energy: rating(raw['en']),
+      mood: rating(raw['md']),
+    );
+  }
+
+  static Map<String, dynamic> _checkInJson(CheckIn ck) => {
+    if (ck.sleep != null) 'sl': ck.sleep,
+    if (ck.energy != null) 'en': ck.energy,
+    if (ck.mood != null) 'md': ck.mood,
+  };
+
+  static Experiment? _experimentFrom(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final strategy = _enumFrom(StrategyKind.values, raw['st']);
+    final metric = _enumFrom(InsightMetric.values, raw['m']);
+    // Не подменяем неизвестный способ или метрику произвольным значением.
+    if (strategy == null || metric == null) return null;
+    return Experiment(
+      hypothesis: raw['h'] as String? ?? '',
+      strategy: strategy,
+      metric: metric,
+      baseline: (raw['base'] as num?)?.toDouble(),
+      verdict: _enumFrom(Verdict.values, raw['v']),
+    );
+  }
+
+  static Map<String, dynamic> _experimentJson(Experiment exp) => {
+    if (exp.hypothesis.isNotEmpty) 'h': exp.hypothesis,
+    'st': exp.strategy.name,
+    'm': exp.metric.name,
+    // Ноль — известное значение базы, а не отсутствие измерения.
+    if (exp.baseline != null) 'base': exp.baseline,
+    if (exp.verdict case final verdict?) 'v': verdict.name,
+  };
+
+  static WeekReview? _reviewFrom(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final at = raw['at'];
+    final date = at is String ? DateTime.tryParse(at) : null;
+    if (date == null) return null;
+    return WeekReview(
+      at: date,
+      summary: raw['summary'] as String? ?? '',
+      patterns: [
+        if (raw['p'] is List)
+          for (final p in (raw['p'] as List).whereType<Map<String, dynamic>>())
+            (text: p['t'] as String? ?? '', evidence: p['e'] as String? ?? ''),
+      ],
+    );
+  }
+
+  static Map<String, dynamic> _reviewJson(WeekReview review) => {
+    'at': review.at.toIso8601String(),
+    if (review.summary.isNotEmpty) 'summary': review.summary,
+    if (review.patterns.isNotEmpty)
+      'p': [
+        for (final p in review.patterns)
+          {
+            if (p.text.isNotEmpty) 't': p.text,
+            if (p.evidence.isNotEmpty) 'e': p.evidence,
+          },
+      ],
+  };
+
   static Direction _directionFrom(Map<String, dynamic> j) {
     final st = switch (j['st'] as String?) {
       'paused' => DirectionStatus.paused,
@@ -1056,9 +1362,7 @@ class _Doc {
       order: (j['ord'] as num?)?.toInt() ?? 0,
       doneSprint: j['ws'] as String? ?? '',
       doneAt: wa is String ? DateTime.tryParse(wa) : null,
-      proofs: [
-        if (j['pf'] is List) ...(j['pf'] as List).whereType<String>(),
-      ],
+      proofs: [if (j['pf'] is List) ...(j['pf'] as List).whereType<String>()],
     );
   }
 

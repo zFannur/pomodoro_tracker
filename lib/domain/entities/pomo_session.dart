@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:equatable/equatable.dart';
 
+import 'episode.dart';
+
 /// Один засчитанный помидор (запись истории «Сделано»).
 class PomoSession extends Equatable {
   const PomoSession({
@@ -111,6 +113,9 @@ class DayLog extends Equatable {
     required this.goal,
     required this.sessions,
     this.notes = const [],
+    this.episodes = const [],
+    this.checkIn = const CheckIn(),
+    this.ips = const [],
   });
 
   final DateTime date;
@@ -121,6 +126,9 @@ class DayLog extends Equatable {
 
   /// Заметки «на чём встал» — снимают остаток внимания при переключении.
   final List<String> notes;
+  final List<Episode> episodes;
+  final CheckIn checkIn;
+  final List<int> ips;
 
   int get count => sessions.length;
 
@@ -144,17 +152,31 @@ class DayLog extends Equatable {
     List<PomoSession>? sessions,
     List<String>? notes,
     int? goal,
+    List<Episode>? episodes,
+    CheckIn? checkIn,
+    List<int>? ips,
   }) {
     return DayLog(
       date: date,
       goal: goal ?? this.goal,
       sessions: sessions ?? this.sessions,
       notes: notes ?? this.notes,
+      episodes: episodes ?? this.episodes,
+      checkIn: checkIn ?? this.checkIn,
+      ips: ips ?? this.ips,
     );
   }
 
   @override
-  List<Object?> get props => [date, goal, sessions, notes];
+  List<Object?> get props => [
+    date,
+    goal,
+    sessions,
+    notes,
+    episodes,
+    checkIn,
+    ips,
+  ];
 }
 
 /// Час начала суток. Единственное место, где живёт эта граница: раньше «5»

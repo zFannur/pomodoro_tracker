@@ -3,6 +3,8 @@ import 'package:fpdart/fpdart.dart';
 import '../core/failure.dart';
 import 'entities/app_settings.dart';
 import 'entities/direction.dart';
+import 'entities/episode.dart';
+import 'entities/experiment.dart';
 import 'entities/pomo_session.dart';
 import 'entities/pomo_task.dart';
 import 'entities/sprint.dart';
@@ -34,6 +36,20 @@ abstract interface class JournalRepository {
   );
 }
 
+/// Атомарные изменения не зависят от снимков журнала и спринта в кубитах.
+abstract interface class InsightRepository {
+  Future<Either<Failure, Unit>> addEpisode(Episode e);
+  Future<Either<Failure, Unit>> updateEpisode(Episode e);
+  Future<Either<Failure, Unit>> deleteEpisode(String id);
+  Future<Either<Failure, Unit>> setCheckIn(DateTime day, CheckIn ck);
+  Future<Either<Failure, Unit>> saveIps(DateTime day, List<int> answers);
+  Future<Either<Failure, Unit>> saveExperiment(
+    String sprintId,
+    Experiment? exp,
+  );
+  Future<Either<Failure, Unit>> saveReview(String sprintId, WeekReview review);
+}
+
 /// Спринты (неделя пн–вс).
 abstract interface class SprintRepository {
   Future<Either<Failure, Sprint>> current(DateTime now, int defaultGoal);
@@ -62,4 +78,3 @@ abstract interface class DirectionRepository {
 
   Future<Either<Failure, Unit>> saveCourse(Course course);
 }
-
