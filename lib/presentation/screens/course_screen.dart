@@ -10,6 +10,7 @@ import '../../domain/entities/pomo_session.dart' show logicalDate;
 import '../cubits/directions_cubit.dart';
 import '../cubits/settings_cubit.dart';
 import '../widgets/common.dart';
+import 'help_screen.dart';
 
 /// Экран «Курс»: стратегические направления фокуса (3–12 месяцев),
 /// лестницы вех, хроника закрытий за 26 недель и бюджет внимания за 30 дней.
@@ -77,12 +78,14 @@ class _CourseBodyState extends State<_CourseBody> {
               // Верхняя панель: Заголовок экрана и кнопка создания нового направления
               Row(
                 children: [
-                  Expanded(
+                  Flexible(
                     child: Text(
                       S.courseDirections,
                       style: theme.textTheme.titleLarge,
                     ),
                   ),
+                  const HelpButton(section: 'levels'),
+                  const Spacer(),
                   // На телефоне подпись кнопки не влезает рядом с заголовком
                   // («Добавить направление» шире всей строки), поэтому там
                   // остаётся только «+» с тултипом.

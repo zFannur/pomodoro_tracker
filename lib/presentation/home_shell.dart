@@ -6,12 +6,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../app/strings.dart';
+import '../domain/entities/app_settings.dart';
 import '../domain/entities/episode.dart';
 import 'cubits/insight_cubit.dart';
 import 'cubits/settings_cubit.dart';
 import 'cubits/tasks_cubit.dart';
 import 'cubits/timer_cubit.dart';
 import 'screens/course_screen.dart';
+import 'screens/help_screen.dart';
 import 'screens/insight_screen.dart';
 import 'screens/settings_dialog.dart';
 import 'screens/sprint_screen.dart';
@@ -27,6 +29,11 @@ const kInsightTab = 5;
 /// оболочка зеркалит сюда и обычные переключения, чтобы экраны знали, когда
 /// их открыли.
 final homeTab = ValueNotifier<int>(0);
+
+/// Подвкладка «Разбора»: 0 — «Неделя», 1 — «Эпизоды», 2 — «Окна». Как и
+/// [homeTab], работает в обе стороны: переход извне записывает сюда индекс,
+/// а ручное переключение подвкладок зеркалится обратно.
+final insightSubTab = ValueNotifier<int>(0);
 
 /// Оболочка: NavigationRail + горячие клавиши + заголовок окна с отсчётом.
 class HomeShell extends StatefulWidget {
@@ -45,6 +52,7 @@ class _HomeShellState extends State<HomeShell> {
     HardwareKeyboard.instance.addHandler(_onKey);
     homeTab.value = _index;
     homeTab.addListener(_onHomeTab);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstHelp());
   }
 
   @override
@@ -52,6 +60,21 @@ class _HomeShellState extends State<HomeShell> {
     homeTab.removeListener(_onHomeTab);
     HardwareKeyboard.instance.removeHandler(_onKey);
     super.dispose();
+  }
+
+  /// Первый запуск после появления справки: открыть её на «С чего начать».
+  /// Флаг пишем до показа — если окно не откроется, оно не будет лезть вечно.
+  void _showFirstHelp() {
+    if (!mounted) return;
+    final settings = context.read<SettingsCubit>();
+    if (settings.state.status != SettingsStatus.ready ||
+        settings.state.settings.helpSeen >= AppSettings.helpVersion) {
+      return;
+    }
+    settings.update(
+      settings.state.settings.copyWith(helpSeen: AppSettings.helpVersion),
+    );
+    showHelp(context, section: 'start');
   }
 
   bool _onKey(KeyEvent event) {
@@ -78,6 +101,10 @@ class _HomeShellState extends State<HomeShell> {
             focusContext.findAncestorWidgetOfExactType<EditableText>() !=
                 null)) {
       return false;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.f1) {
+      showHelp(context);
+      return true;
     }
     final timer = context.read<TimerCubit>();
     final tasks = context.read<TasksCubit>();
@@ -251,6 +278,11 @@ class _HomeShellState extends State<HomeShell> {
         title: Text(S.appTitle),
         actions: [
           IconButton(
+            tooltip: S.helpTooltip,
+            icon: const Icon(Icons.help_outline),
+            onPressed: () => showHelp(context),
+          ),
+          IconButton(
             tooltip: S.settings,
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => showSettingsDialog(context),
@@ -314,10 +346,20 @@ class _HomeShellState extends State<HomeShell> {
                 alignment: Alignment.bottomCenter,
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: IconButton(
-                    tooltip: S.settings,
-                    icon: const Icon(Icons.settings_outlined),
-                    onPressed: () => showSettingsDialog(context),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: S.helpTooltip,
+                        icon: const Icon(Icons.help_outline),
+                        onPressed: () => showHelp(context),
+                      ),
+                      IconButton(
+                        tooltip: S.settings,
+                        icon: const Icon(Icons.settings_outlined),
+                        onPressed: () => showSettingsDialog(context),
+                      ),
+                    ],
                   ),
                 ),
               ),

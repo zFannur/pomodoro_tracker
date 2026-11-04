@@ -8,6 +8,7 @@ import '../../data/markdown_codec.dart' show dateHuman, two;
 import '../../services/activity_tracker.dart'
     show browserNames, formatActivityName;
 import '../cubits/activity_cubit.dart';
+import 'help_screen.dart';
 
 export '../../services/activity_tracker.dart' show formatActivityName;
 
@@ -65,6 +66,7 @@ class ActivityScreen extends StatelessWidget {
                         icon: const Icon(Icons.chevron_right),
                         onPressed: state.isToday ? null : cubit.nextDay,
                       ),
+                      const HelpButton(section: 'windows'),
                     ],
                   ),
                   if (state.rows.isNotEmpty) ...[

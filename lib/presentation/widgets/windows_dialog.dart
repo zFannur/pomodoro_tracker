@@ -12,6 +12,7 @@ import '../cubits/activity_cubit.dart';
 import '../cubits/insight_cubit.dart';
 import '../cubits/settings_cubit.dart';
 import '../screens/activity_screen.dart' show formatActivityDuration;
+import '../screens/help_screen.dart';
 
 /// Сколько строк видно сразу, остальные раскрывает «Ещё N».
 const _shownRows = 12;
@@ -85,6 +86,7 @@ Future<void> showWindowsDialog(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.of(dialogContext).pop(),
               ),
+              actions: const [HelpButton(section: 'windows')],
             ),
             body: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -94,7 +96,12 @@ Future<void> showWindowsDialog(
         );
       }
       return AlertDialog(
-        title: Text(title),
+        title: Row(
+          children: [
+            Expanded(child: Text(title)),
+            const HelpButton(section: 'windows'),
+          ],
+        ),
         content: SizedBox(
           width: _dialogWidth,
           child: SingleChildScrollView(child: body),

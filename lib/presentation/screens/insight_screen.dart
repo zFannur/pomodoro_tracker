@@ -26,6 +26,7 @@ import '../widgets/episode_sheet.dart';
 import '../widgets/ips_dialog.dart';
 import '../widgets/windows_dialog.dart';
 import 'activity_screen.dart';
+import 'help_screen.dart';
 
 /// Значение метрики для показа: «+25 мин» / «10:40» / «8 мин» / «12%» / «3».
 /// [lag] — «первый помидор» считается от начала окна, а не от часа суток.
@@ -68,28 +69,84 @@ class InsightScreen extends StatelessWidget {
     return DefaultTabController(
       key: ValueKey(windows),
       length: windows ? 3 : 2,
-      child: Column(
-        children: [
-          TabBar(
-            tabs: [
-              Tab(text: S.insightTabWeek),
-              Tab(text: S.insightTabEpisodes),
-              if (windows) Tab(text: S.insightTabWindows),
-            ],
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _WeekTab(showWindows: windows, aiSlot: aiSlot),
-                _EpisodesTab(showWindows: windows),
-                if (windows) const ActivityScreen(),
+      child: _SubTabSync(
+        child: Column(
+          children: [
+            TabBar(
+              tabs: [
+                Tab(text: S.insightTabWeek),
+                Tab(text: S.insightTabEpisodes),
+                if (windows) Tab(text: S.insightTabWindows),
               ],
             ),
-          ),
-        ],
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _WeekTab(showWindows: windows, aiSlot: aiSlot),
+                  _EpisodesTab(showWindows: windows),
+                  if (windows) const ActivityScreen(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Связывает подвкладки «Разбора» с [insightSubTab]: справка и другие экраны
+/// переходят, записывая индекс; ручной выбор вкладки зеркалится обратно.
+class _SubTabSync extends StatefulWidget {
+  const _SubTabSync({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_SubTabSync> createState() => _SubTabSyncState();
+}
+
+class _SubTabSyncState extends State<_SubTabSync> {
+  TabController? _controller;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = DefaultTabController.of(context);
+    if (identical(controller, _controller)) return;
+    _controller?.removeListener(_mirror);
+    insightSubTab.removeListener(_goto);
+    _controller = controller..addListener(_mirror);
+    // Глобальный индекс мог остаться от прошлого экрана — берём реальный.
+    insightSubTab.value = controller.index;
+    insightSubTab.addListener(_goto);
+  }
+
+  @override
+  void dispose() {
+    _controller?.removeListener(_mirror);
+    insightSubTab.removeListener(_goto);
+    super.dispose();
+  }
+
+  void _mirror() {
+    final controller = _controller;
+    if (controller != null && insightSubTab.value != controller.index) {
+      insightSubTab.value = controller.index;
+    }
+  }
+
+  void _goto() {
+    final controller = _controller;
+    final i = insightSubTab.value;
+    // На Android вкладки «Окна» нет: такой индекс просто не применяется.
+    if (controller != null && i < controller.length && i != controller.index) {
+      controller.animateTo(i);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 // ---------------------------------------------------------------------------
@@ -224,20 +281,27 @@ class _WeekTabState extends State<_WeekTab> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text.rich(
-              TextSpan(
-                text: S.insightWeekTitle(week),
-                children: [
-                  if (observation)
+            Row(
+              children: [
+                Flexible(
+                  child: Text.rich(
                     TextSpan(
-                      text: ' ${S.insightObservationSuffix}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      text: S.insightWeekTitle(week),
+                      children: [
+                        if (observation)
+                          TextSpan(
+                            text: ' ${S.insightObservationSuffix}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
                     ),
-                ],
-              ),
-              style: theme.textTheme.titleLarge,
+                    style: theme.textTheme.titleLarge,
+                  ),
+                ),
+                const HelpButton(section: 'review'),
+              ],
             ),
             const SizedBox(height: 12),
             _Tiles(insight: insight, showWindows: widget.showWindows),

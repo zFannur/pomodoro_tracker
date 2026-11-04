@@ -14,8 +14,19 @@ import '../cubits/settings_cubit.dart';
 import '../cubits/sync_cubit.dart';
 import '../cubits/sprint_cubit.dart';
 import '../widgets/ai_consent.dart';
+import 'help_screen.dart';
 
-void showSettingsDialog(BuildContext context) {
+/// Номера вкладок настроек (порядок в [TabBar]).
+const kSettingsTabTimer = 0;
+const kSettingsTabNotify = 1;
+const kSettingsTabApp = 2;
+const kSettingsTabKanban = 3;
+const kSettingsTabAi = 4;
+
+void showSettingsDialog(
+  BuildContext context, {
+  int initialTab = kSettingsTabTimer,
+}) {
   // Резолвим кубит сразу, а не внутри builder: тот вызывается лениво, и к
   // тому моменту исходный context мог стать невалидным (например, если
   // экран за диалогом успел перестроиться).
@@ -29,15 +40,16 @@ void showSettingsDialog(BuildContext context) {
         BlocProvider.value(value: cubit),
         BlocProvider.value(value: sprintCubit),
       ],
-      child: _SettingsDialog(ai: ai),
+      child: _SettingsDialog(ai: ai, initialTab: initialTab),
     ),
   );
 }
 
 class _SettingsDialog extends StatelessWidget {
-  const _SettingsDialog({this.ai});
+  const _SettingsDialog({this.ai, this.initialTab = kSettingsTabTimer});
 
   final AiService? ai;
+  final int initialTab;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +58,8 @@ class _SettingsDialog extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640, maxHeight: 680),
         child: DefaultTabController(
-           length: 5,
+          length: 5,
+          initialIndex: initialTab.clamp(0, 4),
           child: Column(
             children: [
               Padding(
@@ -969,12 +982,20 @@ class _AiTabState extends State<_AiTab> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        SwitchListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          title: Text(S.aiEnabledLabel),
-          value: settings.aiEnabled,
-          onChanged: (v) => _update(context, settings.copyWith(aiEnabled: v)),
+        Row(
+          children: [
+            Expanded(
+              child: SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(S.aiEnabledLabel),
+                value: settings.aiEnabled,
+                onChanged: (v) =>
+                    _update(context, settings.copyWith(aiEnabled: v)),
+              ),
+            ),
+            const HelpButton(section: 'ai'),
+          ],
         ),
         _TextRow(
           label: S.aiKeyLabel,

@@ -170,6 +170,8 @@ class AppSettings extends Equatable {
     this.aiKey = '',
     this.aiModel = defaultAiModel,
     this.aiConsent = false,
+    this.helpChecks = const [],
+    this.helpSeen = 0,
   });
 
   factory AppSettings.fromJson(
@@ -259,6 +261,10 @@ class AppSettings extends Equatable {
         _ => defaultAiModel,
       },
       aiConsent: json['aiConsent'] as bool? ?? false,
+      helpChecks:
+          (json['helpChecks'] as List?)?.whereType<String>().toList() ??
+          const [],
+      helpSeen: json['helpSeen'] as int? ?? 0,
     );
   }
 
@@ -291,6 +297,9 @@ class AppSettings extends Equatable {
   /// У DeepSeek напрямую это DeepSeek-V4.1-Flash; имена уже менялись,
   /// поэтому модель — поле настроек, а не константа в сервисе.
   static const defaultAiModel = 'deepseek-flash';
+
+  /// Версия справки: при `helpSeen` меньше неё окно помощи открывается само.
+  static const helpVersion = 1;
 
   /// Свёрнутые по умолчанию группы экрана «Задачи».
   static const defaultCollapsedGroups = [
@@ -421,6 +430,12 @@ class AppSettings extends Equatable {
   /// Пользователь согласился, что текст задачи и мысли уходят в DeepSeek.
   final bool aiConsent;
 
+  /// Шаги пути внедрения, отмеченные руками (id шагов). Локально, не синкается.
+  final List<String> helpChecks;
+
+  /// Версия справки, которую пользователь уже видел (0 — ни разу).
+  final int helpSeen;
+
   TimerScheme get scheme => schemes.firstWhere(
     (s) => s.name == activeScheme,
     orElse: () => schemes.isEmpty ? defaultSchemes.first : schemes.first,
@@ -475,6 +490,8 @@ class AppSettings extends Equatable {
     'aiKey': aiKey,
     'aiModel': aiModel,
     'aiConsent': aiConsent,
+    'helpChecks': helpChecks,
+    'helpSeen': helpSeen,
   };
 
   AppSettings copyWith({
@@ -526,6 +543,8 @@ class AppSettings extends Equatable {
     String? aiKey,
     String? aiModel,
     bool? aiConsent,
+    List<String>? helpChecks,
+    int? helpSeen,
   }) {
     return AppSettings(
       schemes: schemes ?? this.schemes,
@@ -576,6 +595,8 @@ class AppSettings extends Equatable {
       aiKey: aiKey ?? this.aiKey,
       aiModel: aiModel ?? this.aiModel,
       aiConsent: aiConsent ?? this.aiConsent,
+      helpChecks: helpChecks ?? this.helpChecks,
+      helpSeen: helpSeen ?? this.helpSeen,
     );
   }
 
@@ -636,5 +657,7 @@ class AppSettings extends Equatable {
     aiKey,
     aiModel,
     aiConsent,
+    helpChecks,
+    helpSeen,
   ];
 }

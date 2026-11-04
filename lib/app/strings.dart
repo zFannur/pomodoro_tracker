@@ -1058,6 +1058,46 @@ abstract final class S {
     _ => '',
   };
 
+  // Справка (само содержимое — в help_content.dart)
+  static String get helpTitle => _t('Справка', 'Help');
+  static String get helpTooltip => _t('Справка (F1)', 'Help (F1)');
+  static String get helpSearch => _t('Поиск по справке', 'Search help');
+  static String get helpNothing => _t('Ничего не нашлось', 'Nothing found');
+  static String get helpPrev => _t('← Предыдущий', '← Previous');
+  static String get helpNext => _t('Следующий →', 'Next →');
+  static String get helpOpen => _t('Открыть', 'Open');
+  static String get helpOptional => _t('по желанию', 'optional');
+  static String get helpPathCaption => _t('Внедрение', 'Adoption');
+  static String helpPathProgress(int stage, int total) =>
+      _t('Внедрение · этап $stage из $total', 'Adoption · stage $stage of $total');
+  static String get helpPathDone =>
+      _t('Внедрение · путь пройден', 'Adoption · path complete');
+  static String helpNextStep(String title) =>
+      _t('Следующий шаг: $title', 'Next step: $title');
+  static String get helpPathComplete => _t(
+    'Путь пройден. Дальше — свой ритм: оставляй то, что работает.',
+    'Path complete. From here it is your own rhythm: keep what works.',
+  );
+  static String helpStageCount(int done, int total) => '$done / $total';
+  static String helpProgressOf(int n, int total) =>
+      _t('$n из $total', '$n of $total');
+  static String helpProgressMornings(int n, int total) => _t(
+    '$n ${switch (n % 10) {
+      1 when n % 100 != 11 => 'утро',
+      2 || 3 || 4 when n % 100 < 10 || n % 100 >= 20 => 'утра',
+      _ => 'утр',
+    }} из $total',
+    '$n ${n == 1 ? 'morning' : 'mornings'} of $total',
+  );
+  static String helpProgressDays(int n, int total) => _t(
+    '$n ${switch (n % 10) {
+      1 when n % 100 != 11 => 'день',
+      2 || 3 || 4 when n % 100 < 10 || n % 100 >= 20 => 'дня',
+      _ => 'дней',
+    }} из $total',
+    '$n ${n == 1 ? 'day' : 'days'} of $total',
+  );
+
   // Общее
   static String get retry => _t('Повторить', 'Retry');
   static String get errorPrefix => _t('Ошибка: ', 'Error: ');

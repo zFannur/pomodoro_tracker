@@ -162,10 +162,20 @@ class FakeInsights implements InsightRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// Настройки тестов экранов: справка уже «увидена», иначе HomeShell открыл бы
+/// её сам при первом кадре.
+AppSettings _seenHelpSettings() => AppSettings.fromJson({
+  'helpSeen': AppSettings.helpVersion,
+}, fallbackPath: '.');
+
 class FakeSettings implements SettingsRepository {
+  FakeSettings([this._settings]);
+
+  final AppSettings? _settings;
+
   @override
   Future<Either<Failure, AppSettings>> load() async =>
-      Either.right(AppSettings.fromJson(const {}, fallbackPath: '.'));
+      Either.right(_settings ?? _seenHelpSettings());
 
   @override
   Future<Either<Failure, Unit>> save(AppSettings s) async => Either.right(unit);
@@ -189,16 +199,16 @@ Future<ScreenHarness> pumpScreen(
   TimerCubit? timerCubit,
   InsightCubit? insightCubit,
   DirectionsCubit? directionsCubit,
-}
-) async {
+  AppSettings? appSettings,
+}) async {
   tester.view
     ..physicalSize = size
     ..devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
   final settings = SettingsCubit(
-    FakeSettings(),
-    initial: AppSettings.fromJson(const {}, fallbackPath: '.'),
+    FakeSettings(appSettings),
+    initial: appSettings ?? _seenHelpSettings(),
     onStoragePathChanged: (_) {},
   );
   await settings.load();

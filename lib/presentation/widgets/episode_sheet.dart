@@ -13,6 +13,7 @@ import '../cubits/tasks_cubit.dart';
 import '../cubits/timer_cubit.dart';
 import 'ai_consent.dart';
 import 'cause_chips.dart';
+import '../screens/help_screen.dart';
 import 'first_step_field.dart';
 
 Future<void> showEpisodeSheet(
@@ -369,6 +370,7 @@ class _EpisodeSheetState extends State<_EpisodeSheet> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
+                  const HelpButton(section: 'stuck'),
                   IconButton(
                     tooltip: S.close,
                     onPressed: () => Navigator.of(context).pop(),
