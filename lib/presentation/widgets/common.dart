@@ -542,6 +542,7 @@ showTaskEditDialog(
   String firstStep = '',
   String cue = '',
   String cueAt = '',
+  bool planExpanded = false,
 }) {
   // Кубит — до showDialog: builder ленив, исходный context может умереть.
   final settingsCubit = context.read<SettingsCubit>();
@@ -603,6 +604,7 @@ showTaskEditDialog(
                       builder: (context, setDialogState) => ExpansionTile(
                         title: Text(S.startPlan),
                         initiallyExpanded:
+                            planExpanded ||
                             firstStep.isNotEmpty ||
                             cue.isNotEmpty ||
                             cueAt.isNotEmpty,

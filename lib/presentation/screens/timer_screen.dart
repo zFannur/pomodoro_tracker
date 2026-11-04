@@ -23,6 +23,7 @@ import '../cubits/tasks_cubit.dart';
 import '../cubits/timer_cubit.dart';
 import '../widgets/cause_chips.dart';
 import '../widgets/common.dart';
+import '../widgets/day_card.dart';
 import '../widgets/episode_sheet.dart';
 import 'activity_screen.dart' show formatActivityDuration, formatActivityName;
 import '../widgets/kanban_board.dart';
@@ -330,6 +331,7 @@ class _TimerBlock extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
+          const DayCard(),
           _NowCard(task: tasks.current),
           const SizedBox(height: 16),
           if (distraction != null)

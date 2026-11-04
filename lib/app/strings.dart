@@ -735,6 +735,38 @@ abstract final class S {
     Verdict.unclear => _t('мало данных', 'not enough data'),
   };
 
+  // Карточка дня
+  static String get dayCardSetting =>
+      _t('Карточка дня на таймере', 'Day card on the timer');
+  static String get sleepLabel => _t('Сон', 'Sleep');
+  static String get energyLabel => _t('Энергия', 'Energy');
+  static String get moodQuestion =>
+      _t('Как прошёл день?', 'How was your day?');
+  static String dotsLabel(String name, int? value) => value == null
+      ? _t('$name, не отмечено', '$name, not rated')
+      : _t('$name, $value из 5', '$name, $value out of 5');
+  static String get yesterdayFrog => _t(
+    'Вчера 🐸 не сдвинулась. Так бывает — это про задачу, не про тебя.',
+    "Yesterday's 🐸 didn't move. It happens — it's about the task, not you.",
+  );
+  static String yesterdayDefers(int n) => _t(
+    'Вчера $n ${_deferWord(n)}. Посмотрим, что мешало?',
+    'Yesterday: $n deferrals. Shall we see what got in the way?',
+  );
+  static String _deferWord(int n) => switch (n % 10) {
+    1 when n % 100 != 11 => 'перенос',
+    2 || 3 || 4 when n % 100 < 10 || n % 100 >= 20 => 'переноса',
+    _ => 'переносов',
+  };
+  static String get whatGotInTheWay =>
+      _t('Что помешало?', 'What got in the way?');
+  static String get firstStepForFrog =>
+      _t('Первый шаг для 🐸', 'First step for 🐸');
+  static String planLine(String cue, String then, String at) => _t(
+    '▸ Когда $cue → $then${at.isEmpty ? '' : ' · $at'}',
+    '▸ When $cue → $then${at.isEmpty ? '' : ' · $at'}',
+  );
+
   // Общее
   static String get retry => _t('Повторить', 'Retry');
   static String get errorPrefix => _t('Ошибка: ', 'Error: ');

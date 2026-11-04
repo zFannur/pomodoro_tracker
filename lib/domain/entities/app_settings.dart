@@ -164,6 +164,8 @@ class AppSettings extends Equatable {
     this.syncServerClientId = '',
     this.deviceId = '',
     this.kanbanEnabled = false,
+    this.dayCard = true,
+    this.dayCardHidden = '',
   });
 
   factory AppSettings.fromJson(
@@ -244,6 +246,8 @@ class AppSettings extends Equatable {
       syncServerClientId: json['syncServerClientId'] as String? ?? '',
       deviceId: json['deviceId'] as String? ?? '',
       kanbanEnabled: json['kanbanEnabled'] as bool? ?? false,
+      dayCard: json['dayCard'] as bool? ?? true,
+      dayCardHidden: json['dayCardHidden'] as String? ?? '',
     );
   }
 
@@ -384,6 +388,13 @@ class AppSettings extends Equatable {
   /// На главной вкладке показывать доску спринта вместо обычного списка.
   final bool kanbanEnabled;
 
+  /// Карточка дня (самочувствие, «вчера», план) над СЕЙЧАС на таймере.
+  final bool dayCard;
+
+  /// `dateKey` логического дня, до конца которого скрыты «Вчера» и «План».
+  /// Локально: настройки не синхронизируются.
+  final String dayCardHidden;
+
   TimerScheme get scheme => schemes.firstWhere(
     (s) => s.name == activeScheme,
     orElse: () => schemes.isEmpty ? defaultSchemes.first : schemes.first,
@@ -432,6 +443,8 @@ class AppSettings extends Equatable {
     'syncServerClientId': syncServerClientId,
     'deviceId': deviceId,
     'kanbanEnabled': kanbanEnabled,
+    'dayCard': dayCard,
+    'dayCardHidden': dayCardHidden,
   };
 
   AppSettings copyWith({
@@ -477,6 +490,8 @@ class AppSettings extends Equatable {
     String? syncServerClientId,
     String? deviceId,
     bool? kanbanEnabled,
+    bool? dayCard,
+    String? dayCardHidden,
   }) {
     return AppSettings(
       schemes: schemes ?? this.schemes,
@@ -521,6 +536,8 @@ class AppSettings extends Equatable {
       syncServerClientId: syncServerClientId ?? this.syncServerClientId,
       deviceId: deviceId ?? this.deviceId,
       kanbanEnabled: kanbanEnabled ?? this.kanbanEnabled,
+      dayCard: dayCard ?? this.dayCard,
+      dayCardHidden: dayCardHidden ?? this.dayCardHidden,
     );
   }
 
@@ -575,5 +592,7 @@ class AppSettings extends Equatable {
     syncServerClientId,
     deviceId,
     kanbanEnabled,
+    dayCard,
+    dayCardHidden,
   ];
 }

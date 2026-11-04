@@ -632,6 +632,12 @@ class _AppTab extends StatelessWidget {
           onChanged: (v) =>
               _update(context, settings.copyWith(mirrorToVault: v)),
         ),
+        SwitchListTile(
+          dense: true,
+          title: Text(S.dayCardSetting),
+          value: settings.dayCard,
+          onChanged: (v) => _update(context, settings.copyWith(dayCard: v)),
+        ),
         const Divider(height: 24),
         _SyncSection(settings: settings),
         const Divider(height: 24),
