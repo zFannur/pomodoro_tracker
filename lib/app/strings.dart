@@ -1,4 +1,6 @@
 import '../domain/entities/app_settings.dart';
+import '../domain/entities/episode.dart';
+import '../domain/entities/experiment.dart';
 
 /// Все строки интерфейса, на двух языках — переключаются в настройках
 /// ([S.lang]) и меняют текст немедленно (виджеты читают геттеры при
@@ -25,7 +27,7 @@ abstract final class S {
     'Продолжай, пока идёт. «Готово» — когда хватит.',
     'Keep going while it flows. Press Done when you have had enough.',
   );
-  static String get fieldFirstStep => _t('Первый шаг', 'First step');
+  static String get fieldFirstStep => _t('Первый шаг (≤5 мин)', 'First step (≤5 min)');
   static String get startPlan => _t('План старта', 'Start plan');
   static String get cueLabel => _t('Когда…', 'When…');
   static String get cueHint =>
@@ -614,6 +616,87 @@ abstract final class S {
     1 when n % 100 != 11 => 'запись',
     2 || 3 || 4 when n % 100 < 10 || n % 100 >= 20 => 'записи',
     _ => 'записей',
+  };
+
+  // Откладывание: причины и способы
+  static String cause(Cause c) => switch (c) {
+    Cause.unclear => _t('Непонятно, с чего начать', 'Not sure where to start'),
+    Cause.big => _t('Слишком большая', 'Too big'),
+    Cause.boring => _t('Скучно', 'Boring'),
+    Cause.perfect => _t('Боюсь сделать плохо', "Afraid it won't be good"),
+    Cause.tired => _t('Нет сил', 'No energy'),
+    Cause.pointless => _t('Не вижу смысла', "Don't see the point"),
+    Cause.external => _t('Отвлекли', 'Interrupted'),
+  };
+  static String get causeFinished => _t('Доделал', 'Finished');
+
+  static String strategyTitle(StrategyKind k) => switch (k) {
+    StrategyKind.firstStep => _t('Первый шаг на 5 минут', 'First step in 5 minutes'),
+    StrategyKind.warmup => _t('Только 10 минут', 'Just 10 minutes'),
+    StrategyKind.ifThen => _t('План «если — то»', 'If-then plan'),
+    StrategyKind.shrink => _t('Уменьшить задачу', 'Shrink the task'),
+    StrategyKind.thought => _t('Проверить мысль', 'Check the thought'),
+    StrategyKind.defuse => _t('Взять чувство с собой', 'Take the feeling with you'),
+    StrategyKind.value => _t('Зачем это мне', 'Why this matters to me'),
+    StrategyKind.rest => _t('Честный отдых', 'Real rest'),
+    StrategyKind.removeCue => _t('Убрать раздражитель', 'Remove the distraction'),
+  };
+
+  static String strategyBody(StrategyKind k) => switch (k) {
+    StrategyKind.firstStep => _t('Запиши самое первое физическое действие: открыть файл, написать одно предложение, найти одну ссылку. Не решение — только вход.', 'Write down the very first physical action: open a file, write one sentence, find one link. Not the solution — just a way in.'),
+    StrategyKind.warmup => _t('Договорись с собой на 10 минут. После можно честно остановиться — но обычно не хочется.', 'Commit to 10 minutes. Afterwards you can honestly stop — but usually you will want to continue.'),
+    StrategyKind.ifThen => _t('Привяжи начало к ситуации: «Когда ___, я ___». Чем конкретнее ситуация, тем лучше срабатывает.', 'Tie the start to a situation: "When ___, I will ___". The more specific the situation, the better it works.'),
+    StrategyKind.shrink => _t('Какая самая маленькая версия ещё считается шагом вперёд? Её — первой.', 'What is the smallest version that still counts as a step forward? Do that first.'),
+    StrategyKind.thought => _t('Мысль — это гипотеза, не факт. Что ты знаешь наверняка? Как сказать точнее?', 'A thought is a hypothesis, not a fact. What do you know for sure? How can you put it more accurately?'),
+    StrategyKind.defuse => _t('Скажи себе: «Я замечаю мысль, что…». Не надо ждать, пока станет не страшно, — возьми это чувство с собой на 10 минут.', 'Tell yourself: "I notice the thought that…". You do not have to wait until you are no longer afraid — take the feeling with you for 10 minutes.'),
+    StrategyKind.value => _t('Показывает «Зачем» направления задачи. Нет направления: «Эта задача не про твои цели. Может, ей место во „Входящих“?»', 'Shows the task direction’s "Why". No direction: "This task is not about your goals. Maybe it belongs in Inbox?"'),
+    StrategyKind.rest => _t('10 минут без экрана: вода, окно, пройтись. Потом — разгон.', '10 minutes without a screen: water, a window, a walk. Then warm up.'),
+    StrategyKind.removeCue => _t('Закрой вкладку, телефон экраном вниз или в другую комнату. Мысль, которая отвлекла, — во «Входящие».', 'Close the tab, put your phone face down or in another room. Put the distracting thought in Inbox.'),
+  };
+  static String get actionWarmup => _t('Разгон 10 мин', '10-min warm-up');
+  static String get actionSaveWarmup => _t('Сохранить и разгон 10 мин', 'Save and warm up 10 min');
+  static String get actionSave => _t('Сохранить', 'Save');
+  static String get actionRest => _t('Отдых 10 мин', 'Rest 10 min');
+  static String get actionToInbox => _t('Во „Входящие“', 'To Inbox');
+  static String get actionAddStart => _t('Добавить и начать', 'Add and start');
+  static String get actionContinue => _t('Продолжить', 'Continue');
+  static String get fieldCue => _t('Когда…', 'When…');
+  static String get fieldCueAt => _t('Напомнить в', 'Remind at');
+  static String get fieldShrink => _t('Минимальная версия', 'Smallest version');
+  static String get fieldThought => _t('Мысль', 'Thought');
+  static String get fieldFact => _t('Что я знаю наверняка', 'What I know for sure');
+  static String get fieldAlt => _t('Как сказать точнее', 'A more accurate thought');
+  static String get fieldWhy => _t('Зачем мне это направление?', 'Why does this direction matter to me?');
+  static String get fieldToInbox => _t('Мысль, которая отвлекла, — во «Входящие»', 'Put the distracting thought in Inbox');
+  static String get valueNoDirection => _t('Эта задача не про твои цели. Может, ей место во „Входящих“?', 'This task is not about your goals. Maybe it belongs in Inbox?');
+  static String defuseLine(String thought) => _t('Я замечаю мысль, что «$thought»', 'I notice the thought that "$thought"');
+  static String metric(InsightMetric m) => switch (m) {
+    InsightMetric.firstStart => _t('Первый помидор', 'First pomodoro'),
+    InsightMetric.idle => _t('Простой', 'Idle time'),
+    InsightMetric.frogFirst => _t('🐸 первой', '🐸 first'),
+    InsightMetric.deferrals => _t('Переносы', 'Deferrals'),
+    InsightMetric.distract => _t('Отвлечения', 'Distractions'),
+    InsightMetric.success => _t('Успех способов', 'Strategy success'),
+  };
+  static String hypothesis(StrategyKind k, InsightMetric m) {
+    final action = switch (k) {
+      StrategyKind.firstStep => _t('у задачи есть первый шаг', 'the task has a first step'),
+      StrategyKind.warmup => _t('начинать с разгона 10 минут', 'I start with a 10-minute warm-up'),
+      StrategyKind.ifThen => _t('у 🐸 есть план „если — то“', '🐸 has an if-then plan'),
+      StrategyKind.shrink => _t('уменьшать большую задачу', 'I shrink a large task'),
+      StrategyKind.thought => _t('проверять мысль', 'I check the thought'),
+      StrategyKind.defuse => _t('брать чувство с собой', 'I take the feeling with me'),
+      StrategyKind.value => _t('вспоминать „зачем“', 'I remember why'),
+      StrategyKind.rest => _t('отдыхать честно', 'I take real rest'),
+      StrategyKind.removeCue => _t('убирать раздражитель', 'I remove the distraction'),
+    };
+    return _t('Если $action, ${metric(m)} станет лучше', 'If $action, ${metric(m)} will improve');
+  }
+  static String verdict(Verdict v) => switch (v) {
+    Verdict.works => _t('работает', 'works'),
+    Verdict.same => _t('без разницы', 'no difference'),
+    Verdict.worse => _t('хуже', 'worse'),
+    Verdict.unclear => _t('мало данных', 'not enough data'),
   };
 
   // Общее
