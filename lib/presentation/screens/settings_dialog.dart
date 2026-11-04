@@ -6,18 +6,27 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
 import '../../domain/entities/app_settings.dart';
+import '../../domain/entities/kanban.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../cubits/settings_cubit.dart';
 import '../cubits/sync_cubit.dart';
+import '../cubits/sprint_cubit.dart';
 
 void showSettingsDialog(BuildContext context) {
   // Резолвим кубит сразу, а не внутри builder: тот вызывается лениво, и к
   // тому моменту исходный context мог стать невалидным (например, если
   // экран за диалогом успел перестроиться).
   final cubit = context.read<SettingsCubit>();
+  final sprintCubit = context.read<SprintCubit>();
   showDialog<void>(
     context: context,
-    builder: (_) => BlocProvider.value(value: cubit, child: const _SettingsDialog()),
+    builder: (_) => MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: cubit),
+        BlocProvider.value(value: sprintCubit),
+      ],
+      child: const _SettingsDialog(),
+    ),
   );
 }
 
@@ -31,7 +40,7 @@ class _SettingsDialog extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640, maxHeight: 680),
         child: DefaultTabController(
-          length: 3,
+           length: 4,
           child: Column(
             children: [
               Padding(
@@ -56,7 +65,8 @@ class _SettingsDialog extends StatelessWidget {
                 tabs: [
                   Tab(text: S.tabTimer),
                   Tab(text: S.tabNotify),
-                  Tab(text: S.tabApp),
+                   Tab(text: S.tabApp),
+                   Tab(text: S.tabKanban),
                 ],
               ),
               Expanded(
@@ -68,6 +78,7 @@ class _SettingsDialog extends StatelessWidget {
                         _TimerTab(settings: settings),
                         _NotifyTab(settings: settings),
                         _AppTab(settings: settings),
+                        const _KanbanTab(),
                       ],
                     );
                   },
@@ -703,6 +714,190 @@ class _AppTab extends StatelessWidget {
           );
         })
         .whenComplete(controller.dispose);
+  }
+}
+
+class _KanbanTab extends StatelessWidget {
+  const _KanbanTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsCubit>().state.settings;
+    final sprint = context.watch<SprintCubit>().state.sprint;
+    final columns = sprint?.kanbanColumns ?? defaultKanbanColumns;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text(S.kanbanEnabled),
+          value: settings.kanbanEnabled,
+          onChanged: (value) => _update(
+            context,
+            settings.copyWith(kanbanEnabled: value),
+          ),
+        ),
+        const Divider(height: 24),
+        Text(S.kanbanColumns, style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 4),
+        Text(
+          S.kanbanLastColumnHint,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          itemCount: columns.length,
+          onReorderItem: (oldIndex, newIndex) {
+            final lastIndex = columns.length - 1;
+            if (oldIndex >= lastIndex || newIndex > lastIndex) return;
+            final editable = [...columns.take(lastIndex)];
+            final moved = editable.removeAt(oldIndex);
+            editable.insert(newIndex.clamp(0, editable.length), moved);
+            context.read<SprintCubit>().setKanbanColumns([
+              ...editable,
+              columns.last,
+            ]);
+          },
+          itemBuilder: (context, index) => _KanbanColumnSetting(
+            key: ValueKey(columns[index].id),
+            index: index,
+            columns: columns,
+          ),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => _addColumn(context, columns),
+          icon: const Icon(Icons.add),
+          label: Text(S.kanbanAddColumn),
+        ),
+      ],
+    );
+  }
+
+  void _addColumn(BuildContext context, List<KanbanColumn> columns) {
+    final controller = TextEditingController();
+    showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(S.kanbanAddColumn),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(labelText: S.kanbanColumnName),
+          onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(S.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: Text(S.add),
+          ),
+        ],
+      ),
+    ).then((name) {
+      final title = (name ?? '').trim();
+      if (title.isEmpty || !context.mounted) return;
+      final id = 'column-${DateTime.now().microsecondsSinceEpoch}';
+      context.read<SprintCubit>().setKanbanColumns([
+        ...columns.take(columns.length - 1),
+        KanbanColumn(id: id, title: title),
+        columns.last,
+      ]);
+    }).whenComplete(controller.dispose);
+  }
+}
+
+class _KanbanColumnSetting extends StatelessWidget {
+  const _KanbanColumnSetting({
+    required this.index,
+    required this.columns,
+    super.key,
+  });
+
+  final int index;
+  final List<KanbanColumn> columns;
+
+  @override
+  Widget build(BuildContext context) {
+    final column = columns[index];
+    final isLast = index == columns.length - 1;
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: index == columns.length - 1
+          ? const Icon(Icons.lock_outline, size: 18)
+          : ReorderableDragStartListener(
+              index: index,
+              child: const Icon(Icons.drag_handle),
+            ),
+      title: Text(column.title),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: S.editTask,
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            onPressed: () => _rename(context, column),
+          ),
+          IconButton(
+            tooltip: S.delete,
+            icon: const Icon(Icons.delete_outline, size: 18),
+            onPressed: isLast || columns.length <= 2
+                ? null
+                : () => _delete(context, column),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _rename(BuildContext context, KanbanColumn column) {
+    final controller = TextEditingController(text: column.title);
+    showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(S.kanbanColumnName),
+        content: TextField(controller: controller, autofocus: true),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(S.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: Text(S.save),
+          ),
+        ],
+      ),
+    ).then((name) {
+      final title = (name ?? '').trim();
+      if (title.isEmpty || !context.mounted) return;
+      final next = [
+        for (final item in columns)
+          item.id == column.id ? item.copyWith(title: title) : item,
+      ];
+      context.read<SprintCubit>().setKanbanColumns(next);
+    }).whenComplete(controller.dispose);
+  }
+
+  void _delete(BuildContext context, KanbanColumn column) {
+    final sprint = context.read<SprintCubit>().state.sprint;
+    if (sprint == null) return;
+    if (sprint.kanbanCards.any((card) => card.columnId == column.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.kanbanColumnHasTasks)),
+      );
+      return;
+    }
+    final next = columns.where((item) => item.id != column.id).toList();
+    context.read<SprintCubit>().setKanbanColumns(next);
   }
 }
 

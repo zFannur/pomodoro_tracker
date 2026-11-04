@@ -22,6 +22,7 @@ import '../cubits/timer_cubit.dart';
 import '../widgets/common.dart';
 import 'activity_screen.dart' show formatActivityDuration, formatActivityName;
 import 'planner_dialog.dart';
+import '../widgets/kanban_board.dart';
 
 /// Главная страница: таймер + «Запланировано» + «Сделано» — один поток,
 /// как на оригинале.
@@ -30,21 +31,25 @@ class TimerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final kanbanEnabled = context.watch<SettingsCubit>().state.settings.kanbanEnabled;
+    const content = Column(
+      children: [
+        _TimerBlock(),
+        SizedBox(height: 24),
+        _TodoSection(),
+        SizedBox(height: 24),
+        _DoneSection(),
+      ],
+    );
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
       child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 780),
-          child: const Column(
-            children: [
-              _TimerBlock(),
-              SizedBox(height: 24),
-              _TodoSection(),
-              SizedBox(height: 24),
-              _DoneSection(),
-            ],
-          ),
-        ),
+        child: kanbanEnabled
+            ? SizedBox(width: double.infinity, child: content)
+            : ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 780),
+                child: content,
+              ),
       ),
     );
   }
@@ -552,6 +557,41 @@ class _TodoSection extends StatelessWidget {
         tasksState.todo.isNotEmpty &&
         identical(visible.first, tasksState.todo.first);
     final forecast = _forecast(visible, timer, scheme, carryFirst);
+
+    if (settings.kanbanEnabled) {
+      return SectionCard(
+        title: S.kanban,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _AddTaskForm(
+              onSubmit: (category, text) => context.read<TasksCubit>().add(
+                text,
+                fallbackCategory: category,
+                toSprint: true,
+              ),
+              onSubmitInbox: (category, text) => context.read<TasksCubit>().add(
+                text,
+                fallbackCategory: category,
+                toPlanner: true,
+                toSprint: true,
+              ),
+              plannerButton: true,
+            ),
+            const SizedBox(height: 12),
+            KanbanBoard(),
+            const SizedBox(height: 8),
+            Text(
+              '${S.nowLabel}: ${tasksState.current?.description ?? S.nowEmpty}',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return SectionCard(
       title:

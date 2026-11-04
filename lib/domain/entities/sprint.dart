@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'kanban.dart';
+
 /// Недельный спринт (пн–вс): веха + задачи недели (⭐ в общем списке задач).
 class Sprint extends Equatable {
   const Sprint({
@@ -9,6 +11,8 @@ class Sprint extends Equatable {
     this.milestone = '',
     this.milestoneId = '',
     this.doneWeek = const [],
+    this.kanbanColumns = defaultKanbanColumns,
+    this.kanbanCards = const [],
   });
 
   /// Идентификатор вида `2026-W29`.
@@ -29,6 +33,16 @@ class Sprint extends Equatable {
   /// Закрытые за неделю ⭐-задачи (строки для секции «Сделано за неделю»).
   final List<String> doneWeek;
 
+  /// Колонки и карточки доски синхронизируются вместе со спринтом.
+  final List<KanbanColumn> kanbanColumns;
+  final List<KanbanCard> kanbanCards;
+
+  List<KanbanCard> get sortedKanbanCards => [...kanbanCards]
+    ..sort((a, b) {
+      final byColumn = a.columnId.compareTo(b.columnId);
+      return byColumn == 0 ? a.order.compareTo(b.order) : byColumn;
+    });
+
   DateTime get end => DateTime(start.year, start.month, start.day + 6);
 
   Sprint copyWith({
@@ -37,6 +51,8 @@ class Sprint extends Equatable {
     String? milestoneId,
     bool clearMilestoneId = false,
     List<String>? doneWeek,
+    List<KanbanColumn>? kanbanColumns,
+    List<KanbanCard>? kanbanCards,
   }) {
     return Sprint(
       id: id,
@@ -45,11 +61,22 @@ class Sprint extends Equatable {
       milestone: milestone ?? this.milestone,
       milestoneId: clearMilestoneId ? '' : (milestoneId ?? this.milestoneId),
       doneWeek: doneWeek ?? this.doneWeek,
+      kanbanColumns: kanbanColumns ?? this.kanbanColumns,
+      kanbanCards: kanbanCards ?? this.kanbanCards,
     );
   }
 
   @override
-  List<Object?> get props => [id, start, goal, milestone, milestoneId, doneWeek];
+  List<Object?> get props => [
+        id,
+        start,
+        goal,
+        milestone,
+        milestoneId,
+        doneWeek,
+        kanbanColumns,
+        kanbanCards,
+      ];
 }
 
 /// Сводка прошедшего спринта для истории.

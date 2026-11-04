@@ -137,6 +137,8 @@ Future<void> main() async {
     await sprintCubit.addDoneWeek(line);
     await directionsCubit.addProof(milestoneId, line);
   };
+  tasksCubit.onTaskClosed = sprintCubit.completeKanbanTask;
+  tasksCubit.onWeekChanged = sprintCubit.syncKanbanTask;
   // Смена дня — сброс 🐸 (лягушка выбирается утром заново);
   // смена недели — сброс ⭐ (3 задачи спринта выбираются из вехи заново).
   Future<bool> rolloverCheck() async {

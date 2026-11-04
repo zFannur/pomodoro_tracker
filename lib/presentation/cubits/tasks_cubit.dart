@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/strings.dart';
 import '../../data/json_data_repository.dart' show newId;
 import '../../domain/entities/app_settings.dart';
+import '../../domain/entities/kanban.dart';
 import '../../domain/entities/pomo_session.dart';
 import '../../domain/entities/pomo_task.dart';
 import '../../domain/repositories.dart';
@@ -146,6 +147,12 @@ class TasksCubit extends Cubit<TasksState> {
   /// не перечитывались — задача исчезала из «Сегодня» будто в никуда.
   Future<void> Function()? onHistoryWritten;
 
+  /// Обновляет карточку текущего спринта после полного закрытия задачи.
+  Future<void> Function(PomoTask task)? onTaskClosed;
+
+  /// Обновляет доску после изменения ⭐.
+  Future<void> Function(PomoTask task, bool enabled)? onWeekChanged;
+
   int get _pomodoroMinutes => _settings().scheme.pomodoro;
 
   /// ⭐-задачи недели из обоих списков.
@@ -189,6 +196,7 @@ class TasksCubit extends Cubit<TasksState> {
     bool toPlanner = false,
     DateTime? due,
     bool forceBottom = false,
+    bool toSprint = false,
   }) async {
     final parsed = parseSmartInput(raw);
     if (parsed.description.isEmpty) return;
@@ -202,15 +210,19 @@ class TasksCubit extends Cubit<TasksState> {
         ? baseMinutes
         : math.min(300, parsed.pomos! * baseMinutes);
     final task = PomoTask(
+      id: newId(),
       description: parsed.description.length > 255
           ? parsed.description.substring(0, 255)
           : parsed.description,
       category: category.length > 255 ? category.substring(0, 255) : category,
       durationMinutes: math.max(1, duration),
       due: due,
+      week: toSprint,
+      milestoneId: toSprint ? _currentMilestoneId() : '',
     );
     if (toPlanner) {
       await _persist(planner: [...state.planner, task]);
+      if (toSprint) await onWeekChanged?.call(task, true);
       return;
     }
     final top = settings.tasksTop && !forceBottom;
@@ -222,8 +234,11 @@ class TasksCubit extends Cubit<TasksState> {
         todo[edgeIndex].category == task.category) {
       todo[edgeIndex] = todo[edgeIndex].copyWith(
         durationMinutes: todo[edgeIndex].durationMinutes + task.durationMinutes,
+        week: toSprint ? true : null,
+        milestoneId: toSprint ? _currentMilestoneId() : null,
       );
       await _persist(todo: todo);
+      if (toSprint) await onWeekChanged?.call(todo[edgeIndex], true);
       return;
     }
     if (top) {
@@ -232,6 +247,7 @@ class TasksCubit extends Cubit<TasksState> {
       todo.add(task);
     }
     await _persist(todo: todo);
+    if (toSprint) await onWeekChanged?.call(task, true);
   }
 
   // -- операции над задачами TODO ---------------------------------------------
@@ -334,6 +350,7 @@ class TasksCubit extends Cubit<TasksState> {
       todo: inPlanner ? null : list,
       planner: inPlanner ? list : null,
     );
+    await onWeekChanged?.call(list[index], nextWeek);
   }
 
   /// Разбить: 25м → 13м (остаётся) + 12м (копия следом).
@@ -396,6 +413,7 @@ class TasksCubit extends Cubit<TasksState> {
       frog: task.frog,
     );
     await onHistoryWritten?.call();
+    if (rest <= 0 && task.week) await onTaskClosed?.call(task);
   }
 
   Future<void> edit(int index, {String? description, String? category}) async {
@@ -559,6 +577,7 @@ class TasksCubit extends Cubit<TasksState> {
           todo[0] = current.copyWith(durationMinutes: rest);
         }
         await _persist(todo: todo);
+        if (rest <= 0 && current.week) await onTaskClosed?.call(current);
       }
     }
     await _writeHistory(
@@ -574,6 +593,34 @@ class TasksCubit extends Cubit<TasksState> {
     if (state.todo.isEmpty && current != null) {
       await _notify.event(settings, title: S.appTitle, body: S.todoEmptyDone);
     }
+  }
+
+  /// Убрать задачу из активного списка без записи фиктивного времени. Это
+  /// используется только переносом карточки канбана в последнюю колонку.
+  Future<PomoTask?> closeForKanban(String taskId) async {
+    final todo = [...state.todo];
+    final todoIndex = todo.indexWhere((task) => task.id == taskId);
+    if (todoIndex >= 0) {
+      final task = todo.removeAt(todoIndex);
+      await _persist(todo: todo);
+      if (task.week) await onTaskClosed?.call(task);
+      return task;
+    }
+    final planner = [...state.planner];
+    final plannerIndex = planner.indexWhere((task) => task.id == taskId);
+    if (plannerIndex < 0) return null;
+    final task = planner.removeAt(plannerIndex);
+    await _persist(planner: planner);
+    if (task.week) await onTaskClosed?.call(task);
+    return task;
+  }
+
+  /// Вернуть завершённую карточку в «Сегодня», не создавая запись журнала.
+  Future<void> restoreKanbanCard(KanbanCard card) async {
+    final exists = [...state.todo, ...state.planner]
+        .any((task) => task.id == card.taskId);
+    if (exists) return;
+    await _persist(todo: [card.toTask(), ...state.todo]);
   }
 
   // -- история -------------------------------------------------------------------

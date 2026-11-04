@@ -47,16 +47,21 @@ abstract final class S {
 
   // Задачи
   static String get planned => _t('Запланировано', 'Planned');
+  static String get kanban => _t('Канбан', 'Kanban');
   static String get categoryHint => _t('Категория', 'Category');
   static String get descriptionHint =>
       _t('#категория описание ~помидоры', '#category description ~pomodoros');
   static String get add => _t('Добавить', 'Add');
   static String get planner => _t('Планировщик', 'Planner');
-  static String get emptyPlanned => _t('Список планирования пуст.', 'The plan is empty.');
-  static String get emptyPlannedHint =>
-      _t('Добавьте задачи через форму выше.', 'Add tasks using the form above.');
+  static String get emptyPlanned =>
+      _t('Список планирования пуст.', 'The plan is empty.');
+  static String get emptyPlannedHint => _t(
+    'Добавьте задачи через форму выше.',
+    'Add tasks using the form above.',
+  );
   static String get finishTime => _t('ВРЕМЯ ОКОНЧАНИЯ', 'FINISH TIME');
-  static String get nextLongBreak => _t('Следующий длинный перерыв', 'Next long break');
+  static String get nextLongBreak =>
+      _t('Следующий длинный перерыв', 'Next long break');
   static String get categories => _t('Категории', 'Categories');
   static String get hintTasks => _t(
     'Клик — редактирование. Клик по числу — +помидор (Alt — минус, Shift — ×4). Перетаскивайте для сортировки.',
@@ -64,12 +69,15 @@ abstract final class S {
   );
   static String get menuAddPomo => _t('Добавить помидор', 'Add a pomodoro');
   static String get menuRemovePomo => _t('Убрать один', 'Remove one');
-  static String get menuMarkDone => _t('Отметить как выполненное', 'Mark as done');
-  static String get menuCloseWhole => _t('Закрыть задачу целиком', 'Close the whole task');
+  static String get menuMarkDone =>
+      _t('Отметить как выполненное', 'Mark as done');
+  static String get menuCloseWhole =>
+      _t('Закрыть задачу целиком', 'Close the whole task');
   static String get menuSplit => _t('Разбить', 'Split');
   static String get menuMerge => _t('Объединить', 'Merge');
   static String get menuToInbox => _t('Во входящие', 'To inbox');
-  static String get menuToTomorrow => _t('Перенести на завтра', 'Move to tomorrow');
+  static String get menuToTomorrow =>
+      _t('Перенести на завтра', 'Move to tomorrow');
   static String get menuToLater => _t('Перенести на позже', 'Move to later');
   static String get delete => _t('Удалить', 'Delete');
   static String get close => _t('Закрыть', 'Close');
@@ -82,7 +90,8 @@ abstract final class S {
   static String get withoutNote => _t('Без заметки', 'No note');
   static String get emptyBucket => _t('Пусто', 'Empty');
   static String get listSettings => _t('Настроить', 'Configure');
-  static String get tasksTopLabel => _t('Новые задачи — наверх', 'New tasks go to the top');
+  static String get tasksTopLabel =>
+      _t('Новые задачи — наверх', 'New tasks go to the top');
   static String get completeRemoveLabel => _t(
     'Снимать задачу при завершении помидора',
     'Remove task when a pomodoro finishes it',
@@ -101,11 +110,16 @@ abstract final class S {
   static String get goalLeft => _t('осталось', 'left');
   static String get menuRepeat => _t('Повторить', 'Repeat');
   static String get menuFillBlanks => _t('Заполнить пустые', 'Fill the gaps');
-  static String get emptyDone => _t('Сегодня ещё нет помидоров.', 'No pomodoros yet today.');
-  static String get todoEmptyDone =>
-      _t('Отличная работа! Список задач пуст.', 'Great work! The task list is empty.');
-  static String get goalCompleted =>
-      _t('Поздравляем! Дневная цель выполнена.', 'Congrats! Daily goal reached.');
+  static String get emptyDone =>
+      _t('Сегодня ещё нет помидоров.', 'No pomodoros yet today.');
+  static String get todoEmptyDone => _t(
+    'Отличная работа! Список задач пуст.',
+    'Great work! The task list is empty.',
+  );
+  static String get goalCompleted => _t(
+    'Поздравляем! Дневная цель выполнена.',
+    'Congrats! Daily goal reached.',
+  );
   static String get dayCleared => _t(
     'Новый день — список «Сделано» начат заново.',
     'New day — the "Done" list starts over.',
@@ -131,7 +145,8 @@ abstract final class S {
     'Тонкий срез до реальности, проверяется бинарно: «товар покупается живым юзером»',
     'A thin slice of reality, checked as pass/fail: "a real user buys the product"',
   );
-  static String get weekTasksTitle => _t('Задачи спринта (⭐)', 'Sprint tasks (⭐)');
+  static String get weekTasksTitle =>
+      _t('Задачи спринта (⭐)', 'Sprint tasks (⭐)');
   static String get weekTasksEmpty => _t(
     'Отметь 2–3 задачи звездой в Планировщике (кнопка «Выбрать») — они двигают веху. '
         'В новую неделю звёзды снимаются автоматически.',
@@ -165,9 +180,14 @@ abstract final class S {
 
   // Система фокуса
   static String get nowLabel => _t('СЕЙЧАС', 'NOW');
-  static String get nowEmpty =>
-      _t('Возьми одну задачу — верхняя в списке и есть СЕЙЧАС', 'Pick one task — the top of the list is NOW');
-  static String get frogLabel => _t('🐸 Лягушка дня — делается первой', '🐸 Frog of the day — do it first');
+  static String get nowEmpty => _t(
+    'Возьми одну задачу — верхняя в списке и есть СЕЙЧАС',
+    'Pick one task — the top of the list is NOW',
+  );
+  static String get frogLabel => _t(
+    '🐸 Лягушка дня — делается первой',
+    '🐸 Frog of the day — do it first',
+  );
   static String get frogRemove => _t('Убрать лягушку', 'Remove the frog');
   static String get weekMark => _t(
     '⭐ В спринт — двигает веху недели (снимается в новую неделю)',
@@ -179,9 +199,12 @@ abstract final class S {
     'По системе: 🐸 + 2 задачи на день. Лишнее — во «Входящие» (меню ⋮).',
     'The system: 🐸 + 2 tasks a day. Extra goes to "Inbox" (⋮ menu).',
   );
-  static String get stuckHint =>
-      _t('Застрял? Разбей до шага на 5 минут — и стартуй.', "Stuck? Break it down to a 5-minute step — and start.");
-  static String get whereStopped => _t('На чём встал?', 'Where did you leave off?');
+  static String get stuckHint => _t(
+    'Застрял? Разбей до шага на 5 минут — и стартуй.',
+    "Stuck? Break it down to a 5-minute step — and start.",
+  );
+  static String get whereStopped =>
+      _t('На чём встал?', 'Where did you leave off?');
   static String get whereStoppedHint => _t(
     'Одна строка — чтобы завтра не вспоминать (можно пропустить)',
     "One line, so you don't have to remember tomorrow (optional)",
@@ -203,11 +226,15 @@ abstract final class S {
   static String get statStreak => _t('Серия дней', 'Day streak');
   static String get statBestDay => _t('Лучший день', 'Best day');
   static String get statFrog => _t('🐸 Лягушки', '🐸 Frogs');
-  static String get statFrogHint => _t('дней, где сделал главное', "days you got the main thing done");
+  static String get statFrogHint =>
+      _t('дней, где сделал главное', "days you got the main thing done");
   static String get statByCategory => _t('По категориям', 'By category');
   static String get statLast14 => _t('Последние 14 дней', 'Last 14 days');
   static String get statHeatmap => _t('Карта активности', 'Activity map');
-  static String get statEmpty => _t('Пока нет ни одного помидора за период.', 'No pomodoros in this period yet.');
+  static String get statEmpty => _t(
+    'Пока нет ни одного помидора за период.',
+    'No pomodoros in this period yet.',
+  );
   static String get daysSuffix => _t('дн.', 'd.');
 
   // Настройки
@@ -215,14 +242,59 @@ abstract final class S {
   static String get tabTimer => _t('Таймер', 'Timer');
   static String get tabNotify => _t('Оповещения', 'Notifications');
   static String get tabApp => _t('Приложение', 'App');
+  static String get tabKanban => _t('Канбан', 'Kanban');
+  static String get kanbanEnabled =>
+      _t('Включить режим канбан', 'Enable kanban mode');
+  static String get kanbanColumns => _t('Колонки канбана', 'Kanban columns');
+  static String get kanbanAddColumn => _t('Добавить колонку', 'Add column');
+  static String get kanbanColumnName => _t('Название колонки', 'Column name');
+  static String get kanbanNoSprint =>
+      _t('Спринт ещё загружается.', 'The sprint is still loading.');
+  static String get kanbanLastColumnHint => _t(
+    'Последняя колонка считается завершением задачи.',
+    'The last column marks a task as complete.',
+  );
+  static String get kanbanColumnHasTasks => _t(
+    'Сначала переместите задачи из этой колонки.',
+    'Move the tasks out of this column first.',
+  );
+  static String get kanbanNoTasks => _t(
+    'В текущем спринте пока нет задач ⭐.',
+    'There are no ⭐ tasks in the current sprint yet.',
+  );
+  static String get kanbanDropHere => _t('Вставить сюда', 'Drop here');
+  static String get kanbanAddSprintTask => _t(
+    'Добавьте задачу в спринт через Планировщик.',
+    'Add a task to the sprint through Planner.',
+  );
+  static String kanbanColumnPercent(int count, int total, int percent) =>
+      _t('$percent% · $count из $total', '$percent% · $count of $total');
+  static String kanbanDaysLeft(int days, int tasks) => _t(
+    'Осталось дней: $days · задач: $tasks',
+    'Days left: $days · tasks: $tasks',
+  );
+  static String kanbanPace(String needed, String actual) => _t(
+    'Нужно $needed задач/день · факт $actual/день',
+    'Need $needed tasks/day · actual $actual/day',
+  );
   static String get settingsSchemes => _t('Схемы', 'Schemes');
   static String get schemeName => _t('Название схемы', 'Scheme name');
-  static String get pomodoroLen => _t('Продолжительность помидора, мин', 'Pomodoro length, min');
+  static String get pomodoroLen =>
+      _t('Продолжительность помидора, мин', 'Pomodoro length, min');
   static String get shortLen => _t('Короткий перерыв, мин', 'Short break, min');
   static String get longLen => _t('Длинный перерыв, мин', 'Long break, min');
-  static String get longEvery => _t('Длинный перерыв через каждые N помидоров', 'Long break every N pomodoros');
-  static String get autostartPomodoro => _t('Автостарт помидора после перерыва', 'Auto-start pomodoro after a break');
-  static String get autostartBreak => _t('Автостарт перерыва после помидора', 'Auto-start break after a pomodoro');
+  static String get longEvery => _t(
+    'Длинный перерыв через каждые N помидоров',
+    'Long break every N pomodoros',
+  );
+  static String get autostartPomodoro => _t(
+    'Автостарт помидора после перерыва',
+    'Auto-start pomodoro after a break',
+  );
+  static String get autostartBreak => _t(
+    'Автостарт перерыва после помидора',
+    'Auto-start break after a pomodoro',
+  );
   static String get autostartIfTodo => _t(
     'Автостарт помидора только при наличии задач',
     'Auto-start pomodoro only if tasks are queued',
@@ -231,9 +303,12 @@ abstract final class S {
     'Flowtime: не выбивать из потока (помидор дотикал — таймер тихо считает дальше)',
     "Flowtime: don't break the flow (pomodoro ends — the timer quietly keeps counting)",
   );
-  static String get dailyGoal => _t('Цель на день, 🍅 (0 — без цели)', 'Daily goal, 🍅 (0 — no goal)');
-  static String get sessionHoursLabel =>
-      _t('Длина сессии, ч (список «Сегодня»)', 'Session length, h (Today list)');
+  static String get dailyGoal =>
+      _t('Цель на день, 🍅 (0 — без цели)', 'Daily goal, 🍅 (0 — no goal)');
+  static String get sessionHoursLabel => _t(
+    'Длина сессии, ч (список «Сегодня»)',
+    'Session length, h (Today list)',
+  );
   static String get sessionWindowsLabel =>
       _t('Расписание сессий', 'Session schedule');
   static String get sessionWindowsHint => _t(
@@ -246,23 +321,36 @@ abstract final class S {
   static String get volume => _t('Громкость', 'Volume');
   static String get finishSound => _t('Финишный звук', 'Finish sound');
   static String get finishMelody => _t('Мелодия финиша', 'Finish melody');
-  static String get tickingSound => _t('Тикающий звук во время помидора', 'Ticking sound during a pomodoro');
-  static String get tickingInBreaks => _t('Тикать и в перерывах', 'Tick during breaks too');
-  static String get notifications => _t('Системные уведомления', 'System notifications');
-  static String get notifyMinuteBefore => _t('Предупреждать за минуту до конца', 'Warn one minute before the end');
-  static String get popupRaiseWindow => _t('Поднимать окно, когда фаза окончена', 'Raise the window when a phase ends');
+  static String get tickingSound =>
+      _t('Тикающий звук во время помидора', 'Ticking sound during a pomodoro');
+  static String get tickingInBreaks =>
+      _t('Тикать и в перерывах', 'Tick during breaks too');
+  static String get notifications =>
+      _t('Системные уведомления', 'System notifications');
+  static String get notifyMinuteBefore =>
+      _t('Предупреждать за минуту до конца', 'Warn one minute before the end');
+  static String get popupRaiseWindow => _t(
+    'Поднимать окно, когда фаза окончена',
+    'Raise the window when a phase ends',
+  );
   static String get messages => _t('Сообщения', 'Messages');
   static String get msgPomodoroHint => _t(
     'Тексты для «Помидор завершён» — по одному на строку, выбирается случайный',
     'Texts for "Pomodoro finished" — one per line, a random one is picked',
   );
-  static String get msgBreakHint => _t('Тексты для «Перерыв окончен»', 'Texts for "Break finished"');
+  static String get msgBreakHint =>
+      _t('Тексты для «Перерыв окончен»', 'Texts for "Break finished"');
   static String get telegram => _t('Telegram', 'Telegram');
   static String get telegramToken => _t('Токен бота', 'Bot token');
   static String get telegramChatId => _t('Chat ID', 'Chat ID');
-  static String get notifyTelegram => _t('Дублировать уведомления в Telegram', 'Duplicate notifications to Telegram');
-  static String get sendTest => _t('Отправить тестовое оповещение', 'Send a test notification');
-  static String get testNotification => _t('Проверка уведомлений', 'Notification test');
+  static String get notifyTelegram => _t(
+    'Дублировать уведомления в Telegram',
+    'Duplicate notifications to Telegram',
+  );
+  static String get sendTest =>
+      _t('Отправить тестовое оповещение', 'Send a test notification');
+  static String get testNotification =>
+      _t('Проверка уведомлений', 'Notification test');
   static String get themeMode => _t('Цветовая схема', 'Color theme');
   static String get themeLight => _t('Светлая', 'Light');
   static String get themeDark => _t('Тёмная', 'Dark');
@@ -274,7 +362,8 @@ abstract final class S {
   static String get languageEn => 'English';
   static String get dateFormat => _t('Формат даты', 'Date format');
   static String get timeFormat => _t('Формат времени', 'Time format');
-  static String get storageFolder => _t('Папка хранения (markdown)', 'Storage folder (markdown)');
+  static String get storageFolder =>
+      _t('Папка хранения (markdown)', 'Storage folder (markdown)');
   static String get mirrorToVaultLabel => _t(
     'Зеркалить задачи в валт («Задачи.md», только просмотр)',
     'Mirror tasks to the vault ("Задачи.md", view-only)',
@@ -283,12 +372,16 @@ abstract final class S {
   static String get newCategory => _t('Новая категория', 'New category');
   static String get boundScheme => _t('Схема категории', 'Category scheme');
   static String get defaultScheme => _t('по умолчанию', 'default');
-  static String get sprintGoalDefault => _t('Цель спринта по умолчанию, 🍅', 'Default sprint goal, 🍅');
+  static String get sprintGoalDefault =>
+      _t('Цель спринта по умолчанию, 🍅', 'Default sprint goal, 🍅');
   static String get addScheme => _t('Добавить схему', 'Add scheme');
-  static String get notifyMinuteLeft => _t('Осталась минута', 'One minute left');
-  static String get notifyPomodoroDone => _t('Помидор завершён!', 'Pomodoro finished!');
+  static String get notifyMinuteLeft =>
+      _t('Осталась минута', 'One minute left');
+  static String get notifyPomodoroDone =>
+      _t('Помидор завершён!', 'Pomodoro finished!');
   static String get notifyBreakDone => _t('Перерыв окончен', 'Break finished');
-  static String get notifyBreakDoneBody => _t('Следующий помидор будет лучше!', 'The next pomodoro will be better!');
+  static String get notifyBreakDoneBody =>
+      _t('Следующий помидор будет лучше!', 'The next pomodoro will be better!');
 
   // Таблица истории спринтов, поле минут в диалоге редактирования записи
   static String get sprintWord => _t('Спринт', 'Sprint');
@@ -311,10 +404,8 @@ abstract final class S {
   static String get trashEmpty => _t('Корзина пуста', 'Trash is empty');
 
   // Google Drive синк
-  static String get syncSection => _t(
-    'Google Drive — синхронизация задач',
-    'Google Drive — task sync',
-  );
+  static String get syncSection =>
+      _t('Google Drive — синхронизация задач', 'Google Drive — task sync');
   static String get syncConnect => _t('Подключить', 'Connect');
   static String get syncDisconnect => _t('Отключить', 'Disconnect');
   static String get syncNowBtn => _t('Синхронизировать', 'Sync now');
@@ -322,18 +413,12 @@ abstract final class S {
   static String get syncDisconnected => _t('Не подключено', 'Not connected');
   static String get syncSyncing => _t('Синхронизация…', 'Syncing…');
   static String get syncLast => _t('Последний синк', 'Last sync');
-  static String get syncClientIdLabel => _t(
-    'Client ID (Desktop app)',
-    'Client ID (Desktop app)',
-  );
-  static String get syncClientSecretLabel => _t(
-    'Client Secret (Desktop app)',
-    'Client Secret (Desktop app)',
-  );
-  static String get syncServerClientIdLabel => _t(
-    'Server Client ID (Web)',
-    'Server Client ID (Web)',
-  );
+  static String get syncClientIdLabel =>
+      _t('Client ID (Desktop app)', 'Client ID (Desktop app)');
+  static String get syncClientSecretLabel =>
+      _t('Client Secret (Desktop app)', 'Client Secret (Desktop app)');
+  static String get syncServerClientIdLabel =>
+      _t('Server Client ID (Web)', 'Server Client ID (Web)');
   static String get syncFillCredentials => _t(
     'Заполни Client ID и Client Secret: Google Cloud Console → '
         'Credentials → OAuth client «Desktop app». Инструкция — в README.',
@@ -378,8 +463,7 @@ abstract final class S {
   static String get courseClosures => _t('Лента закрытий', 'Closure feed');
   static String get courseAttention =>
       _t('Внимание за 30 дней', 'Attention over 30 days');
-  static String get monthReviewTitle =>
-      _t('Месячный разбор', 'Monthly review');
+  static String get monthReviewTitle => _t('Месячный разбор', 'Monthly review');
 
   static String get courseEmptyDirections => _t(
     'Пока ни одного направления. Направление — это цель на 3–12 месяцев; '
@@ -398,8 +482,7 @@ abstract final class S {
   static String get courseMilestone => _t('Веха', 'Milestone');
   static String get courseAddDirection =>
       _t('Добавить направление', 'Add direction');
-  static String get courseAddMilestone =>
-      _t('Добавить веху', 'Add milestone');
+  static String get courseAddMilestone => _t('Добавить веху', 'Add milestone');
   static String get coursePause => _t('Пауза', 'Pause');
   static String get courseResume => _t('Вернуть в работу', 'Resume');
   static String get courseCloseDirection =>
@@ -454,8 +537,9 @@ abstract final class S {
   static String milestoneProgressCounter(int tasksCount, int closedCount) {
     final taskWord = switch (tasksCount % 10) {
       1 when tasksCount % 100 != 11 => 'задача',
-      2 || 3 || 4 when tasksCount % 100 < 10 || tasksCount % 100 >= 20 =>
-        'задачи',
+      2 ||
+      3 ||
+      4 when tasksCount % 100 < 10 || tasksCount % 100 >= 20 => 'задачи',
       _ => 'задач',
     };
     final taskWordEn = tasksCount == 1 ? 'task' : 'tasks';
@@ -527,10 +611,8 @@ abstract final class S {
 /// Длительность для UI (в отличие от [formatMinutes] в markdown_codec.dart,
 /// который пишет формат в файлы данных — тот всегда русский, это интерфейс).
 /// «HH:mm» из минут от полуночи, с учётом 12/24ч.
-String formatMinutesOfDay(int minOfDay, TimeFmt fmt) => formatClock(
-  DateTime(2000, 1, 1, minOfDay ~/ 60, minOfDay % 60),
-  fmt,
-);
+String formatMinutesOfDay(int minOfDay, TimeFmt fmt) =>
+    formatClock(DateTime(2000, 1, 1, minOfDay ~/ 60, minOfDay % 60), fmt);
 
 String formatMinutesUi(int minutes) {
   final h = minutes ~/ 60;
