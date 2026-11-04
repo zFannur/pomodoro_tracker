@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:pomodoro_tracker/core/failure.dart';
@@ -38,6 +39,12 @@ class _RacyTasks extends _MemTasks {
     }
     return super.saveTasks(f);
   }
+}
+
+class _FailingTasks extends _MemTasks {
+  @override
+  Future<Either<Failure, Unit>> saveTasks(TasksFile f) async =>
+      Either.left(const StorageFailure('не удалось сохранить'));
 }
 
 class _MemJournal implements JournalRepository {
@@ -93,6 +100,86 @@ void main() {
 
   List<String> plannerNames() =>
       cubit.state.planner.map((t) => t.description).toList();
+
+  test('postpone считает перенос и вызывает колбэк после записи', () async {
+    await seed(todo: [t('сегодня').copyWith(id: 'task', deferrals: 2)]);
+    final calls = <PomoTask>[];
+    cubit.onDeferred = (task) async {
+      expect(repo.file.todo, isEmpty);
+      expect(repo.file.planner.single, task);
+      calls.add(task);
+    };
+    await cubit.postpone(0, PlannerTab.tomorrow);
+    expect(repo.file.planner.single.deferrals, 3);
+    expect(calls.single, repo.file.planner.single);
+    await cubit.close();
+  });
+
+  test('postpone countDeferral false не считает и не сообщает', () async {
+    await seed(todo: [t('осознанно').copyWith(deferrals: 2)]);
+    var calls = 0;
+    cubit.onDeferred = (_) async => calls++;
+    await cubit.postpone(0, PlannerTab.inbox, countDeferral: false);
+    expect(repo.file.planner.single.deferrals, 2);
+    expect(calls, 0);
+    await cubit.close();
+  });
+
+  for (final oldTab in [PlannerTab.due, PlannerTab.inbox, PlannerTab.tomorrow]) {
+    test('plannerMove $oldTab → week', () => withClock(
+      Clock.fixed(DateTime(2026, 11, 4, 10)), () async {
+        await seed(planner: [t('план', due: plannerDueFor(oldTab, clock.now()))
+          .copyWith(id: 'task', deferrals: 2)]);
+        final calls = <PomoTask>[];
+        cubit.onDeferred = (task) async {
+          expect(repo.file.planner.single, task);
+          calls.add(task);
+        };
+        await cubit.plannerMove(0, PlannerTab.week);
+        expect(repo.file.planner.single.deferrals,
+          oldTab == PlannerTab.due ? 3 : 2);
+        expect(calls.length, oldTab == PlannerTab.due ? 1 : 0);
+        await cubit.close();
+      }));
+  }
+
+  test('due → due и plannerToToday не считаются переносами', () async {
+    await seed(planner: [t('срок', due: DateTime(2020)).copyWith(deferrals: 2)]);
+    var calls = 0;
+    cubit.onDeferred = (_) async => calls++;
+    await cubit.plannerMove(0, PlannerTab.due);
+    await cubit.plannerToToday(0);
+    expect(repo.file.todo.single.deferrals, 2);
+    expect(calls, 0);
+    await cubit.close();
+  });
+
+  test('bumpDeferral ищет по id и не вызывает onDeferred', () async {
+    await seed(todo: [t('обычная').copyWith(id: 'a'),
+      t('лягушка').copyWith(id: 'b', frog: true)]);
+    var calls = 0;
+    cubit.onDeferred = (_) async => calls++;
+    expect((await cubit.bumpDeferral('b'))?.deferrals, 1);
+    expect(repo.file.todo.first.deferrals, 0);
+    expect(await cubit.bumpDeferral('missing'), isNull);
+    await cubit.clearFrogs();
+    expect(repo.file.todo.last.deferrals, 1);
+    expect(calls, 0);
+    await cubit.close();
+  });
+
+  test('ошибка сохранения не вызывает onDeferred', () async {
+    final failing = _FailingTasks()..file = TasksFile(todo: [t('x')], planner: []);
+    final c = TasksCubit(failing, _MemJournal(),
+      () => AppSettings.fromJson(const {}, fallbackPath: '.'), NotifyService());
+    await c.load();
+    var calls = 0;
+    c.onDeferred = (_) async => calls++;
+    await c.postpone(0, PlannerTab.inbox);
+    expect(c.state.status, TasksStatus.failure);
+    expect(calls, 0);
+    await c.close();
+  });
 
   test('таймер и ручная отметка записывают id выбранной задачи', () async {
     await seed(todo: [t('первая', minutes: 50).copyWith(id: 'first'),

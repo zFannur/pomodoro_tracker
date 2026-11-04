@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:clock/clock.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_tracker/data/activity_store.dart';
 import 'package:pomodoro_tracker/data/markdown_codec.dart' show dateKey;
@@ -7,6 +10,157 @@ import 'package:pomodoro_tracker/presentation/cubits/activity_cubit.dart';
 import 'package:pomodoro_tracker/services/activity_tracker.dart';
 
 void main() {
+  group('детектор отвлечения', () {
+    void scenario(void Function(ActivityTracker tracker,
+        void Function(int seconds) tick,
+        void Function(String exe, String title) window,
+        void Function(bool value) focus,
+        List<String> calls) body) {
+      fakeAsync((async) {
+        var inFocus = true;
+        var foreground = (exe: 'chrome.exe', title: 'YouTube - Google Chrome');
+        final changes = StreamController<bool>.broadcast(sync: true);
+        final tracker = ActivityTracker(store: _MemStore(),
+          inPomodoro: () => inFocus, pomodoroChanges: changes.stream,
+          inputIdleReader: () => 0, foregroundReader: () => foreground);
+        tracker.data.distracting.addAll({'YouTube', 'Games', 'game.exe'});
+        final calls = <String>[];
+        tracker.onDistraction = calls.add;
+        void tick(int seconds) {
+          for (var i = 0; i < seconds ~/ 5; i++) {
+            async.elapse(const Duration(seconds: 5));
+            tracker.poll();
+          }
+        }
+        body(tracker, tick,
+          (exe, title) => foreground = (exe: exe, title: title),
+          (value) { inFocus = value; tracker.poll(); }, calls);
+        unawaited(tracker.dispose());
+        unawaited(changes.close());
+        async.flushMicrotasks();
+      }, initialTime: DateTime(2026, 11, 4, 10));
+    }
+
+    test('60 секунд → один вызов; повтор в том же помидоре подавлен', () {
+      scenario((tracker, tick, window, focus, calls) {
+        tick(55);
+        expect(calls, isEmpty);
+        tick(5);
+        expect(calls, ['Chrome: YouTube']);
+        tick(120);
+        window('code.exe', '');
+        tick(5);
+        window('chrome.exe', 'Games - Google Chrome');
+        tick(60);
+        expect(calls, hasLength(1));
+        focus(false);
+        focus(true);
+        tick(60);
+        expect(calls, ['Chrome: YouTube', 'Chrome: Games']);
+      });
+    });
+
+    test('55 секунд + смена окна сбрасывают серию, даже между отвлечениями', () {
+      scenario((tracker, tick, window, focus, calls) {
+        tick(55);
+        window('chrome.exe', 'Games - Google Chrome');
+        tick(55);
+        expect(calls, isEmpty);
+        tick(5);
+        expect(calls, ['Chrome: Games']);
+      });
+    });
+
+    test('разрыв > двух тиков не засчитывается как отвлечение', () {
+      fakeAsync((async) {
+        final calls = <String>[];
+        final tracker = ActivityTracker(store: _MemStore(), inPomodoro: () => true,
+          inputIdleReader: () => 0,
+          foregroundReader: () => (exe: 'game.exe', title: ''));
+        tracker.data.distracting.add('game.exe');
+        tracker.onDistraction = calls.add;
+        for (var i = 0; i < 11; i++) {
+          async.elapse(const Duration(seconds: 5));
+          tracker.poll();
+        }
+        async.elapse(const Duration(days: 3));
+        tracker.poll();
+        expect(calls, isEmpty);
+        for (var i = 0; i < 11; i++) {
+          async.elapse(const Duration(seconds: 5));
+          tracker.poll();
+        }
+        expect(calls, ['game']);
+        unawaited(tracker.dispose());
+        async.flushMicrotasks();
+      }, initialTime: DateTime(2026, 11, 4, 10));
+    });
+
+    test('неизвестный ввод, отошёл и отсутствие окна прерывают серию', () {
+      fakeAsync((async) {
+        int? idle = 0;
+        ({String exe, String title})? window = (exe: 'game.exe', title: '');
+        final calls = <String>[];
+        final tracker = ActivityTracker(store: _MemStore(), inPomodoro: () => true,
+          inputIdleReader: () => idle, foregroundReader: () => window);
+        tracker.data.distracting.add('game.exe');
+        tracker.onDistraction = calls.add;
+        void ticks(int count) {
+          for (var i = 0; i < count; i++) {
+            async.elapse(const Duration(seconds: 5));
+            tracker.poll();
+          }
+        }
+        ticks(11);
+        idle = null;
+        ticks(1);
+        idle = 0;
+        ticks(11);
+        idle = 121;
+        ticks(1);
+        idle = 0;
+        ticks(11);
+        window = null;
+        ticks(1);
+        window = (exe: 'game.exe', title: '');
+        ticks(11);
+        expect(calls, isEmpty);
+        ticks(1);
+        expect(calls, ['game']);
+        unawaited(tracker.dispose());
+        async.flushMicrotasks();
+      }, initialTime: DateTime(2026, 11, 4, 10));
+    });
+
+    test('быстрый стоп и новый старт между опросами сбрасывают флаг', () {
+      fakeAsync((async) {
+        var inFocus = true;
+        final changes = StreamController<bool>.broadcast(sync: true);
+        final calls = <String>[];
+        final tracker = ActivityTracker(store: _MemStore(),
+          inPomodoro: () => inFocus, pomodoroChanges: changes.stream,
+          inputIdleReader: () => 0,
+          foregroundReader: () => (exe: 'game.exe', title: ''));
+        tracker.onDistraction = calls.add;
+        unawaited(tracker.start());
+        async.flushMicrotasks();
+        tracker.data.distracting.add('game.exe');
+        async.elapse(const Duration(seconds: 60));
+        expect(calls, ['game']);
+        inFocus = false;
+        changes.add(inFocus);
+        inFocus = true;
+        changes.add(inFocus);
+        async.elapse(const Duration(seconds: 60));
+        expect(calls, ['game', 'game']);
+        unawaited(tracker.dispose());
+        unawaited(changes.close());
+        async.flushMicrotasks();
+        expect(async.periodicTimerCount, 0);
+      }, initialTime: DateTime(2026, 11, 4, 10));
+    });
+  });
+
   group('addTick', () {
     test('суммирует секунды одного ключа', () {
       final day = <String, ActivityEntry>{};
@@ -587,6 +741,9 @@ void main() {
 
 /// Хранилище без диска: в тестах path_provider недоступен.
 class _MemStore extends ActivityStore {
+  @override
+  Future<ActivityData> load() async => ActivityData();
+
   @override
   Future<void> save(ActivityData data) async {}
 }

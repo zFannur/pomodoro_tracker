@@ -345,6 +345,23 @@ abstract final class S {
       _t('Системные уведомления', 'System notifications');
   static String get notifyMinuteBefore =>
       _t('Предупреждать за минуту до конца', 'Warn one minute before the end');
+  static String get nudgeIdleLabel =>
+      _t('Напоминать при простое', 'Remind me when idle');
+  static String get nudgeDistractionLabel => _t(
+    'Сигнал при отвлечении в помидоре',
+    'Alert when distracted during a pomodoro',
+  );
+  static String get nudgeIdleTitle =>
+      _t('15 минут без помидора', '15 minutes without a pomodoro');
+  static String nudgeIdleBody(String task) =>
+      _t('Что мешает начать «$task»?', 'What is keeping you from starting "$task"?');
+  static String nudgeDistractTitle(String label) =>
+      _t('$label во время помидора', '$label during a pomodoro');
+  static String nudgeDistractBody(String task) =>
+      _t('Вернуться к „$task“?', 'Return to "$task"?');
+  static String get cueTitle => _t('Пора', 'Time to start');
+  static String cueBody(String cue, String step) =>
+      _t('Когда $cue → $step', 'When $cue → $step');
   static String get popupRaiseWindow => _t(
     'Поднимать окно, когда фаза окончена',
     'Raise the window when a phase ends',

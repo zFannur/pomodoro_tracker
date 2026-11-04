@@ -408,6 +408,21 @@ class _NotifyTab extends StatelessWidget {
         ),
         SwitchListTile(
           dense: true,
+          title: Text(S.nudgeIdleLabel),
+          value: settings.nudgeIdle,
+          onChanged: (v) =>
+              _update(context, settings.copyWith(nudgeIdle: v)),
+        ),
+        if (Platform.isWindows)
+          SwitchListTile(
+            dense: true,
+            title: Text(S.nudgeDistractionLabel),
+            value: settings.nudgeDistraction,
+            onChanged: (v) =>
+                _update(context, settings.copyWith(nudgeDistraction: v)),
+          ),
+        SwitchListTile(
+          dense: true,
           title: Text(S.popupRaiseWindow),
           value: settings.popupRaiseWindow,
           onChanged: (v) =>

@@ -140,6 +140,8 @@ class AppSettings extends Equatable {
     required this.tickingInBreaks,
     required this.notifications,
     required this.notifyMinuteBefore,
+    this.nudgeIdle = true,
+    this.nudgeDistraction = true,
     required this.popupRaiseWindow,
     required this.msgPomodoroDone,
     required this.msgBreakDone,
@@ -208,6 +210,8 @@ class AppSettings extends Equatable {
       tickingInBreaks: json['tickingInBreaks'] as bool? ?? false,
       notifications: json['notifications'] as bool? ?? true,
       notifyMinuteBefore: json['notifyMinuteBefore'] as bool? ?? false,
+      nudgeIdle: json['nudgeIdle'] as bool? ?? true,
+      nudgeDistraction: json['nudgeDistraction'] as bool? ?? true,
       popupRaiseWindow: json['popupRaiseWindow'] as bool? ?? false,
       msgPomodoroDone: json['msgPomodoroDone'] as String? ?? '',
       msgBreakDone: json['msgBreakDone'] as String? ?? '',
@@ -323,6 +327,8 @@ class AppSettings extends Equatable {
   final bool tickingInBreaks;
   final bool notifications;
   final bool notifyMinuteBefore;
+  final bool nudgeIdle;
+  final bool nudgeDistraction;
 
   /// Поднимать окно приложения, когда помидор/перерыв окончен
   /// (аналог «всплывающих окон» оригинала).
@@ -402,6 +408,8 @@ class AppSettings extends Equatable {
     'tickingInBreaks': tickingInBreaks,
     'notifications': notifications,
     'notifyMinuteBefore': notifyMinuteBefore,
+    'nudgeIdle': nudgeIdle,
+    'nudgeDistraction': nudgeDistraction,
     'popupRaiseWindow': popupRaiseWindow,
     'msgPomodoroDone': msgPomodoroDone,
     'msgBreakDone': msgBreakDone,
@@ -445,6 +453,8 @@ class AppSettings extends Equatable {
     bool? tickingInBreaks,
     bool? notifications,
     bool? notifyMinuteBefore,
+    bool? nudgeIdle,
+    bool? nudgeDistraction,
     bool? popupRaiseWindow,
     String? msgPomodoroDone,
     String? msgBreakDone,
@@ -487,6 +497,8 @@ class AppSettings extends Equatable {
       tickingInBreaks: tickingInBreaks ?? this.tickingInBreaks,
       notifications: notifications ?? this.notifications,
       notifyMinuteBefore: notifyMinuteBefore ?? this.notifyMinuteBefore,
+      nudgeIdle: nudgeIdle ?? this.nudgeIdle,
+      nudgeDistraction: nudgeDistraction ?? this.nudgeDistraction,
       popupRaiseWindow: popupRaiseWindow ?? this.popupRaiseWindow,
       msgPomodoroDone: msgPomodoroDone ?? this.msgPomodoroDone,
       msgBreakDone: msgBreakDone ?? this.msgBreakDone,
@@ -539,6 +551,8 @@ class AppSettings extends Equatable {
     tickingInBreaks,
     notifications,
     notifyMinuteBefore,
+    nudgeIdle,
+    nudgeDistraction,
     popupRaiseWindow,
     msgPomodoroDone,
     msgBreakDone,

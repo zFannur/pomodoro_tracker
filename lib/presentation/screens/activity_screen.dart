@@ -5,8 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../app/strings.dart';
 import '../../data/markdown_codec.dart' show dateHuman, two;
-import '../../services/activity_tracker.dart' show browserNames;
+import '../../services/activity_tracker.dart'
+    show browserNames, formatActivityName;
 import '../cubits/activity_cubit.dart';
+
+export '../../services/activity_tracker.dart' show formatActivityName;
 
 /// Сколько строк показываем, остальное сворачиваем в «прочее».
 const _topRows = 50;
@@ -260,15 +263,6 @@ Future<void> _confirmAndDelete(
   if (confirmed == true && context.mounted) {
     await onConfirm();
   }
-}
-
-/// Имя exe без `.exe`; у браузера — «Chrome: название вкладки».
-String formatActivityName(String app, String title) {
-  final browser = browserNames[app.toLowerCase()];
-  if (browser == null) {
-    return app.replaceFirst(RegExp(r'\.exe$', caseSensitive: false), '');
-  }
-  return title.isEmpty ? browser : '$browser: $title';
 }
 
 /// «1 ч 05 мин», «12 мин», «<1 мин».

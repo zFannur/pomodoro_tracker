@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:clock/clock.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -152,6 +153,9 @@ class TasksCubit extends Cubit<TasksState> {
 
   /// Обновляет доску после изменения ⭐.
   Future<void> Function(PomoTask task, bool enabled)? onWeekChanged;
+
+  /// Эпизод переноса создаётся только после успешной записи задачи.
+  Future<void> Function(PomoTask task)? onDeferred;
 
   int get _pomodoroMinutes => _settings().scheme.pomodoro;
 
@@ -473,20 +477,30 @@ class TasksCubit extends Cubit<TasksState> {
   // -- планировщик -------------------------------------------------------------
 
   /// Отложить задачу из TODO в планировщик.
-  Future<void> postpone(int index, PlannerTab tab) async {
+  Future<void> postpone(
+    int index,
+    PlannerTab tab, {
+    bool countDeferral = true,
+  }) async {
     final todo = [...state.todo];
     if (index < 0 || index >= todo.length) return;
-    final task = todo.removeAt(index);
-    await _persist(
+    final original = todo.removeAt(index);
+    final task = original.copyWith(
+      due: _dueFor(tab),
+      clearDue: tab == PlannerTab.inbox,
+      deferrals: original.deferrals + (countDeferral ? 1 : 0),
+    );
+    final saved = await _persist(
       todo: todo,
       planner: [
         ...state.planner,
-        task.copyWith(due: _dueFor(tab), clearDue: tab == PlannerTab.inbox),
+        task,
       ],
     );
+    if (saved && countDeferral) await onDeferred?.call(task);
   }
 
-  DateTime? _dueFor(PlannerTab tab) => plannerDueFor(tab, DateTime.now());
+  DateTime? _dueFor(PlannerTab tab) => plannerDueFor(tab, clock.now());
 
   /// Перенести задачу планировщика в «Сегодня».
   Future<void> plannerToToday(int index) async {
@@ -502,11 +516,28 @@ class TasksCubit extends Cubit<TasksState> {
   Future<void> plannerMove(int index, PlannerTab tab) async {
     final planner = [...state.planner];
     if (index < 0 || index >= planner.length) return;
-    planner[index] = planner[index].copyWith(
+    final task = planner[index];
+    final deferred =
+        task.tab(clock.now()) == PlannerTab.due && tab != PlannerTab.due;
+    planner[index] = task.copyWith(
       due: _dueFor(tab),
       clearDue: tab == PlannerTab.inbox,
+      deferrals: task.deferrals + (deferred ? 1 : 0),
     );
-    await _persist(planner: planner);
+    final updated = planner[index];
+    final saved = await _persist(planner: planner);
+    if (saved && deferred) await onDeferred?.call(updated);
+  }
+
+  /// Сигнал 🐸 не является ручным переносом и не вызывает onDeferred.
+  Future<PomoTask?> bumpDeferral(String taskId) async {
+    final todo = [...state.todo];
+    final index = todo.indexWhere((task) => task.id == taskId);
+    if (index < 0) return null;
+    final task = todo[index];
+    final updated = task.copyWith(deferrals: task.deferrals + 1);
+    todo[index] = updated;
+    return await _persist(todo: todo) ? updated : null;
   }
 
   Future<void> plannerRemove(int index) async {
@@ -789,7 +820,7 @@ class TasksCubit extends Cubit<TasksState> {
   // молча перезапишет новый — самый опасный класс бага для этих данных.
   Future<void> _writeQueue = Future.value();
 
-  Future<void> _persist({
+  Future<bool> _persist({
     List<PomoTask>? todo,
     List<PomoTask>? planner,
     List<TrashedTask>? trash,
@@ -812,5 +843,6 @@ class TasksCubit extends Cubit<TasksState> {
       ),
       (_) {},
     );
+    return result.isRight();
   }
 }

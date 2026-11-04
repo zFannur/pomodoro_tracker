@@ -31,6 +31,15 @@ const browserNames = {
   'opera.exe': 'Opera',
 };
 
+/// Один формат имени для списка активности и сигналов детектора.
+String formatActivityName(String app, String title) {
+  final browser = browserNames[app.toLowerCase()];
+  if (browser == null) {
+    return app.replaceFirst(RegExp(r'\.exe$', caseSensitive: false), '');
+  }
+  return title.isEmpty ? browser : '$browser: $title';
+}
+
 /// Названия браузеров в заголовках окон («Microsoft Edge» бывает с невидимым
 /// пробелом внутри).
 const _brands =
@@ -205,37 +214,58 @@ void deleteActivity(
 
 /// Учёт активного окна Windows. На остальных платформах — no-op.
 class ActivityTracker {
-  ActivityTracker({required this.store, required this.inPomodoro});
+  ActivityTracker({
+    required this.store,
+    required this.inPomodoro,
+    this.pomodoroChanges,
+    this.inputIdleReader,
+    this.foregroundReader,
+  });
 
   final ActivityStore store;
 
   /// Идёт ли сейчас помидор: геттер, а не сам TimerCubit.
   final bool Function() inPomodoro;
+  final Stream<bool>? pomodoroChanges;
+  final int? Function()? inputIdleReader;
+  final ({String exe, String title})? Function()? foregroundReader;
+  void Function(String label)? onDistraction;
 
   ActivityData data = ActivityData();
   final _ticks = StreamController<void>.broadcast();
   Timer? _timer;
   bool _dirty = false;
+  bool _disposed = false;
   DateTime _lastFlush = clock.now();
+  StreamSubscription<bool>? _pomodoroSubscription;
+  String? _distractionWindow;
+  DateTime? _distractionFrom;
+  DateTime? _distractionLast;
+  bool _distractionFired = false;
 
   /// Сигнал «данные изменились» — на него обновляется экран.
   Stream<void> get ticks => _ticks.stream;
 
   Future<void> start() async {
     if (!Platform.isWindows) return;
+    if (_timer != null || _disposed) return;
     data = await store.load();
+    if (_disposed) return;
     pruneDays(data.days, logicalDate(clock.now()));
     pruneDays(data.focusSegments, logicalDate(clock.now()));
     _lastFlush = clock.now();
+    _pomodoroSubscription = pomodoroChanges?.listen(_observePomodoro);
     _timer = Timer.periodic(
       const Duration(seconds: activityTickSeconds),
-      (_) => _tick(),
+      (_) => poll(),
     );
     _ticks.add(null);
   }
 
   Future<void> dispose() async {
+    _disposed = true;
     _timer?.cancel();
+    await _pomodoroSubscription?.cancel();
     await flush();
     await _ticks.close();
   }
@@ -265,7 +295,8 @@ class ActivityTracker {
     await store.save(data);
   }
 
-  void _tick() {
+  void poll() {
+    if (_disposed) return;
     final now = clock.now();
     _record(now);
     if (_dirty && now.difference(_lastFlush) >= _flushEvery) {
@@ -274,11 +305,23 @@ class ActivityTracker {
   }
 
   void _record(DateTime now) {
-    if (_idleSeconds() > _idleLimitSeconds) return;
-    final window = _foreground();
-    if (window == null) return;
     final inFocus = inPomodoro();
+    _observePomodoro(inFocus);
+    final idle = inputIdleSeconds();
+    if (idle == null || idle > _idleLimitSeconds) {
+      _clearDistractionStreak();
+      return;
+    }
+    final reader = foregroundReader;
+    final window = reader != null
+        ? reader()
+        : (Platform.isWindows ? _foreground() : null);
+    if (window == null) {
+      _clearDistractionStreak();
+      return;
+    }
     final title = browserTabTitle(window.exe, window.title);
+    _detectDistraction(now, window.exe, title, inFocus);
     final dayKey = dateKey(logicalDate(now));
     addTick(
       data.days.putIfAbsent(dayKey, () => {}),
@@ -300,12 +343,54 @@ class ActivityTracker {
     _ticks.add(null);
   }
 
+  void _clearDistractionStreak() {
+    _distractionWindow = null;
+    _distractionFrom = null;
+    _distractionLast = null;
+  }
+
+  void _observePomodoro(bool inFocus) {
+    if (inFocus) return;
+    _distractionFired = false;
+    _clearDistractionStreak();
+  }
+
+  void _detectDistraction(DateTime now, String app, String title, bool inFocus) {
+    final key = title.isEmpty ? app : title;
+    if (!inFocus || !data.distracting.contains(key)) {
+      _clearDistractionStreak();
+      return;
+    }
+    final window = '$app|$title';
+    final last = _distractionLast;
+    final gap = last == null ? null : now.difference(last);
+    if (_distractionWindow != window ||
+        gap == null ||
+        gap.isNegative ||
+        gap > const Duration(seconds: activityTickSeconds * 2)) {
+      _distractionFrom = now.subtract(const Duration(seconds: activityTickSeconds));
+    }
+    _distractionWindow = window;
+    _distractionLast = now;
+    final from = _distractionFrom;
+    if (!_distractionFired &&
+        from != null &&
+        now.difference(from) >= const Duration(seconds: 60)) {
+      _distractionFired = true;
+      onDistraction?.call(formatActivityName(app, title));
+    }
+  }
+
   /// Секунд с последнего ввода (мышь/клавиатура).
-  int _idleSeconds() {
+  /// null — платформа не поддерживается или WinAPI не дал данных.
+  int? inputIdleSeconds() {
+    final reader = inputIdleReader;
+    if (reader != null) return reader();
+    if (!Platform.isWindows) return null;
     final info = calloc<LASTINPUTINFO>();
     try {
       info.ref.cbSize = sizeOf<LASTINPUTINFO>();
-      if (GetLastInputInfo(info) == 0) return 0;
+      if (GetLastInputInfo(info) == 0) return null;
       // Оба значения — 32-битные миллисекунды с запуска, маска держит переход.
       return ((GetTickCount() - info.ref.dwTime) & 0xFFFFFFFF) ~/ 1000;
     } finally {

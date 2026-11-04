@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ffi' show nullptr;
 import 'dart:io';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path_provider/path_provider.dart';
@@ -16,6 +17,7 @@ import 'data/markdown_codec.dart' show dateKey, sprintId;
 import 'data/timer_state_store.dart';
 import 'data/vault_repositories.dart';
 import 'domain/entities/app_settings.dart';
+import 'domain/entities/episode.dart';
 import 'domain/entities/pomo_session.dart' show logicalDate;
 import 'presentation/cubits/activity_cubit.dart';
 import 'presentation/cubits/directions_cubit.dart';
@@ -30,6 +32,8 @@ import 'presentation/cubits/timer_cubit.dart';
 import 'presentation/home_shell.dart';
 import 'services/activity_tracker.dart';
 import 'services/drive_sync_service.dart';
+import 'services/frog_rollover.dart';
+import 'services/nudge_service.dart';
 import 'services/notify_service.dart';
 import 'services/sound_service.dart';
 import 'services/sync_auth.dart';
@@ -162,22 +166,44 @@ Future<void> main() async {
   };
   tasksCubit.onTaskClosed = sprintCubit.completeKanbanTask;
   tasksCubit.onWeekChanged = sprintCubit.syncKanbanTask;
+  tasksCubit.onDeferred = (task) async {
+    final episode = await insightCubit.addEpisode(
+      source: EpisodeSource.defer,
+      task: task,
+    );
+    insightCubit.reportDeferral(episode, task.deferrals);
+  };
   // Смена дня — сброс 🐸 (лягушка выбирается утром заново);
   // смена недели — сброс ⭐ (3 задачи спринта выбираются из вехи заново).
-  Future<bool> rolloverCheck() async {
-    final today = dateKey(logicalDate(DateTime.now()));
-    final week = sprintId(logicalDate(DateTime.now()));
+  Future<bool>? rolloverPending;
+  Future<bool> performRollover() async {
+    final now = clock.now();
+    final today = dateKey(logicalDate(now));
+    final week = sprintId(logicalDate(now));
     // Отметки берём из синхронизируемого документа, а не из локальных
     // настроек: сброс должно делать ровно одно устройство, остальные узнают
     // о нём через слияние. Раньше телефон, открытый вечером, снимал ⭐,
     // расставленные утром на ПК, и отправлял это в Drive.
-    final marks = (await dataRepository.rollover()).getOrElse(
-      (_) => (day: null, week: null),
+    final marks = (await dataRepository.rollover()).fold(
+      (_) => null,
+      (value) => value,
     );
+    if (marks == null) return false;
     final newDay = marks.day != today;
     final newWeek = marks.week != week;
     if (!newDay && !newWeek) return false;
-    if (newDay) await tasksCubit.clearFrogs();
+    if (newDay) {
+      if (!await recordUntouchedFrog(
+        previousDay: marks.day,
+        tasks: tasksCubit,
+        journal: dataRepository,
+        insights: insightCubit,
+        dailyGoal: settings().dailyGoal,
+      )) {
+        return false;
+      }
+      await tasksCubit.clearFrogs();
+    }
     if (newWeek) await tasksCubit.clearWeekFlags();
     await dataRepository.markRollover(
       day: newDay ? today : null,
@@ -185,6 +211,10 @@ Future<void> main() async {
     );
     return true;
   }
+
+  // Bootstrap и смена суток могут совпасть: читаем старую отметку один раз.
+  Future<bool> rolloverCheck() => rolloverPending ??=
+      performRollover().whenComplete(() => rolloverPending = null);
 
   final journalCubit = JournalCubit(
     dataRepository,
@@ -205,6 +235,17 @@ Future<void> main() async {
       await tasksCubit.completeFromTimer(result);
       await journalCubit.refresh();
       await refreshViews();
+    },
+  );
+  final nudgeService = NudgeService(
+    settings: settings,
+    timerState: () => timerCubit.state,
+    timerChanges: timerCubit.stream,
+    todos: () => tasksCubit.state.todo,
+    inputIdleSeconds: () => activityTracker.inputIdleSeconds(),
+    notify: notify,
+    onIdle: (task) async {
+      await insightCubit.addEpisode(source: EpisodeSource.idle, task: task);
     },
   );
 
@@ -291,6 +332,7 @@ Future<void> main() async {
       await sprintCubit.refresh();
       await directionsCubit.refresh();
     }
+    nudgeService.start();
   }
 
   // Трекер активности (только Windows, иначе no-op): локальные данные в
@@ -298,8 +340,34 @@ Future<void> main() async {
   activityTracker = ActivityTracker(
     store: ActivityStore(),
     inPomodoro: () =>
-        timerCubit.state.running && timerCubit.state.mode == TimerMode.pomodoro,
+        timerCubit.state.running &&
+        timerCubit.state.mode == TimerMode.pomodoro &&
+        !timerCubit.state.foreign,
+    pomodoroChanges: timerCubit.stream.map(
+      (state) => state.running &&
+          state.mode == TimerMode.pomodoro && !state.foreign,
+    ),
   );
+  activityTracker.onDistraction = (label) {
+    final task = tasksCubit.state.current;
+    unawaited(
+      insightCubit.addEpisode(
+        source: EpisodeSource.distract,
+        task: task,
+        app: label,
+      ),
+    );
+    if (settings().nudgeDistraction) {
+      unawaited(
+        notify.event(
+          settings(),
+          title: S.nudgeDistractTitle(label),
+          body: S.nudgeDistractBody(task?.description ?? ''),
+          raise: false,
+        ),
+      );
+    }
+  };
   final activityCubit = ActivityCubit(activityTracker);
   unawaited(activityTracker.start());
   unawaited(bootstrap());
@@ -318,16 +386,23 @@ Future<void> main() async {
         BlocProvider.value(value: syncCubit),
         BlocProvider.value(value: activityCubit),
       ],
-      child: PomodoroApp(onWindowFocus: onForeground),
+      child: PomodoroApp(
+        onWindowFocus: onForeground,
+        onDispose: () {
+          unawaited(nudgeService.dispose());
+          unawaited(activityTracker.dispose());
+        },
+      ),
     ),
   );
 }
 
 class PomodoroApp extends StatefulWidget {
-  const PomodoroApp({this.onWindowFocus, super.key});
+  const PomodoroApp({this.onWindowFocus, this.onDispose, super.key});
 
   /// Вернулись в окно — забрать захваченное из «Входящие.md».
   final Future<void> Function()? onWindowFocus;
+  final VoidCallback? onDispose;
 
   @override
   State<PomodoroApp> createState() => _PomodoroAppState();
@@ -354,6 +429,7 @@ class _PomodoroAppState extends State<PomodoroApp>
 
   @override
   void dispose() {
+    widget.onDispose?.call();
     windowManager.removeListener(this);
     WidgetsBinding.instance.removeObserver(this);
     _autoTheme?.cancel();

@@ -207,10 +207,11 @@ class InsightCubit extends Cubit<InsightState> {
     String app = '',
     Cause? cause,
     String thought = '',
+    DateTime? at,
   }) async {
     final e = Episode(
       id: newId(),
-      at: clock.now(),
+      at: at ?? clock.now(),
       source: source,
       taskId: task?.id ?? '',
       task: task?.description ?? '',
