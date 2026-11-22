@@ -163,7 +163,6 @@ class AppSettings extends Equatable {
     this.syncClientSecret = '',
     this.syncServerClientId = '',
     this.deviceId = '',
-    this.kanbanEnabled = false,
     this.dayCard = true,
     this.dayCardHidden = '',
     this.aiEnabled = false,
@@ -251,7 +250,6 @@ class AppSettings extends Equatable {
       syncClientSecret: json['syncClientSecret'] as String? ?? '',
       syncServerClientId: json['syncServerClientId'] as String? ?? '',
       deviceId: json['deviceId'] as String? ?? '',
-      kanbanEnabled: json['kanbanEnabled'] as bool? ?? false,
       dayCard: json['dayCard'] as bool? ?? true,
       dayCardHidden: json['dayCardHidden'] as String? ?? '',
       aiEnabled: json['aiEnabled'] as bool? ?? false,
@@ -409,9 +407,6 @@ class AppSettings extends Equatable {
   /// за него запись в журнал.
   final String deviceId;
 
-  /// На главной вкладке показывать доску спринта вместо обычного списка.
-  final bool kanbanEnabled;
-
   /// Карточка дня (самочувствие, «вчера», план) над СЕЙЧАС на таймере.
   final bool dayCard;
 
@@ -483,7 +478,6 @@ class AppSettings extends Equatable {
     'syncClientSecret': syncClientSecret,
     'syncServerClientId': syncServerClientId,
     'deviceId': deviceId,
-    'kanbanEnabled': kanbanEnabled,
     'dayCard': dayCard,
     'dayCardHidden': dayCardHidden,
     'aiEnabled': aiEnabled,
@@ -536,7 +530,6 @@ class AppSettings extends Equatable {
     String? syncClientSecret,
     String? syncServerClientId,
     String? deviceId,
-    bool? kanbanEnabled,
     bool? dayCard,
     String? dayCardHidden,
     bool? aiEnabled,
@@ -588,7 +581,6 @@ class AppSettings extends Equatable {
       syncClientSecret: syncClientSecret ?? this.syncClientSecret,
       syncServerClientId: syncServerClientId ?? this.syncServerClientId,
       deviceId: deviceId ?? this.deviceId,
-      kanbanEnabled: kanbanEnabled ?? this.kanbanEnabled,
       dayCard: dayCard ?? this.dayCard,
       dayCardHidden: dayCardHidden ?? this.dayCardHidden,
       aiEnabled: aiEnabled ?? this.aiEnabled,
@@ -650,7 +642,6 @@ class AppSettings extends Equatable {
     syncClientSecret,
     syncServerClientId,
     deviceId,
-    kanbanEnabled,
     dayCard,
     dayCardHidden,
     aiEnabled,

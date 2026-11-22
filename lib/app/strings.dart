@@ -63,7 +63,6 @@ abstract final class S {
 
   // Задачи
   static String get planned => _t('Запланировано', 'Planned');
-  static String get kanban => _t('Канбан', 'Kanban');
   static String get categoryHint => _t('Категория', 'Category');
   static String get descriptionHint =>
       _t('#категория описание ~помидоры', '#category description ~pomodoros');
@@ -258,41 +257,6 @@ abstract final class S {
   static String get tabTimer => _t('Таймер', 'Timer');
   static String get tabNotify => _t('Оповещения', 'Notifications');
   static String get tabApp => _t('Приложение', 'App');
-  static String get tabKanban => _t('Канбан', 'Kanban');
-  static String get kanbanEnabled =>
-      _t('Включить режим канбан', 'Enable kanban mode');
-  static String get kanbanColumns => _t('Колонки канбана', 'Kanban columns');
-  static String get kanbanAddColumn => _t('Добавить колонку', 'Add column');
-  static String get kanbanColumnName => _t('Название колонки', 'Column name');
-  static String get kanbanNoSprint =>
-      _t('Спринт ещё загружается.', 'The sprint is still loading.');
-  static String get kanbanLastColumnHint => _t(
-    'Последняя колонка считается завершением задачи.',
-    'The last column marks a task as complete.',
-  );
-  static String get kanbanColumnHasTasks => _t(
-    'Сначала переместите задачи из этой колонки.',
-    'Move the tasks out of this column first.',
-  );
-  static String get kanbanNoTasks => _t(
-    'В текущем спринте пока нет задач ⭐.',
-    'There are no ⭐ tasks in the current sprint yet.',
-  );
-  static String get kanbanDropHere => _t('Вставить сюда', 'Drop here');
-  static String get kanbanAddSprintTask => _t(
-    'Добавьте задачу в спринт через Планировщик.',
-    'Add a task to the sprint through Planner.',
-  );
-  static String kanbanColumnPercent(int count, int total, int percent) =>
-      _t('$percent% · $count из $total', '$percent% · $count of $total');
-  static String kanbanDaysLeft(int days, int tasks) => _t(
-    'Осталось дней: $days · задач: $tasks',
-    'Days left: $days · tasks: $tasks',
-  );
-  static String kanbanPace(String needed, String actual) => _t(
-    'Нужно $needed задач/день · факт $actual/день',
-    'Need $needed tasks/day · actual $actual/day',
-  );
   static String get settingsSchemes => _t('Схемы', 'Schemes');
   static String get schemeName => _t('Название схемы', 'Scheme name');
   static String get pomodoroLen =>

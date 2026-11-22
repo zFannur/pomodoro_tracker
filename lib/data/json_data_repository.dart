@@ -10,7 +10,6 @@ import '../core/failure.dart';
 import '../domain/entities/direction.dart';
 import '../domain/entities/episode.dart';
 import '../domain/entities/experiment.dart';
-import '../domain/entities/kanban.dart';
 import '../domain/entities/pomo_session.dart';
 import '../domain/entities/pomo_task.dart';
 import '../domain/entities/sprint.dart';
@@ -480,20 +479,10 @@ class JsonDataRepository
     }
     final monday = _mondayOfSprint(id);
     if (monday == null) throw FormatException('Неизвестный спринт: $id');
-    final previous = doc.sprints.entries
-        .where((entry) => entry.key.compareTo(id) < 0)
-        .fold<Sprint?>(
-          null,
-          (latest, entry) =>
-              latest == null || entry.key.compareTo(latest.id) > 0
-              ? entry.value
-              : latest,
-        );
     return Sprint(
       id: id,
       start: monday,
       goal: defaultGoal,
-      kanbanColumns: previous?.kanbanColumns ?? defaultKanbanColumns,
     );
   }
 
@@ -520,8 +509,6 @@ class JsonDataRepository
       milestone: sprint.milestone,
       milestoneId: sprint.milestoneId,
       doneWeek: sprint.doneWeek,
-      kanbanColumns: sprint.kanbanColumns,
-      kanbanCards: sprint.kanbanCards,
       experiment: existing?.experiment,
       review: existing?.review,
     );
@@ -532,9 +519,7 @@ class JsonDataRepository
         existing.goal == sprint.goal &&
         existing.milestone == sprint.milestone &&
         existing.milestoneId == sprint.milestoneId &&
-        _sameList(existing.doneWeek, sprint.doneWeek) &&
-        _sameList(existing.kanbanColumns, sprint.kanbanColumns) &&
-        _sameList(existing.kanbanCards, sprint.kanbanCards)) {
+        _sameList(existing.doneWeek, sprint.doneWeek)) {
       await _mirrorSprint(doc, saved, fact, weekTasks);
       return unit;
     }
@@ -544,7 +529,7 @@ class JsonDataRepository
     return unit;
   });
 
-  static bool _sameList(List<Object?> a, List<Object?> b) {
+  static bool _sameList(List<String> a, List<String> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;
@@ -971,8 +956,6 @@ class _Doc {
           doneWeek: [
             if (s['done'] is List) ...(s['done'] as List).whereType<String>(),
           ],
-          kanbanColumns: _kanbanColumns(s['kanban']),
-          kanbanCards: _kanbanCards(s['kanban']),
           experiment: _experimentFrom(s['exp']),
           review: _reviewFrom(s['ai']),
         );
@@ -1066,12 +1049,6 @@ class _Doc {
           if (e.value.experiment case final experiment?)
             'exp': _experimentJson(experiment),
           if (e.value.review case final review?) 'ai': _reviewJson(review),
-          if (e.value.kanbanColumns.isNotEmpty ||
-              e.value.kanbanCards.isNotEmpty)
-            'kanban': {
-              'columns': [for (final c in e.value.kanbanColumns) c.toJson()],
-              'cards': [for (final c in e.value.kanbanCards) c.toJson()],
-            },
         },
     },
     'graves': graves,
@@ -1106,24 +1083,6 @@ class _Doc {
       deferrals: (j['df'] as num?)?.toInt() ?? 0,
     );
   }
-
-  static List<KanbanColumn> _kanbanColumns(Object? raw) {
-    if (raw is! Map<String, dynamic> || raw['columns'] is! List) {
-      return defaultKanbanColumns;
-    }
-    final result = [
-      for (final e
-          in (raw['columns'] as List).whereType<Map<String, dynamic>>())
-        KanbanColumn.fromJson(e),
-    ];
-    return result.length >= 2 ? result : defaultKanbanColumns;
-  }
-
-  static List<KanbanCard> _kanbanCards(Object? raw) => [
-    if (raw is Map<String, dynamic> && raw['cards'] is List)
-      for (final e in (raw['cards'] as List).whereType<Map<String, dynamic>>())
-        KanbanCard.fromJson(e),
-  ];
 
   static Map<String, dynamic> _taskJson(PomoTask t) => {
     'id': t.id,

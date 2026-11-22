@@ -1,6 +1,5 @@
 import 'package:equatable/equatable.dart';
 
-import 'kanban.dart';
 import 'experiment.dart';
 
 /// Недельный спринт (пн–вс): веха + задачи недели (⭐ в общем списке задач).
@@ -12,8 +11,6 @@ class Sprint extends Equatable {
     this.milestone = '',
     this.milestoneId = '',
     this.doneWeek = const [],
-    this.kanbanColumns = defaultKanbanColumns,
-    this.kanbanCards = const [],
     this.experiment,
     this.review,
   });
@@ -36,19 +33,9 @@ class Sprint extends Equatable {
   /// Закрытые за неделю ⭐-задачи (строки для секции «Сделано за неделю»).
   final List<String> doneWeek;
 
-  /// Колонки и карточки доски синхронизируются вместе со спринтом.
-  final List<KanbanColumn> kanbanColumns;
-  final List<KanbanCard> kanbanCards;
-
   /// null — эксперимент ещё не выбран, разбор ещё не запрашивали.
   final Experiment? experiment;
   final WeekReview? review;
-
-  List<KanbanCard> get sortedKanbanCards => [...kanbanCards]
-    ..sort((a, b) {
-      final byColumn = a.columnId.compareTo(b.columnId);
-      return byColumn == 0 ? a.order.compareTo(b.order) : byColumn;
-    });
 
   DateTime get end => DateTime(start.year, start.month, start.day + 6);
 
@@ -58,8 +45,6 @@ class Sprint extends Equatable {
     String? milestoneId,
     bool clearMilestoneId = false,
     List<String>? doneWeek,
-    List<KanbanColumn>? kanbanColumns,
-    List<KanbanCard>? kanbanCards,
     Experiment? experiment,
     bool clearExperiment = false,
     WeekReview? review,
@@ -71,8 +56,6 @@ class Sprint extends Equatable {
       milestone: milestone ?? this.milestone,
       milestoneId: clearMilestoneId ? '' : (milestoneId ?? this.milestoneId),
       doneWeek: doneWeek ?? this.doneWeek,
-      kanbanColumns: kanbanColumns ?? this.kanbanColumns,
-      kanbanCards: kanbanCards ?? this.kanbanCards,
       experiment: clearExperiment ? null : (experiment ?? this.experiment),
       review: review ?? this.review,
     );
@@ -86,8 +69,6 @@ class Sprint extends Equatable {
     milestone,
     milestoneId,
     doneWeek,
-    kanbanColumns,
-    kanbanCards,
     experiment,
     review,
   ];

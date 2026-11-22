@@ -171,8 +171,6 @@ Future<void> main() async {
     await sprintCubit.addDoneWeek(line);
     await directionsCubit.addProof(milestoneId, line);
   };
-  tasksCubit.onTaskClosed = sprintCubit.completeKanbanTask;
-  tasksCubit.onWeekChanged = sprintCubit.syncKanbanTask;
   tasksCubit.onDeferred = (task) async {
     final episode = await insightCubit.addEpisode(
       source: EpisodeSource.defer,

@@ -241,27 +241,9 @@ Map<String, dynamic> _mergeSprints(Object? win, Object? lose) {
     // {...l, ...w}, а не {...w}: encode опускает пустую веху, поэтому у
     // победителя ключа могло просто не быть — и непустая веха проигравшего
     // не «проигрывала скаляр», а молча исчезала у обоих устройств.
-    result[key] = {
-      ...l,
-      ...w,
-      'done': _mergeValues(w['done'], l['done']),
-      if (w['kanban'] is Map<String, dynamic> ||
-          l['kanban'] is Map<String, dynamic>)
-        'kanban': _mergeKanban(w['kanban'], l['kanban']),
-    };
+    result[key] = {...l, ...w, 'done': _mergeValues(w['done'], l['done'])};
   }
   return result;
-}
-
-Map<String, dynamic> _mergeKanban(Object? win, Object? lose) {
-  final w = _map(win);
-  final l = _map(lose);
-  final columns = _mergeById(w['columns'], l['columns']);
-  final cards = _mergeById(w['cards'], l['cards']);
-  return {
-    if (columns.isNotEmpty) 'columns': columns,
-    if (cards.isNotEmpty) 'cards': cards,
-  };
 }
 
 /// Снимок таймера: тот, у кого `savedAt` больше.

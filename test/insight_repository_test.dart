@@ -4,11 +4,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_tracker/data/data_merge.dart';
 import 'package:pomodoro_tracker/data/json_data_repository.dart';
-import 'package:pomodoro_tracker/data/markdown_codec.dart';
 import 'package:pomodoro_tracker/data/vault_repositories.dart';
 import 'package:pomodoro_tracker/domain/entities/episode.dart';
 import 'package:pomodoro_tracker/domain/entities/experiment.dart';
-import 'package:pomodoro_tracker/domain/entities/kanban.dart';
 import 'package:pomodoro_tracker/domain/entities/pomo_session.dart';
 import 'package:pomodoro_tracker/domain/entities/sprint.dart';
 
@@ -486,34 +484,6 @@ void main() {
     await repo.addEpisode(episode('e'));
     expect((await readDay(fresh())).episodes, [episode('e')]);
   });
-
-  test(
-    'новый спринт наследует колонки, а не карточки или эксперимент',
-    () async {
-      const columns = [
-        KanbanColumn(id: 'a', title: 'А'),
-        KanbanColumn(id: 'b', title: 'Б'),
-      ];
-      await repo.saveSprint(
-        Sprint(
-          id: '2026-W44',
-          start: DateTime(2026, 10, 26),
-          goal: 40,
-          kanbanColumns: columns,
-        ),
-        const [],
-      );
-      final expected = await readSprint();
-      await repo.saveReview('2026-W45', review);
-      final created = await readSprint(fresh());
-      expect(created.kanbanColumns, expected.kanbanColumns);
-      expect(created.kanbanColumns, columns);
-      expect(created.kanbanCards, isEmpty);
-      expect(created.start, mondayOf(day));
-      expect(created.goal, 40);
-      expect(created.experiment, isNull);
-    },
-  );
 
   test(
     'ошибка id спринта типизирована и не ломает следующую операцию',

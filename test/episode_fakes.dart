@@ -143,7 +143,6 @@ class EpisodeTasks extends TasksCubit {
     bool toPlanner = false,
     DateTime? due,
     bool forceBottom = false,
-    bool toSprint = false,
   }) async {
     if (toPlanner) inbox.add(raw);
     await super.add(
@@ -152,7 +151,6 @@ class EpisodeTasks extends TasksCubit {
       toPlanner: toPlanner,
       due: due,
       forceBottom: forceBottom,
-      toSprint: toSprint,
     );
   }
 
