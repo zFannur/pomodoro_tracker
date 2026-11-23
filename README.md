@@ -72,8 +72,17 @@ markdown в твоём валте, который видно в графе Obsid
 
 ## Быстрый старт
 
-Готовой сборки в релизах пока нет — приложение собирается из исходников
-(Windows и Android).
+Готовые сборки лежат в [релизах](https://github.com/zFannur/pomodoro_tracker/releases/latest):
+
+- **Windows** — `pomodoro_tracker-1.5.0-windows-x64.zip`: распаковать и
+  запустить `pomodoro_tracker.exe`, установка не нужна.
+- **Android** — `pomodoro_tracker-1.5.0.apk` (Android 7.0+).
+
+Сборка для Windows не подписана сертификатом, поэтому SmartScreen может
+показать «Windows защитила ваш компьютер» — это ожидаемо для неподписанного
+open-source exe.
+
+Из исходников:
 
 ```bash
 flutter pub get

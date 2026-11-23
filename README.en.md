@@ -72,10 +72,16 @@ middleman service.
 
 ## Quick start
 
-There is no prebuilt release yet — the app is built from source (Windows and
-Android).
+Ready-made builds are in [Releases](https://github.com/zFannur/pomodoro_tracker/releases/latest):
 
-Build it yourself:
+- **Windows** — `pomodoro_tracker-1.5.0-windows-x64.zip`: unpack and run
+  `pomodoro_tracker.exe`, no installation needed.
+- **Android** — `pomodoro_tracker-1.5.0.apk` (Android 7.0+).
+
+The Windows build is not code-signed, so SmartScreen may show "Windows
+protected your PC" — that is expected for an unsigned open-source exe.
+
+From source:
 
 ```bash
 flutter pub get
