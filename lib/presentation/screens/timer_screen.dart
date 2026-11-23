@@ -166,7 +166,7 @@ class _TimerBlock extends StatelessWidget {
     final doneCount = journal.sessions.length;
     final phase = switch (timer.mode) {
       TimerMode.pomodoro =>
-        timer.warmup ? S.warmupTitle : '${S.pomodoroWord}${doneCount + 1}',
+        timer.warmup ? S.warmupTitle : '${S.pomodoroWord} ${doneCount + 1}',
       TimerMode.shortBreak => S.shortBreakTitle,
       TimerMode.longBreak => S.longBreakTitle,
     };
