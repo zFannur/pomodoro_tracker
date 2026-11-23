@@ -20,9 +20,9 @@ Obsidian vault as plain `.md` files for reading, search and git.
 [![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Android-0078D6?logo=windows&logoColor=white)](#quick-start)
 [![Storage](https://img.shields.io/badge/Storage-Markdown-3FA45B?logo=markdown&logoColor=white)](#data-storage)
-[![Tests](https://img.shields.io/badge/tests-635%20passing-3FA45B.svg)](#tests)
+[![Tests](https://img.shields.io/badge/tests-633%20passing-3FA45B.svg)](#tests)
 
-<img src="docs/screenshot-timer.png" width="820" alt="Timer screen">
+<img src="docs/screenshots/timer.png" width="820" alt="Timer screen">
 
 </div>
 
@@ -39,18 +39,20 @@ markdown in your own vault — visible in Obsidian's graph, searchable, and easy
 to keep in git. Sync goes through your personal Drive, not through a
 middleman service.
 
-> 📘 **Not sure where to start?** — [How to use it](docs/КАК-ПОЛЬЗОВАТЬСЯ.md)
-> (in Russian): the working order step by step, daily/weekly/monthly rituals,
-> common mistakes. This README is the feature reference; that file is the
-> operating manual. The same help lives inside the app: **F1** or the **"?"**
-> button on the screens.
+> 📘 **Not sure where to start?** — [How to use it](docs/HOW-TO-USE.md):
+> the working order step by step, daily/weekly/monthly rituals, common
+> mistakes. This README is the feature reference; that file is the operating
+> manual. The same help lives inside the app: **F1** or the **"?"** button on
+> the screens. [Русская версия](docs/КАК-ПОЛЬЗОВАТЬСЯ.md) is built from the
+> same text.
 
 ---
 
 ## Contents
 
-- [How to use it](docs/КАК-ПОЛЬЗОВАТЬСЯ.md) ← the working order, step by step
+- [How to use it](docs/HOW-TO-USE.md) ← the working order, step by step
 - [Quick start](#quick-start)
+- [Screenshots](#screenshots)
 - [Core concepts](#core-concepts)
 - [Screens](#screens)
 - [Focus system](#focus-system)
@@ -70,6 +72,11 @@ middleman service.
 
 ## Quick start
 
+There is no prebuilt release yet — the app is built from source (Windows and
+Android).
+
+Build it yourself:
+
 ```bash
 flutter pub get
 flutter build windows --release
@@ -87,11 +94,46 @@ Cross-device sync is optional: without it the app runs fully offline. See
 
 ---
 
+## Screenshots
+
+Captured in the app on demo data, English interface, dark theme. All of them
+live in [`docs/screenshots/`](docs/screenshots).
+
+| Screen | File | What you see |
+|---|---|---|
+| Timer | [`timer.png`](docs/screenshots/timer.png) | Phase, day card, NOW card, "Not going well" |
+| Timer, below | [`timer-planned.png`](docs/screenshots/timer-planned.png) | Sessions with estimates and finish time |
+| Timer, "Done" | [`timer-done.png`](docs/screenshots/timer-done.png) | Today's journal and the daily-goal line |
+| Tasks | [`tasks.png`](docs/screenshots/tasks.png) | Groups, 🐸/⭐, pomodoro counters |
+| Sprint | [`sprint.png`](docs/screenshots/sprint.png) | Weekly milestone, ⭐ tasks, experiment |
+| Course | [`course.png`](docs/screenshots/course.png) | Directions with pace and ETA |
+| Course, milestones | [`course-milestones.png`](docs/screenshots/course-milestones.png) | The ladder and a rung's proofs |
+| Stats, today | [`stats-today.png`](docs/screenshots/stats-today.png) | Tiles, categories, last 14 days |
+| Stats, year | [`stats-year.png`](docs/screenshots/stats-year.png) | 365 days and the activity map |
+| Review → Week | [`review-week.png`](docs/screenshots/review-week.png) | Tiles, causes, best approach |
+| Review → Episodes | [`review-episodes.png`](docs/screenshots/review-episodes.png) | Episode feed with outcomes |
+| Review → Windows | [`review-windows.png`](docs/screenshots/review-windows.png) | The activity tracker for a day |
+| Settings | [`settings.png`](docs/screenshots/settings.png) | Schemes, auto-start, Flowtime |
+| Help | [`help.png`](docs/screenshots/help.png) | Search and the 5-stage adoption path |
+| Episode sheet | [`episode-sheet.png`](docs/screenshots/episode-sheet.png) | "What is getting in the way?" — 7 causes |
+| Approach | [`episode-approach.png`](docs/screenshots/episode-approach.png) | The recommended approach and its record |
+
+<br>
+
+<img src="docs/screenshots/tasks.png" width="49%" alt="Tasks screen">
+<img src="docs/screenshots/review-week.png" width="49%" alt="Weekly review">
+
+<img src="docs/screenshots/course.png" width="49%" alt="Course: directions">
+<img src="docs/screenshots/episode-sheet.png" width="49%" alt="Episode sheet">
+
+---
+
 ## Core concepts
 
 | Concept | What it means |
 |---|---|
 | **Pomodoro** | A work interval (25 min by default). A completed pomodoro is written to the day's journal. |
+| **Session** | A block inside "Today": a set of tasks with their total wall time and a finish time. Its bounds come from the session schedule or the session length. |
 | **Series** | A running count of consecutive pomodoros. Every N pomodoros triggers a long break. Burns out after a long idle stretch. |
 | **Task estimate** | Stored **in minutes**, not checkboxes. Pomodoros = `ceil(minutes / pomodoro length)`. |
 | **Current task** | Always the **top** item in "Planned". Also shown in the "NOW" card. |
@@ -112,12 +154,19 @@ A single-page flow:
 
 1. **Timer** — large digits, a progress bar, color-coded by phase (work —
    tomato, break — green). The header shows the pomodoro number, the series
-   `(N)`, and interruption tick marks `′′`.
+   `(N)`, and interruption tick marks `′′`. Next to it: "+1 min"
+   (Shift — +5), skip the break and a fullscreen button; once stopped, a
+   "skip the phase forward" arrow.
 2. **NOW** — a card for the current task (WIP = 1).
-3. **Planned** — the task list with estimates, a finish-time forecast, and
-   category counters.
-4. **Done** — today's pomodoro journal with focus, idle time and
-   interruptions.
+3. **Planned** — the task list with estimates, a finish-time forecast, category
+   counters and **sessions**: the list is split into blocks titled
+   "Session 1 · 5 🍅 / 2h 35m · by 21:20", keyed to the session schedule or to
+   the session length from Settings. The gear next to the header toggles
+   "New tasks go to the top", "Remove task when a pomodoro finishes it" and
+   offers "Clear list".
+4. **Done** — today's pomodoro journal with focus, idle time and interruptions;
+   the daily-goal line and a per-entry menu ("What was open", "Task windows",
+   "Repeat", "Fill the gaps", "Delete").
 
 The window title shows `MM:SS category` while running — visible from the
 taskbar.
@@ -135,20 +184,21 @@ A full-screen task manager over the same list the timer uses:
 - **Quick-add on top**: smart input, `Enter` — straight to Inbox (capture
   without deciding), `Ctrl+Enter` — to Today, `Ctrl+N` — jump here from
   anywhere in the app;
-- **Collapsible groups** with counters and 🍅 totals: Today / Inbox /
-  Tomorrow / This week / Later / Done this week (collapse state is
-  remembered);
+- **Collapsible groups** with counters and 🍅 totals: Today (with sessions) /
+  Due / Inbox / Tomorrow / This week / Later / Done today / Done this week /
+  Trash (collapse state is remembered);
 - the first Today task is highlighted as **NOW** (WIP = 1);
 - priority = tap 🐸 / tap ⭐ / drag (reordering works inside Planner buckets
-  too);
+  and across sessions);
 - deleting shows an Undo snackbar;
 - wide window (≥1000px) — two columns, narrow — one.
 
 ### Sprint
 
-The weekly milestone, ⭐ sprint tasks, "Done this week", fact tiles (Actual /
-Time / Velocity / Forecast), progress toward the goal, a daily chart, and
-week history.
+The weekly milestone, ⭐ sprint tasks (the "Pick" button opens the Planner),
+"Done this week", fact tiles (Actual / Time / Velocity / Forecast), progress
+toward the goal, a daily chart (tapping a day unfolds its journal) and week
+history. Above the list sits the current **weekly experiment** card.
 
 ### Stats
 
@@ -205,6 +255,24 @@ The first week with episodes is the **observation week**: approaches are not
 offered, so there is something to compare against (a "Help anyway" button is
 there).
 
+### Help
+
+Opens with **F1** or the **"?"** button on the screens, and shows itself on
+first launch. On the left — sections with search (Where to start, How it fits
+together, One day, Week and month, When it is not going, Review and
+experiments, Windows and distractions, AI hints, How to word things, Common
+mistakes, Keys and input, Why it works); on the right — the section text and
+the **5-stage adoption path**: Setup → Observation week → First experiment →
+"If — then" and warm-up → Your own rhythm. Stage checks are derived from your
+data (directions, session windows, episodes with a cause, days with 🐸…); only
+"manual" steps are ticked by hand. The "Open" button on a step jumps to the
+right screen.
+
+At the bottom sits the "Adoption · stage 2 of 5" bar. The same text lives in the
+repository: [`docs/HOW-TO-USE.md`](docs/HOW-TO-USE.md) and
+[`docs/КАК-ПОЛЬЗОВАТЬСЯ.md`](docs/КАК-ПОЛЬЗОВАТЬСЯ.md) — both generated from
+`lib/app/help_content.dart`.
+
 ---
 
 ## Focus system
@@ -213,8 +281,8 @@ On top of the classic timer, a personal focus system:
 
 | Element | How it works |
 |---|---|
-| 🐸 **Frog of the day** | One per day, always at the top of the list. Set from the Planner. **Resets every morning** (05:00 boundary). |
-| ⭐ **Sprint task** | A weekly commitment that moves the milestone. The weekly milestone is a link to a ladder rung, and closing it moves the direction forward permanently. Set from the Planner. **Cleared automatically at the start of a new week.** Starring a task **records the specific rung** as a snapshot, not a live link: when a rung is closed and the next one steps into the sprint, commitments already taken are not re-attributed after the fact. A closed ⭐ task goes both to "Done this week" and to the rung's **proofs** — under a milestone you can see what actually closed it. |
+| 🐸 **Frog of the day** | One per day, always at the top of the list. Set by tapping 🐸 on the Tasks screen or in the Planner (Sprint → "⭐ Pick"). **Resets every morning** (05:00 boundary). |
+| ⭐ **Sprint task** | A weekly commitment that moves the milestone. The weekly milestone is a link to a ladder rung, and closing it moves the direction forward permanently. Set by tapping ⭐ on the Tasks screen or in the Planner. **Cleared automatically at the start of a new week.** Starring a task **records the specific rung** as a snapshot, not a live link: when a rung is closed and the next one steps into the sprint, commitments already taken are not re-attributed after the fact. A closed ⭐ task goes both to "Done this week" and to the rung's **proofs** — under a milestone you can see what actually closed it. |
 | **NOW (WIP = 1)** | One task in progress — the top of the list. |
 | **Flowtime** | The pomodoro finishes — the timer quietly keeps counting up (`+ MM:SS`) until you press "Done". Doesn't break your flow. Toggled in Settings. |
 | **"Where did you leave off?"** | Stopping a running pomodoro asks a one-line question. The answer goes into the day journal's `## Notes`. Skippable. |
@@ -229,9 +297,11 @@ On top of the classic timer, a personal focus system:
 | **Overload warning** | More than 3 tasks in a day → a reminder about "🐸 + 2 tasks". |
 | **Frog stat** | "🐸 N / M" — days with a frog out of **active** days. No streak. |
 
-**Buckets ≠ sprint.** The Planner (Inbox / Tomorrow / This week / Later) is
-about **due dates**. The sprint is only ⭐. A task can be in Inbox and in the
-sprint at the same time.
+**Buckets ≠ sprint.** The Planner (Due / Inbox / Tomorrow / This week / Later) is
+about **due dates**; it opens from Sprint with the "⭐ Pick" button. Inside,
+a "Today" tab shows the same sessions as the timer, plus four buckets with
+🐸/⭐ toggles, due dates and counters. The sprint is only ⭐. A task can be in
+Inbox and in the sprint at the same time.
 
 **Category = project.** Categories are now grouped into **directions**
 (strategic 3–12 month level), while Obsidian remains the place for "why"
@@ -288,6 +358,11 @@ always reach the other device together.
 On first launch data is migrated automatically from whatever was there before:
 tasks from `tasks.json`, journal and sprints from the vault's markdown. The
 source files are not deleted — deleting `data.json` rolls everything back.
+
+Next to it in the same folder live `settings.json` (settings, OAuth and AI
+keys — **never** synced), `timer_state.json` (timer state used for restore) and
+`activity.json` — the Windows window tracker: 60 days inside pomodoros, 14 days
+outside them; it never goes to sync or to the AI.
 
 Markdown in the storage folder (`…\Obsidian\Помодоро` by default) is a set of
 **read-only mirrors**:
@@ -512,7 +587,13 @@ instead of release), or the clients are spread across separate projects.
 - auto-start pomodoro after a break / break after a pomodoro / only if tasks
   are queued;
 - **Flowtime**;
-- daily goal (0 — none), default sprint goal (40).
+- daily goal (0 — none, capped at 32), default sprint goal (40);
+- **session length** (3 h by default, fractional allowed) and a **session
+  schedule** — windows like `10:00–13:00`, `13:00–15:00`. With a schedule the
+  Today lists split along those windows and a session's capacity is the window
+  length; whatever does not fit becomes a tail sized by the session length. The
+  schedule also sets the reference point for the "first pomodoro" metric in
+  Review and the window inside which idle reminders are sent.
 
 ### Notifications
 
@@ -602,23 +683,33 @@ Flutter 3.44 / Dart 3.12, Windows desktop + Android. Layers:
 
 ```
 lib/
-├── app/            # strings.dart (all text, ru/en), theme.dart (all colors)
+├── app/            # strings.dart (all text, ru/en), theme.dart (all colors),
+│                   # help_content.dart (help text and the adoption path)
 ├── core/           # failure.dart
 ├── domain/
-│   ├── entities/   # PomoTask, PomoSession, DayLog, Sprint, AppSettings
+│   ├── entities/   # PomoTask, PomoSession, DayLog, Sprint, Direction, Episode,
+│   │               # Experiment, AppSettings
+│   ├── insights.dart      # week metrics, approach success, experiment verdict
+│   ├── strategies.dart    # causes, approaches, ranking
+│   ├── adoption.dart      # adoption stages and auto-checks
 │   └── repositories.dart
 ├── data/
 │   ├── markdown_codec.dart       # pure serialize/parse (test-covered)
 │   ├── data_merge.dart           # merging two data.json snapshots (pure)
 │   ├── json_data_repository.dart # data.json: truth, migration, tombstones, mirrors
+│   ├── activity_store.dart       # activity.json: windows and tabs (Windows)
 │   ├── vault_repositories.dart   # vault access, inbox, settings
 │   └── timer_state_store.dart
 ├── presentation/
-│   ├── cubits/     # timer, tasks, journal, sprint, stats, settings, sync
-│   ├── screens/    # timer, tasks, sprint, stats, planner_dialog, settings_dialog
-│   ├── widgets/    # common.dart
+│   ├── cubits/     # timer, tasks, journal, sprint, stats, settings, sync,
+│   │               # insight, activity, directions
+│   ├── screens/    # timer, tasks, sprint, course, stats, insight, help,
+│   │               # planner_dialog, settings_dialog
+│   ├── widgets/    # common.dart, day_card, episode_sheet, ips_dialog,
+│   │               # windows_dialog, cause_chips, ai_consent
 │   └── home_shell.dart
 ├── services/       # sound_service (WAV-synthesized sounds), notify_service,
+│                   # nudge_service, activity_tracker, ai_service,
 │                   # sync_auth (per-platform OAuth), drive_sync_service
 └── main.dart       # dependency wiring, 🐸/⭐ rollover
 ```
@@ -645,10 +736,26 @@ lib/
 ```bash
 flutter pub get
 flutter analyze          # should be clean
-flutter test             # 635 tests
+flutter test             # 633 tests
 flutter run -d windows   # debug
 flutter build windows --release
 flutter build apk --release
+```
+
+### Documentation
+
+| File | What it is |
+|---|---|
+| [`README.md`](README.md) / [`README.en.md`](README.en.md) | the feature reference |
+| [`docs/HOW-TO-USE.md`](docs/HOW-TO-USE.md) / [`docs/КАК-ПОЛЬЗОВАТЬСЯ.md`](docs/КАК-ПОЛЬЗОВАТЬСЯ.md) | the operating manual; **generated** from `lib/app/help_content.dart` |
+| [`CHANGELOG.md`](CHANGELOG.md) | version history |
+| [`BUGS.md`](BUGS.md) | post-mortems of the defects found and fixed |
+
+Help text is edited **only** in `help_content.dart` (ru and en stay in
+lockstep), after which both documents are regenerated:
+
+```bash
+UPDATE_HELP_DOC=1 flutter test test/help_doc_test.dart
 ```
 
 ### Android
@@ -675,6 +782,10 @@ may need to clear the Windows icon cache (`IconCache.db` + restart Explorer).
 
 ### Tests
 
+`flutter test` — 633 tests across 50 files. The manual
+(`docs/КАК-ПОЛЬЗОВАТЬСЯ.md`, `docs/HOW-TO-USE.md`) is generated from
+`help_content.dart` and verified by a test.
+
 - `test/markdown_codec_test.dart` — round-trip of tasks, journal (🐸, `|`,
   overnight pomodoros), sprint, `Курс.md` mirror (checkboxes, empty fields, `order`);
   the focus formula; logical date; ISO weeks.
@@ -682,9 +793,41 @@ may need to clear the Windows icon cache (`IconCache.db` + restart Explorer).
   `test/course_screen_test.dart`, `test/directions_cubit_test.dart` —
   course domain functions (ladders, velocity, completion ETA, attention budget),
   direction and milestone merging, state management, and the Course screen.
+- `test/insights_test.dart`, `test/insight_cubit_test.dart`,
+  `test/insight_entities_test.dart`, `test/insight_merge_test.dart`,
+  `test/insight_repository_test.dart`, `test/insight_screen_test.dart` —
+  week metrics, approach success, experiment verdict, merging of episodes,
+  well-being and IPS, storage, and the whole Review screen.
+- `test/strategies_test.dart` — causes, approaches and ranking.
+- `test/episode_sheet_test.dart`, `test/insight_markdown_test.dart` — the
+  Episode sheet and the self-observation mirrors (`## Самочувствие`,
+  `## Откладывания`, `## Эксперимент`).
+- `test/activity_tracker_test.dart`, `test/idle_segments_test.dart`,
+  `test/windows_dialog_test.dart` — the window tracker: segments, idle time,
+  browser tabs, windows outside pomodoros, and the "Task windows" /
+  "What was open instead" dialogs.
+- `test/nudge_service_test.dart`, `test/frog_rollover_test.dart` —
+  procrastination signals, the "when" rules and session windows, 🐸/⭐ rollover.
+- `test/p08_start_plan_test.dart`, `test/day_card_test.dart` — the start plan
+  (first step, "if — then") and the Day card.
+- `test/session_split_test.dart` — splitting the Today list into sessions by
+  length and by the schedule windows.
+- `test/help_content_test.dart`, `test/help_doc_test.dart`,
+  `test/help_places_test.dart`, `test/help_screen_test.dart`,
+  `test/help_shell_test.dart`, `test/adoption_test.dart` — help text, document
+  generation, search, the adoption path and its auto-checks.
+- `test/ai_service_test.dart`, `test/ai_widgets_test.dart` — DeepSeek answer
+  validation, consent and the ✨ widgets.
 - `test/timer_cubit_test.dart` — pomodoro/break cycle, series, pause and
   interruptions, stop, skip, prolong, smart input.
-- `test/stats_frog_test.dart` — counting days with a frog.
+- `test/timer_screen_test.dart`, `test/tasks_screen_test.dart` — the main
+  screen and the task manager at phone and wide widths, the direction thread,
+  and the absence of the Planner button on the timer.
+- `test/stats_frog_test.dart`, `test/stats_screen_test.dart` — counting days
+  with a frog, and the stats layout (a width bug once broke it).
+- `test/sprint_milestone_test.dart`, `test/star_milestone_test.dart`,
+  `test/sprint_done_week_test.dart`, `test/day_and_sprint_details_test.dart` —
+  the weekly milestone, the ⭐ rung snapshot, "Done this week", day details.
 - `test/strings_test.dart` — interface language switching, localized time
   units.
 - `test/json_data_repository_test.dart` — migration of tasks and journal,
@@ -692,15 +835,14 @@ may need to clear the Windows icon cache (`IconCache.db` + restart Explorer).
   days, mirrors (including `Курс.md`), the inbox file, `applyRemote`.
 - `test/data_merge_test.dart` — merging: union by id, delete-wins in both
   directions, survival of unknown sections, idempotence.
-- `test/tasks_cubit_planner_test.dart` — bucket reordering, editing, the
-  trash, serialized disk writes.
-- `test/drive_sync_test.dart` — the Drive sync algorithm: push/pull, merge on
+- `test/tasks_cubit_planner_test.dart`, `test/planner_buckets_test.dart`,
+  `test/planner_edit_test.dart` — bucket reordering and editing, the trash,
+  serialized disk writes.
+- `test/drive_sync_test.dart`, `test/sync_regressions_test.dart`,
+  `test/sync_auth_test.dart` — the Drive sync algorithm (push/pull, merge on
   first connect and on conflict, dirty-flag survival, sign-in called exactly
-  once.
-- `test/sync_auth_test.dart` — decisions made before Google sign-in is
-  initialized (it can't be initialized twice per launch).
-- `test/stats_screen_test.dart` — the stats screen lays out at phone and wide
-  widths (a layout mistake once broke the whole screen).
+  once), regressions of the sync defects, and what is decided before Google
+  sign-in is initialized.
 
 ---
 
